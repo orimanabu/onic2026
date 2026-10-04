@@ -38,7 +38,7 @@ Part IV   Network Device Driver Framework Evolution
           netdev-genl / Rust driver abstractions
 
 Part V    observability / explainability
-          eBPF + BTF → skb_drop_reason → Retis / pwru
+          eBPF + BTF → skb_drop_reason → queue/NAPI/page_pool observability
 
 Part VI   synthesis
           release間比較と全体architecture map
@@ -699,7 +699,16 @@ RFC / review
     ≠ released tag
 ```
 
-Grade は `A / A-rc / B / C / D` を用い、定義もこの表を生成する canonical
+Grade の定義は次のとおりであり、この文書自体にも保持する。
+
+- **A**: released milestone で、release/mainline evidence が十分に確認済み。
+- **A-rc**: 現在の未リリース cycle について Linus mainline への merge を確認済み。
+- **B**: release/cycle attribution は強いが、exact commit/tag boundary の一部が未確定。
+- **C**: development boundary または release attribution が引き続き監査対象。
+- **D**: RFC/design evidence のみで、mainline/release fact として扱わない。
+
+C/D は現在の canonical milestone table では使用していないが、将来の監査対象を表すため grade scheme として定義を残す。
+
 dataset に保持します。
 
   ----------------------------------------------------------------------------------------------------------------
@@ -761,7 +770,7 @@ dataset に保持します。
   4.13              SOCK_OPS; kTLS TX; TCP-internal   A                 release
                     pacing/fallback generation                          
 
-  4.14              phylink; SOCKMAP; TCP             A                 release; exact phylink/TCP-ZC anchors;
+  4.14              phylink; SOCKMAP; TCP             A                 release; exact phylink / TCP `MSG_ZEROCOPY` send-side anchors;
                     MSG_ZEROCOPY; XDP devmap                            devmap documented since 4.14
 
   4.15              XDP cpumap                        A                 kernel docs explicitly document cpumap
@@ -827,14 +836,9 @@ dataset に保持します。
   6.2               TCP PLB; XFRM/IPsec packet        A                 release; exact XFRM anchor
                     offload                                             
 
-  6.3               YNL/YAML Netlink                  A                 first released generation is v6.3; origin
-                    specification/tooling generation                    commit is contained in v6.3-rc1
-                    (`Documentation/netlink/specs`,                     
-                    generated C code,                                   
-                    `tools/net/ynl`)                                    
-
-  6.3               IPv4 BIG TCP                      A                 release; exact commit set
-
+  6.3               YNL/YAML Netlink tooling;          A                 YNL origin contained in v6.3-rc1; IPv4 BIG TCP release
+                    IPv4 BIG TCP                                        attribution confirmed; detailed BIG TCP commit set is
+                                                                        not reproduced in Part VII
   6.6               AF_XDP multi-buffer; TCX /        A                 release; TCX/bpf_mprog present in v6.6
                     bpf_mprog multi-program                             sources
                     attachment                                          
@@ -875,6 +879,10 @@ dataset に保持します。
                     accepted ADD_ADDR 8→64; endpoints                   contained in v7.2-rc1
                     8→255                                               
   ----------------------------------------------------------------------------------------------------------------
+
+| 7.3-rc / mainline | BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE | A-rc | net-next-7.3 merged 2026-08-20; final 7.3 pending |
+
+**7.3 status note:** 調査基準日時点では final 7.3 は未リリースのため `A-rc` とする。正式リリースを確認した時点で `A` へ更新する。
 
 **MPTCP endpoint-limit note:** the effective endpoint maximum is
 **255**, not 256: the endpoint ID is an 8-bit value and ID 0 is
@@ -1120,10 +1128,11 @@ v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、2026 の netkit queue leasing
 ### TCP
 
 ``` text
-v5.0 (EDT pacing already present since 4.20)
+TCP zero-copy RX (`TCP_ZEROCOPY_RECEIVE`, 4.18)
+  ↓
+v5.0 era (EDT pacing already present since 4.20)
   ├─ BPF congestion control
   ├─ MPTCP (5.6)
-  ├─ TCP zero-copy RX (`TCP_ZEROCOPY_RECEIVE`, 4.18)
   ├─ BIG TCP (5.19)
   ├─ TCP-AO/security
   ├─ Device Memory TCP
@@ -2099,7 +2108,7 @@ commit in the feature series.
   SO_REUSEPORT            `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a`   `soreuseport: infrastructure`
   infrastructure                                                       
 
-  nftables core           `96518518cc41...`                            `netfilter: add nftables` --- core origin anchor
+  nftables core           `96518518cc417bb0a8c80b9fb736202e28acdf96`                            `netfilter: add nftables` --- core origin anchor
 
   nftables set API        `20a69341f2d00cd042e81c82289fba8a13c05a25`   set-API anchor; not the core origin
 
@@ -2151,7 +2160,8 @@ prerequisite in the later tunnel-BIG-TCP lineage.
   ---------------------- ------------- ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   queue leasing          A             RX side is merged; TX queue leasing remains PoC/design in the cited 2026 discussion; Linux 7.1 attribution confirmed; revised merge is contained in v7.1-rc1
 
-  Queue-leasing release  initial merge 38fc...`and revert`8766d61a1d33...`were both part of the v7.0 merge-window development history and never appeared in the v7.0 release. The revised RX implementation`15089225889b...\`
+**Queue-leasing release boundary:** initial merge `77b9c4a438fc...` と revert `8766d61a1d33...` はともに v7.0 merge window 内の development history で相殺され、v7.0 release には含まれない。revised RX implementation `15089225889b...` は v7.1-rc1 に含まれる。TX queue leasing は未 merge である。
+
   boundary:\*\* the      \`77b9c4a4    is contained in v7.1-rc1. TX queue leasing remains unmerged.
 
   devmem buffers \>      A for 7.3     explicitly listed in the `net-next-7.3` pull merged to Linus mainline
@@ -2162,12 +2172,10 @@ prerequisite in the later tunnel-BIG-TCP lineage.
 
   DIM / `net_dim`        B             Linux 4.16 Net DIM generation; Linux 5.3 common `lib/dim` generalization; exact SHAs pending
 
-  `cake_mq`              A/B           `net-next-7.0` pull explicitly lists multi-queue-aware `sch_cake`; canonical generation Linux 7.0
+  `cake_mq`              A             `net-next-7.0` pull explicitly lists multi-queue-aware `sch_cake`; canonical generation Linux 7.0
 
-  queue-leasing          B             verified: `77b9c4a438fc...` → revert `8766d61a1d33...` → re-merge `15089225889b...`; RX only, TX remains PoC
   merge/revert/remerge                 
   -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 # Appendix --- Source index（非正規）
 
 Appendix は chronology や lineage を再定義しません。正本は以下です。
