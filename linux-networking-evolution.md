@@ -7,7 +7,7 @@ title: Linux Networking Evolution
 > **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras, Parts III–V the lineages / driver-framework / observability story. Part VI is the only normative release chronology, Part VII the provenance ledger, and Appendix material is supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02  
-**構成改訂:** 2026-10-04（r22）
+**構成改訂:** 2026-10-04（r23）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
@@ -127,7 +127,7 @@ DRIVER FRAMEWORK  switchdev / devlink / phylink / DIM / common driver contracts
 
 この分布は Era の違いも示す。Era 1 では accounting / API の基礎、Era 2–3 では reusable object / programmability、Era 4 では assignment / lifetime / synchronization の明示化が目立つ。ただし 各 Era は重なりを許し、この表は厳密な periodization ではない。
 
-この表は release attribution の正本ではない。version と evidence grade は Part VI に従う。
+この表は release attribution の正本ではない。version と Evidence class は Part VI に従う。
 
 ### この thesis が説明しないもの
 
@@ -181,22 +181,9 @@ v3.x は release-by-release に読むより、後の Linux networking を支え�
 
 v3.x では「どこに、どれだけ packet / byte を滞留させるか」を複数レイヤーで制御する仕組みが整った。
 
-``` text
-TCP socket layer
-  TSQ · TCP pacing
-          │
-          ▼
-qdisc / scheduling layer
-  CoDel · fq_codel · sch_fq
-          │
-          ▼
-driver / NIC queue layer
-  DQL / BQL
-```
+この foundation は **socket / qdisc / driver-NIC の3層が同じ queue-pressure 問題を別々に扱い始めたこと**を指す。詳細な3層図と後続の BBR / EDT / CAKE / AQL / cake_mq は、直後の `Queueing / latency / pacing` に集約する。
 
-これは一本の派生 lineage ではない。BQL は driver TX queue の outstanding byte accounting / backpressure、CoDel/fq_codel は qdisc の delay/fairness、TSQ は socket 単位の送信滞留、 sch_fq/TCP pacing は packet の送出時刻を扱う。異なるレイヤーが同じ **queueing / latency / burst control** という設計課題を補完的に扱うようになった。
-
-この foundation の上に、後の BBR、SO_TXTIME、EDT、CAKE、multi-queue-aware scheduling が加わる。 したがって本書では、これを「BQL が CoDel を生み、CoDel が TSQ を生んだ」という因果列ではなく、 **Linux TX latency-control stack の多層化**として扱う。
+Era 1 で重要なのは、BQL、CoDel/fq_codel、TSQ、sch_fq/TCP pacing が単一の後継系列ではなく、queueing / latency / burst control を異なる層で扱う foundation を形成したことである。
 
 ### Virtualization / control foundation
 
@@ -285,12 +272,9 @@ v5.19 BIG TCP は kernel internal GRO/GSO aggregate の 64KiB 制約を緩和し
 GRO/GSO
   ↓
 IPv6 BIG TCP (5.19)
-  ↓
-IPv4 BIG TCP (6.3)
-  ↓
-IPv6 BIG TCP without synthetic HBH jumbo header (Linux 7.0)
-  ↓
-BIG TCP over VXLAN / GENEVE (7.3-rc/mainline)
+  ⇒ IPv4 BIG TCP (6.3)
+  ⇒ IPv6 BIG TCP without synthetic HBH jumbo header (Linux 7.0)
+  ⇒ BIG TCP over VXLAN / GENEVE (7.3-rc/mainline)
 ```
 
 PPPoE GRO/GSO のような encapsulation-specific aggregation も、同じ PERFORMANCE 軸で per-packet cost を減らすが、BIG TCP の派生機能ではない。
@@ -360,6 +344,28 @@ large RX buffers や `>PAGE_SIZE` devmem buffer の拡張は、この model が 
 
 DIBS は shared-memory communication 側の別 lineage であり、この packet-memory contract の 直接の predecessor/successor ではない。本書の canonical packet-networking story には昇格させない。
 
+## io_uring networking
+
+6.0 の SEND_ZC / multishot receive と 6.15 の ZCRX を同じ lineage で扱い、TCP 節には重複記載しない。
+
+TCP `MSG_ZEROCOPY` は send-side copy avoidance の先行 milestone であり、後の io_uring `SEND_ZC` と 同一 API ではないが、userspace↔kernel の data movement cost を減らす PERFORMANCE lineage の 重要な前段として扱う。
+
+``` text
+sendmsg / recvmsg
+      ↓
+zero-copy TX
+      ↓
+multishot / registered buffers
+      ↓
+zero-copy RX (6.15)
+      ↓
+memory-provider / device-memory integration
+```
+
+目標は syscall reduction だけではなく、 NICからuserspaceまでの buffer ownership/lifetime の効率化にある。
+
+------------------------------------------------------------------------
+
 ## XDP / AF_XDP
 
 v5.0 時点で XDP/AF_XDP は存在した。その後の本質は周辺 infrastructure の成熟。ここで XDP → AF_XDP → netkit / queue leasing を単純な派生関係とはみなさない。 XDP は native driver mode、generic/SKB mode、hardware offload で実行位置・性能特性・必要な driver support が異なり、 AF_XDP や queue leasing は queue ownership / zero-copy という共通課題から並行して発展した面を持つ。
@@ -393,9 +399,9 @@ one packet
 
 への重要な変更である。
 
-------------------------------------------------------------------------
-
 XDP multi-buffer / frags は、single contiguous buffer を暗黙の前提にしていた XDP packet model を multi-buffer packet へ拡張した。6.6 の AF_XDP multi-buffer は同じ multi-buffer problem を userspace zero-copy path へ接続するが、native/generic/offload XDP mode の差を消すものではない。
+
+------------------------------------------------------------------------
 
 ## BPF — packet filter から stack extension へ
 
@@ -420,8 +426,6 @@ TC direct packet access、devmap/cpumap、SK_MSG、flow dissector、`struct_ops`
 
 ここで下段は上段の単純な後継ではない。5.x～6.x にかけて **適用範囲と attachment point が 独立・並行して追加された**結果として、packet、socket、protocol algorithm、virtual device、 queue/datapath まで programmability の対象が広がった、と読む。
 
-------------------------------------------------------------------------
-
 ### USENIX research から見える「kernel bypass → in-kernel extensibility」の流れ
 
 USENIX の研究を併せて読むと、Linux networking の programmability が解こうとしてきた問題を別の角度から確認できる。
@@ -441,6 +445,8 @@ eTran (NSDI 2025):
 mTCP は Linux kernel TCP processing の CPU cost に対して user-level TCP stack を採った。一方 Electrode と DINT は、kernel bypass の security / isolation / maintainability 上の trade-off を避けながら、XDP/eBPF により frequent path を kernel 内で処理する。eTran はさらに TCP/DCTCP や Homa のような transport design を eBPF ベースの extensible kernel transport として扱う。この研究史は、**kernel を単に迂回するのではなく、kernel の ownership / protection model を保ったまま fast path や protocol behavior を programmable にする**という方向を補強する。
 
 これらは upstream Linux release milestone ではないため Part VI には追加せず、architecture の動機を説明する research evidence として扱う。
+
+------------------------------------------------------------------------
 
 ## Virtual networking — datapath と queue assignment の並行進化
 
@@ -467,7 +473,7 @@ queue / zero-copy assignment:
   AF_XDP / io_uring ↔ RX HW queue leasing
 ```
 
-`∥` は parallel evolution、`↔` は相互作用する別 lineage を表す。netkit は veth の単純な後継ではなく、 RX HW queue leasing も netkit から派生した機能ではない。queue lease は virtual-device queue と physical-device queue の対応を明示し、AF_XDP や memory-provider 型の queue-bound API を container/virtual-device 側から利用可能にする **assignment mechanism** として位置付ける。
+netkit は veth の単純な後継ではなく、RX HW queue leasing も netkit から派生した機能ではない。queue lease は virtual-device queue と physical-device queue の対応を明示し、AF_XDP や memory-provider 型の queue-bound API を container/virtual-device 側から利用可能にする **assignment mechanism** として位置付ける。
 
 v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、v7.1 RX HW queue leasing に共通して見える方向性は、 full kernel bypass そのものではなく、**kernel の control / protection model を維持しながら data movement と datapath overhead を減らす選択肢を増やしたこと**である。
 
@@ -547,11 +553,11 @@ RTNL は:
 
 ``` text
 global RTNL
- → unlocked operations
- → RCU readers
- → per-netns RTNL
- → subsystem locks/refcounts
- → RTNL-less FIB rule updates (7.3-rc/mainline)
+ ⇒ unlocked operations
+ ⇒ RCU readers
+ ⇒ per-netns RTNL
+ ⇒ subsystem locks/refcounts
+ ⇒ RTNL-less FIB rule updates (7.3-rc/mainline)
 ```
 
 7.3向けnetworking pullでは `RTM_NEWRULE` / `RTM_DELRULE` のFIB rule変更が RTNL-lock-less化され、further RTNL-dependency reductionやlock-less GET準備と 同じ「global RTNL依存を減らす」流れとしてmainlineへ入った。
@@ -575,28 +581,6 @@ hardware offload
 一方で BPF と nftables は単純な新旧置換ではない。
 
 conntrack では performance だけでなく lifetime/GC、per-netns scalability、 hardware flow offload race、BPF kfunc access が重要なテーマとなった。
-
-------------------------------------------------------------------------
-
-## io_uring networking
-
-6.0 の SEND_ZC / multishot receive と 6.15 の ZCRX を同じ lineage で扱い、TCP 節には重複記載しない。
-
-TCP `MSG_ZEROCOPY` は send-side copy avoidance の先行 milestone であり、後の io_uring `SEND_ZC` と 同一 API ではないが、userspace↔kernel の data movement cost を減らす PERFORMANCE lineage の 重要な前段として扱う。
-
-``` text
-sendmsg / recvmsg
-      ↓
-zero-copy TX
-      ↓
-multishot / registered buffers
-      ↓
-zero-copy RX (6.15)
-      ↓
-memory-provider / device-memory integration
-```
-
-目標は syscall reduction だけではなく、 NICからuserspaceまでの buffer ownership/lifetime の効率化にある。
 
 ------------------------------------------------------------------------
 
@@ -1103,7 +1087,7 @@ Part IVで説明した queue、NAPI、page_pool のobject化は、control plane�
 4.1   kprobe-attached eBPF / tracing foundation
   ∥
 5.17  kfree_skb_reason / structured drop-reason foundation
-  ↓
+  ⇒
 5.19  drop-reason coverage expansion
   ∥
 6.8   queue/NAPI netdev-genl visibility
@@ -1248,7 +1232,7 @@ Evidence class は次の語彙だけを用いる。
 | 5.3     | DIM generalized into lib/dim           | DRIVER FRAMEWORK | —                    | GENERATION     |
 | 5.5     | mac80211 AQL                           | PERFORMANCE      | —                    | TAG            |
 | 5.6     | MPTCP                                  | —                | TRANSPORT            | TAG            |
-| 5.6     | WireGuard                              | —                | VIRTUAL / OVERLAY | TAG            |
+| 5.6     | WireGuard                              | —                | SECURITY / VIRTUAL / OVERLAY | TAG            |
 | 5.6     | BPF struct_ops / TCP CC                | PROGRAMMABILITY  | TRANSPORT            | TAG            |
 | 5.6     | ethtool Generic Netlink                | DRIVER FRAMEWORK | —                    | TAG+ANCHOR     |
 | 5.9     | BPF_PROG_TYPE_SK_LOOKUP                | PROGRAMMABILITY  | —                    | TAG+ANCHOR     |
@@ -1302,7 +1286,7 @@ Evidence class は次の語彙だけを用いる。
 
 ### provenance 正規化を残す architecture-critical items
 
-`netmem`、memory providers、page_pool introspection、BTF、vDPA は本文の architecture story 上重要だが、 この版では origin / integration / enablement のどれを1行の canonical milestone とするかを 一次 evidence で再正規化できていない。したがって release を推測して B/GENERATION 行を作らず、 Part VII の **Open provenance items** に明示的に残す。
+`netmem`、memory providers、page_pool introspection、BTF、vDPA は本文の architecture story 上重要だが、 この版では origin / integration / enablement のどれを1行の canonical milestone とするかを 一次 evidence で再正規化できていない。**したがって Part VI に行がないことは意図的であり、重要度が低いことを意味しない。** release を推測して `GENERATION` 行を作らず、Part VII の **Open provenance items** に明示的に残す。
 
 ## Part VI から Part VII へ — chronology から provenance へ
 
@@ -1316,47 +1300,37 @@ Part VI は「いつ」を正規化し、Part VII はその attribution を再�
 
 ## Exact mainline anchor inventory
 
-ここに示すのは代表的な **anchor commit** であり、feature series の全commitを列挙するものではない。
+ここに示すのは feature series の全 commit ではなく、再監査可能な代表 anchor である。`Anchor type` は `origin / integration / enablement / merge` の役割を示す。`First containing tag` を本版で再正規化していない項目は `open` とし、推測で補わない。
 
-以下は exact commit と release containment を保持する anchor inventory である。
+| Item | Anchor type | Exact mainline anchor | Subject / role | First containing tag |
+|---|---|---|---|---|
+| DQL | origin | `75957ba36c05b979701e9ec64b37819adc12f830` | `dql: Dynamic queue limits` | open |
+| CoDel | origin | `76e3cc126bb223013a6b9a0e2a51238d1ef2e409` | CoDel qdisc core anchor | open |
+| SO_REUSEPORT infrastructure | origin | `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a` | `soreuseport: infrastructure` | open |
+| nftables core | origin | `96518518cc417bb0a8c80b9fb736202e28acdf96` | `netfilter: add nftables` | open |
+| nftables set API | integration | `20a69341f2d00cd042e81c82289fba8a13c05a25` | set-API anchor; not core origin | open |
+| devlink | origin | `bfcd3a46617209454cfc0947ab093e37fd1e84ef` | `Introduce devlink infrastructure` | v4.6-rc1 |
+| BBR | origin | `0f8782ea14974ce992618b55f0c041ef43ed0b78` | initial BBR mainline anchor | open |
+| phylink | origin | `9525ae83959b60c6061fe2f2caabdc8f69a48bc6` | `phylink: add phylink infrastructure` | open |
+| netdevsim | origin | `83c9e13aa39aed5cf9a2f8dd69770b7c35ba1281` | hardware-independent offload test device | v4.16-rc1 |
+| SK_MSG | enablement | `4f738adba30a7cfc006f605707e7aee847ffefa0` | socket-message verdict / `BPF_PROG_TYPE_SK_MSG` | open |
+| TCP MSG_ZEROCOPY | enablement | `f214f915e7db99091f1312c48b30928c1e0c90b7` | `tcp: enable MSG_ZEROCOPY` | open |
+| page_pool origin | origin | `ff7d6b27f894f1469dc51ccb828b7363ccd9799f` | page_pool core origin anchor | open |
+| page_pool/XDP integration | integration | `60bbf7eeef10dc647430646d7fe5e3d8d132dbec` | mlx5 page_pool/XDP integration | open |
+| ethtool Generic Netlink | origin | `2b4a8990b7df55875745a80a609a1ceaaf51f322` | `ethtool: introduce ethtool netlink interface` | open |
+| SK_LOOKUP | origin | `e9ddbb7707ff5891616240026062b8c1e29864ca` | dedicated SK_LOOKUP program type / attach point | open |
+| auxiliary bus | origin | `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` | `Add auxiliary bus support` | v5.11-rc1 |
+| IPv6 BIG TCP / GRO | enablement | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | allow `gro_max_size` > 65536 | open |
+| IPv6 BIG TCP / GSO | enablement | `7c4e983c4f3cf94fcd879730c6caa877e0768a4d` | allow `gso_max_size` > 65536 | open |
+| XFRM packet offload | enablement | `d14f28b8c1de668bab863bf5892a49c824cb110d` | add packet offload flag | open |
+| netkit | origin | `35dfaad7188cdc043fde31709c796f5a692ba2bd` | netkit core anchor | open |
+| Rust PHY abstractions | integration | `f20fd5449ada3872dcd67aca397f0e27ca2e8ad6` | Rust core abstractions for network PHY drivers | v6.8-rc1 |
+| netdev-genl queue object | integration | `bc877956272f0521fef107838555817112a450dc` | YAML spec for queue object | v6.8-rc1 |
+| MPTCP subflow / accepted ADD_ADDR limits | enablement | `c8646664fbf1c0beb0990cef391cb52d3c909e78` | limits expanded to 64 | open |
+| MPTCP endpoint limit | enablement | `e845e6397d78bf6b842cfa8b5818ca8189f7e22e` | endpoint limit expanded to 255 | open |
+| net-next 7.3 merge | merge | `91ec2035134982b98fab0609a9fd8480e8217dc1` | merge tag `net-next-7.3` | mainline snapshot |
 
-| Item                     | Exact mainline anchor                                                                                          | First containing tag |
-|:-------------------------|:---------------------------------------------------------------------------------------------------------------|:---------------------|
-| devlink                  | `bfcd3a46617209454cfc0947ab093e37fd1e84ef` — `Introduce devlink infrastructure`                                | v4.6-rc1             |
-| netdevsim                | `83c9e13aa39aed5cf9a2f8dd69770b7c35ba1281`                                                                     | v4.16-rc1            |
-| auxiliary bus            | `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` — `Add auxiliary bus support`                                       | v5.11-rc1            |
-| Rust PHY abstractions    | `f20fd5449ada3872dcd67aca397f0e27ca2e8ad6` — `rust: core abstractions for network PHY drivers`                 | v6.8-rc1             |
-| netdev-genl queue object | `bc877956272f0521fef107838555817112a450dc` — `netdev-genl: spec: Extend netdev netlink spec in YAML for queue` | v6.8-rc1             |
-
-Net DIMについては、algorithm自体は4.16以前からmlx5e内に存在しており、4.16は「共通libraryへの切り出し」という表現を維持する。本版では、提示されたDIM SHAを一次Git objectとして再確認できていないため exact inventory への追加は保留する。
-
-| Feature                     | Mainline anchor                            | Subject / role                                                        |
-|:----------------------------|:-------------------------------------------|:----------------------------------------------------------------------|
-| DQL                         | `75957ba36c05b979701e9ec64b37819adc12f830` | `dql: Dynamic queue limits`                                           |
-| CoDel                       | `76e3cc126bb223013a6b9a0e2a51238d1ef2e409` | CoDel qdisc core anchor                                               |
-| SO_REUSEPORT infrastructure | `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a` | `soreuseport: infrastructure`                                         |
-| nftables core               | `96518518cc417bb0a8c80b9fb736202e28acdf96` | `netfilter: add nftables` — core origin anchor                        |
-| nftables set API            | `20a69341f2d00cd042e81c82289fba8a13c05a25` | set-API anchor; not the core origin                                   |
-| BBR                         | `0f8782ea14974ce992618b55f0c041ef43ed0b78` | initial BBR mainline anchor                                           |
-| phylink                     | `9525ae83959b60c6061fe2f2caabdc8f69a48bc6` | `phylink: add phylink infrastructure`; Linux 4.14                     |
-| TCP MSG_ZEROCOPY            | `f214f915e7db99091f1312c48b30928c1e0c90b7` | `tcp: enable MSG_ZEROCOPY`                                            |
-| page_pool origin            | `ff7d6b27f894f1469dc51ccb828b7363ccd9799f` | `page_pool: refurbish version of page_pool code`                      |
-| page_pool/XDP integration   | `60bbf7eeef10dc647430646d7fe5e3d8d132dbec` | mlx5 page_pool/XDP integration anchor                                 |
-| ethtool Generic Netlink     | `2b4a8990b7df55875745a80a609a1ceaaf51f322` | `ethtool: introduce ethtool netlink interface`                        |
-| SK_MSG                      | `4f738adba30a7cfc006f605707e7aee847ffefa0` | socket-message verdict / `BPF_PROG_TYPE_SK_MSG`; Linux 4.17           |
-| SK_LOOKUP                   | `e9ddbb7707ff5891616240026062b8c1e29864ca` | `bpf: Introduce SK_LOOKUP program type with a dedicated attach point` |
-| XFRM packet offload         | `d14f28b8c1de668bab863bf5892a49c824cb110d` | `xfrm: add new packet offload flag`                                   |
-| IPv6 BIG TCP / GRO          | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | `net: allow gro_max_size to exceed 65536`                             |
-| IPv6 BIG TCP / GSO          | `7c4e983c4f3cf94fcd879730c6caa877e0768a4d` | `net: allow gso_max_size to exceed 65536`                             |
-| netkit                      | `35dfaad7188cdc043fde31709c796f5a692ba2bd` | netkit core anchor                                                    |
-| net-next 7.3 merge          | `91ec2035134982b98fab0609a9fd8480e8217dc1` | `Merge tag 'net-next-7.3' ...`                                        |
-
-**MPTCP 7.2 limit expansion anchors:** 8-patch series のうち上限値を直接引き上げる commit は2つである。
-
-- `c8646664fbf1c0beb0990cef391cb52d3c909e78` — subflows と accepted `ADD_ADDR` の上限をともに 64 へ拡大
-- `e845e6397d78bf6b842cfa8b5818ca8189f7e22e` — endpoint 上限を 255 へ拡大
-
-残りは preparation / selftest であり、「three limit-expansion commits」とは数えない。
+Net DIM / `lib/dim` は algorithm の driver-local origin と common-library generalization の exact boundary を本版で再確認できていないため、この exact inventory には追加せず Open provenance items に残す。
 
 ## Open provenance items
 
@@ -1462,6 +1436,11 @@ released tag
 ```
 
 # Changelog / Errata（非正規）
+
+- **r23:** WireGuard 5.6 を `SECURITY / VIRTUAL / OVERLAY` とし、`evidence grade` の残語を `Evidence class` へ修正。netmem / memory providers の Part VI 未収載が意図的な open provenance であることを明記。
+- **r23:** XDP frags と USENIX subsection の配置を修正し、io_uring networking を Packet memory の直後へ移動。Era 1 の重複 queueing 図を削減。
+- **r23:** BIG TCP / RTNL / drop-reason の直接 extension に `⇒` を適用し、Virtual networking の凡例重複を削除。
+- **r23:** Part VII の2つの anchor 表と MPTCP anchor を単一 inventory に統合。未監査の first-containing tag は `open` として推測を避けた。
 
 - **r22:** r21 の編集事故で欠落した USENIX research / Virtual networking / TCP-UDP transport の3ブロックを r20 から復元。
 
