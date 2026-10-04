@@ -1274,6 +1274,422 @@ coverageが継続して拡張される。
 
 ------------------------------------------------------------------------
 
+# C. pwru and Retis --- two packet-journey observability models
+
+pwruとRetisは競合する部分を持つが、単純な「軽量版/高機能版」という関係ではない。
+両者は同じmodern Linux kernel
+observability基盤から異なる探索戦略を取る。
+
+``` text
+                 eBPF + BTF
+                     │
+          ┌──────────┴──────────┐
+          │                     │
+          ▼                     ▼
+        pwru                   Retis
+          │                     │
+ broad automatic          selected probes
+ function tracing         + semantic collectors
+          │                     │
+          ▼                     ▼
+ kernel function          enriched/correlated
+ trajectory               packet journey
+```
+
+## C.1 pwru --- start broad when you do not know where to look
+
+pwruの中心的アイデアは、kernel
+BTFから`struct sk_buff *`をargumentとして取る
+functionsを発見し、それらへeBPF probeを広くattachすること。
+
+``` text
+kernel BTF
+    ↓
+find skb-accepting functions
+    ↓
+kprobe / kprobe-multi
+    ↓
+filter target packet
+    ↓
+print functions actually traversed
+```
+
+このmodelは、
+
+``` text
+"packetはinterfaceまで来ている"
+        ↓
+"でもstackのどこで問題が起きたか見当がつかない"
+```
+
+という初動調査に特に強い。
+
+FOSDEM 2024では約1,500個規模のfunctionsへprobeをattachする例が示され、
+pcap filterで対象packetだけを選択してtrajectoryを表示している。
+
+## C.2 pwru is more than a simple skb-pointer tracer
+
+pwruはskb pointerを表示するだけではない。
+
+current architectureには:
+
+-   skb clone/copy tracking
+-   skb lifetime termination handling
+-   stack-based tracking
+-   veth/XDP→skb tracking
+-   skb/netns/interface/mark filtering
+-   BTF-based full skb output
+-   skb metadata expressions
+-   call stack/caller output
+-   tunnel tuple output
+-   TC/XDP BPF program visibility
+-   kprobe-multi backend
+
+などが含まれる。
+
+したがって:
+
+``` text
+pwru = "all skb functionsにprobeするだけ"
+```
+
+と表現するのは不正確。
+
+本質は **broad discovery-oriented tracing** にある。
+
+## C.3 Retis --- start from events and enrich their meaning
+
+Retisはcollector architectureを使ってeventへsubsystem
+contextを追加する。
+
+``` text
+probe/event
+    │
+    ├─ skb
+    ├─ skb tracking
+    ├─ drop reason
+    ├─ conntrack
+    ├─ nftables
+    ├─ OVS
+    ├─ stack
+    └─ packet
+          ↓
+     enriched event
+          ↓
+ sort/correlate/reconstruct
+```
+
+特にOVSではkernel datapathだけでなくuserspace upcallとの相関を行うため、
+単一kernel function trajectoryを越えたsubsystem-specific
+semanticsを扱う。
+
+## C.4 Same foundation, different use of BTF
+
+両者ともBTFが重要だが、使い方の重点が異なる。
+
+``` text
+pwru
+BTF
+ ├─ discover functions accepting skb
+ ├─ understand kernel types
+ └─ print skb/kernel state
+
+Retis
+BTF
+ ├─ understand kernel types/enums
+ ├─ decode version-dependent metadata
+ └─ metadata filtering/introspection
+```
+
+この違いはBTFが単なるCO-RE portability mechanismではなく、 network
+observability infrastructureへ発展したことを示す。
+
+## C.5 pcap filter: classic BPF history reconnects to eBPF tracing
+
+pwruのFOSDEM 2024資料はfilter compilation pathを明示している。
+
+``` text
+pcap-filter syntax
+       ↓
+     libpcap
+       ↓
+ cBPF bytecode
+       ↓
+     cbpfc
+       ↓
+ eBPF bytecode
+       ↓
+ tracing program
+```
+
+Retisにもpcap-style packet filteringがあり、両者は歴史的なclassic BPFの
+packet-filter modelをmodern eBPF observabilityへ再接続している。
+
+``` text
+classic BPF
+  │
+  ├─ tcpdump / libpcap
+  │
+  ▼
+eBPF
+  │
+  ├─ TC/XDP datapath programmability
+  │
+  └─ tracing
+       │
+       ├─ pwru
+       └─ Retis
+```
+
+BPFは「packetをfilterする技術」から「network
+datapathをprogramする技術」へ進化し、 さらにそのprogrammable
+datapath自身を観測する技術としても使われるようになった。
+
+## C.6 Tracking comparison
+
+両者ともtrackingを行えるため、
+
+``` text
+pwru = trackingなし
+Retis = trackingあり
+```
+
+という比較は誤り。
+
+違いはtrackingの目的とcorrelation scopeにある。
+
+``` text
+pwru
+packet/skbを追いながら
+kernel function trajectoryを明らかにする
+          │
+          ▼
+"where in the kernel?"
+
+Retis
+packet eventを追いながら
+subsystem metadata/stateをcorrelateする
+          │
+          ▼
+"what happened, where, and in which subsystem context?"
+```
+
+どちらもclone、representation change、XDP↔skbなどpacket
+identityが変化する 境界にはtool-side logic/assumptionが必要になる。
+
+## C.7 OVS is the clearest architectural difference
+
+OVS troubleshootingでは違いが分かりやすい。
+
+``` text
+                pwru
+
+packet
+  ↓
+OVS kernel functions
+  ↓
+ovs_flow_tbl_lookup...
+  ↓
+ovs_execute_actions...
+  ↓
+kernel function trajectory
+```
+
+Retis:
+
+``` text
+packet
+  ↓
+OVS kernel datapath
+  ↓
+flow miss
+  ↓
+ovs_dp_upcall
+  ↓
+       kernel/userspace boundary
+  ↓
+ovs-vswitchd USDT
+  ↓
+translation / flow install
+  ↓
+kernel datapath
+  ↓
+OVS flow enrichment
+```
+
+pwruでもOVS kernel functionsを観測できるが、 RetisのOVS
+collectorはOVS固有のupcall semanticsやuserspace correlationを
+明示的にmodel化する。
+
+ここが「generic broad tracing」と「subsystem-aware
+correlation」の典型的な差。
+
+## C.8 Comparison matrix
+
+  -----------------------------------------------------------------------
+  Aspect                  pwru                    Retis
+  ----------------------- ----------------------- -----------------------
+  Primary model           broad kernel-function   event/collector-based
+                          tracing                 correlation
+
+  Starting point          target packet, location probes/events +
+                          unknown                 collectors
+
+  Probe discovery         BTFからskb              configured/selected
+                          functionsを広く発見     probes and profiles
+
+  kprobe-multi            supported               different probe
+                                                  architecture
+
+  Packet filter           pcap-style              pcap-style
+
+  Kernel metadata         skb/BTF/expressions     skb/BTF metadata
+                                                  filters
+
+  skb tracking            yes                     yes
+
+  clone handling          yes                     tracking/correlation
+                                                  logic
+
+  XDP tracking            supported               XDP/kernel probes
+                                                  depending on collection
+
+  Drop reason             can observe/output      dedicated skb-drop
+                          relevant path/state     semantics
+
+  Conntrack               generic tracing/state   dedicated collector
+                          inspection possible     
+
+  nftables                generic kernel          dedicated semantic
+                          trajectory              collector
+
+  OVS kernel path         visible                 dedicated OVS collector
+
+  OVS userspace upcall    not the central model   explicit
+                                                  kernel↔ovs-vswitchd
+                                                  correlation
+
+  Post-processing         trajectory-oriented     collect → store →
+                          output/JSON             sort/reconstruct
+
+  Best first question     "where did this packet  "what happened in this
+                          go?"                    subsystem context?"
+  -----------------------------------------------------------------------
+
+この表は絶対的な機能境界ではない。両projectとも進化しており、
+overlapする機能は多い。比較軸は「できる/できない」より**design
+center**。
+
+## C.9 Practical troubleshooting model
+
+典型的には次のような使い分けが理解しやすい。
+
+``` text
+connectivity failure
+       ↓
+location completely unknown
+       ↓
+      pwru
+       ↓
+discover suspicious region:
+ nf_hook_slow?
+ ovs_execute_actions?
+ routing?
+ kfree_skb_reason?
+       ↓
+subsystem identified
+       ↓
+Retis or subsystem-specific tools
+       ↓
+enrich with:
+ skb/drop reason
+ conntrack
+ nftables
+ OVS/upcall
+ netns/device
+```
+
+ただしこれは必須workflowではない。
+Retisだけで最初から追跡することも、pwruだけでroot
+causeへ到達することもある。
+
+## C.10 Evolutionary interpretation
+
+Linux networking historyの観点では両者を同じbranchに置く。
+
+``` text
+classic BPF
+    ↓
+eBPF
+    ↓
+BTF + CO-RE + tracing infrastructure
+    ↓
+kernel becomes dynamically introspectable
+    │
+    ├─────────────────────┐
+    ▼                     ▼
+  pwru                  Retis
+    │                     │
+discover broadly      correlate semantically
+    │                     │
+    └──────────┬──────────┘
+               ▼
+       packet journey debugging
+```
+
+これはmodern Linux networkingの重要な変化。
+
+``` text
+programmable datapath
+        ↓
+datapath complexity increases
+        ↓
+BPF/BTF-based observability
+        ↓
+tools can discover and explain
+the running kernel dynamically
+```
+
+つまりpwru/Retisはkernel networking featureそのものではないが、
+**eBPF/BTFによってLinux kernelが「実行中に探索可能なnetwork platform」へ
+変化したことを象徴するtools** と位置付けられる。
+
+## C.11 Conference provenance
+
+pwruについては特に以下をdesign/architecture evidenceとして扱う。
+
+-   FOSDEM 2024, Quentin Monnet: *Packet, where are you? Track in the
+    stack with pwru*
+-   Linux Plumbers Conference 2024: pwru architecture/evolution
+    presentation
+
+Retisについては前章の:
+
+-   OVSCon 2023
+-   OVS/OVN Conf 2024
+-   Red Hat Developer 2023--2025
+
+と対にして扱う。
+
+この組み合わせによりconference provenanceも:
+
+``` text
+FOSDEM/LPC
+   pwru generic kernel tracing
+          │
+          ├── eBPF/BTF foundation ──┐
+          │                         │
+OVSCon                              │
+   Retis OVS-aware correlation ─────┘
+          │
+          ▼
+Linux networking observability evolution
+```
+
+として整理できる。
+
+------------------------------------------------------------------------
+
 # Existing v4.0→7.x audited material
 
 # Linux Networking Evolution --- Linux v4.0 から 7.x まで
