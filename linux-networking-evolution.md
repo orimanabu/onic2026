@@ -3107,36 +3107,37 @@ them.
 
 ### Driver-framework confidence table
 
-  --------------------------------------------------------------------------------
-  Framework         Design/RFC              Release landing Exact anchor status
-  ----------------- ----------------------- --------------- ----------------------
-  switchdev         2014/2015 evolution     3.19 origin;    multi-commit;
-                                            4.x expansion   expansion commits
-                                                            identified
+  ------------------------------------------------------------------------------
+  Framework         Design/RFC              Release       Exact anchor status
+                                            landing       
+  ----------------- ----------------------- ------------- ----------------------
+  switchdev         2014/2015 evolution     3.19 origin;  multi-commit;
+                                            4.x expansion expansion commits
+                                                          identified
 
-  devlink           2016 series             4.6             release verified;
-                                                            exact origin pending
+  devlink           2016 series             4.6           release verified;
+                                                          exact origin pending
 
-  phylink           2015 RFC                4.13 generation `9525ae83959b...`
-                                                            exact
+  phylink           2015 RFC                4.13          `9525ae83959b...`
+                                            generation    exact
 
-  DIM/net_dim       pre-2018 work           upstream by     generic-library SHA
-                                            Netdev 0x12 /   pending
-                                            2018            
+  DIM/net_dim       pre-2018 work           upstream by   generic-library SHA
+                                            Netdev 0x12 / pending
+                                            2018          
 
-  netdevsim         offload test framework  4.16            release verified
+  netdevsim         offload test framework  4.16          release verified
 
-  ethtool-netlink   2018 RFC lineage        5.6 groundwork  release verified;
-                                                            exact core set pending
+  ethtool-netlink   2018 RFC lineage        5.6           release verified;
+                                            groundwork    exact core set pending
 
-  auxiliary bus     ancillary/virtual-bus   5.11            signed tag/tip
-                    predecessors                            verified; origin SHA
-                                                            pending
+  auxiliary bus     ancillary/virtual-bus   5.11          signed tag/tip
+                    predecessors                          verified; origin SHA
+                                                          pending
 
-  Rust phylib       2023 RFC→v11            6.8             release/final-series
-                                                            verified; exact SHAs
-                                                            pending
-  --------------------------------------------------------------------------------
+  Rust phylib       2023 RFC→v11            6.8           release/final-series
+                                                          verified; exact SHAs
+                                                          pending
+  ------------------------------------------------------------------------------
 
 ## Release-attribution re-audit --- pass 6: Driver Framework exact anchors
 
@@ -3211,6 +3212,60 @@ Rust PHY four mainline SHAs
 
 For these, release-level or final-series provenance is stronger than an
 unverified hash. They remain explicitly pending.
+
+## Release-attribution re-audit --- pass 7: Driver Framework integration
+
+This pass does not create a competing timeline. It projects the
+canonical release map onto the Driver Framework axis and connects older
+driver APIs to the newer queue/memory object model.
+
+### netdev-genl queue/NAPI object model
+
+Netdev 0x17 describes extending the YAML-defined `netdev-genl` family
+with queue and NAPI objects. Queue attributes include the servicing NAPI
+instance, statistics and memory model; NAPI attributes include NAPI ID,
+device, IRQ vector and threaded-poller PID.
+
+The Linux 6.8 netdev Netlink documentation already contains `napi` and
+`queue` attribute sets with these relationships. Therefore this document
+uses **6.8 as a documentation-level milestone**, not as a claim that
+every modern queue operation landed in 6.8.
+
+### page_pool introspection
+
+The 2023 RFC→v2 series adds:
+
+``` text
+page-pool IDs
+per-netdev association
+NAPI ID association
+Netlink GET
+state-change notifications
+memory accounting
+recycling statistics
+```
+
+This is the point where page_pool evolves from a common internal
+allocator/recycler into an identifiable and observable networking
+object.
+
+### Modern state must not be backdated
+
+Current `netdev-genl` documentation includes later capabilities such as:
+
+``` text
+napi-set
+queue-create
+queue statistics
+DMA-BUF binding
+io_uring provider information
+XSK information
+```
+
+These current capabilities are shown as the **direction of evolution**
+and are not all retroactively assigned to Linux 6.8. Exact release
+attribution for queue creation, queue leasing and each memory-provider
+operation remains in the 7.x audit backlog.
 
 # Part III --- Long-term feature lineages
 
@@ -3494,6 +3549,98 @@ ownership/lifetime の効率化にある。
 ------------------------------------------------------------------------
 
 # Part IV --- Network Device Driver Framework Evolution
+
+## Canonical Driver Framework chronology
+
+This is the Driver Framework projection of the Part II release map. It
+is not a second independent chronology; every release below must agree
+with Part II.
+
+  -----------------------------------------------------------------------
+  Release                 Driver-framework        Architectural effect
+                          milestone               
+  ----------------------- ----------------------- -----------------------
+  3.3                     DQL/BQL                 common queue-pressure
+                                                  control replaces
+                                                  driver-local queue
+                                                  sizing policy
+
+  3.19                    switchdev origin        Linux forwarding
+                                                  objects begin to drive
+                                                  switch-ASIC offload
+
+  4.6                     devlink                 device/ASIC-wide
+                                                  resources and control
+                                                  separated from one
+                                                  `net_device`
+
+  4.8                     XDP                     driver RX path gains a
+                                                  programmable pre-skb
+                                                  execution point
+
+  4.13                    phylink                 common MAC/PHY/PCS/SFP
+                                                  link-management state
+                                                  machine
+
+  4.16                    netdevsim               common offload APIs
+                                                  become testable without
+                                                  physical hardware
+
+  4.18                    refurbished             RX allocation/recycling
+                          page_pool/XDP memory    begins moving into
+                          return                  common memory
+                                                  infrastructure
+
+  5.1                     devlink health          common
+                                                  reporting/recovery
+                                                  model for device health
+
+  5.6                     ethtool Generic Netlink driver management ABI
+                                                  becomes
+                                                  structured/extensible
+
+  5.11                    auxiliary bus           complex devices can
+                                                  expose independently
+                                                  bound subfunctions
+
+  5.12                    threaded NAPI           NAPI execution model
+                                                  becomes more explicitly
+                                                  configurable
+
+  6.8                     Rust phylib +           safe driver abstraction
+                          queue/NAPI netdev-genl  and explicit netdev
+                          objects                 objects develop in
+                                                  parallel
+
+  6.x→7.x                 page_pool introspection queue, poller and
+                          → queue/NAPI            memory ownership become
+                          configuration → memory  first-class driver/core
+                          providers               contracts
+  -----------------------------------------------------------------------
+
+### The long architectural transition
+
+``` text
+driver-private mechanisms
+        ↓
+common queue/backpressure primitives
+        ↓
+common hardware-offload and device-control models
+        ↓
+common link, interrupt and RX-memory frameworks
+        ↓
+testable + structured userspace-visible driver APIs
+        ↓
+queue / NAPI / page-pool objects
+        ↓
+queue-bound memory providers
+        ↓
+typed / memory-safe Rust driver abstractions
+```
+
+The last steps are important: modern netdev work increasingly exposes
+what used to be opaque driver implementation details as generic objects
+with IDs and relationships.
 
 This section deliberately does **not** enumerate individual NIC drivers.
 It follows the common infrastructure which changed what a Linux network
@@ -3947,6 +4094,89 @@ IPsec hardware pipeline
 This is the same architectural pattern seen in switchdev and TC offload:
 the kernel keeps the canonical networking semantics while the driver
 maps those semantics onto hardware.
+
+## Queue / NAPI / page_pool become first-class netdev objects
+
+The 2023 Netdev 0x17 design work is an important turning point. Rather
+than treating an RX queue, its NAPI poller and its memory allocator as
+opaque details inside each driver, `netdev-genl` exposes generic
+relationships such as:
+
+``` text
+net_device
+   ├── RX queue ID
+   │      ├── NAPI ID
+   │      ├── queue type
+   │      ├── memory model/provider
+   │      └── per-queue statistics
+   │
+   ├── NAPI ID
+   │      ├── IRQ vector
+   │      ├── threaded-NAPI PID
+   │      └── per-NAPI configuration
+   │
+   └── page_pool ID
+          ├── NAPI ID
+          ├── net_device
+          ├── allocation/recycling statistics
+          └── outstanding memory
+```
+
+By Linux 6.8 documentation, the netdev Netlink specification already
+exposes queue and NAPI objects, including the NAPI ID servicing a queue,
+interrupt-vector information and threaded-NAPI PID. This turns topology
+that previously required driver-specific inspection into a generic
+kernel ABI.
+
+### page_pool introspection is the memory side of the same transition
+
+The 2023 page_pool introspection series gives page pools IDs, associates
+them with netdev and NAPI IDs, and exports memory/recycling statistics
+over the same netdev Netlink family.
+
+This changes page_pool's architectural role:
+
+``` text
+fast RX allocation helper
+        ↓
+shared driver memory contract
+        ↓
+identifiable kernel object
+        ↓
+observable memory owner
+        ↓
+basis for configurable queue-bound memory providers
+```
+
+The important point is not merely observability. Once queue, NAPI and
+page-pool identity exists in a common ABI, later zero-copy/device-memory
+APIs can express **which queue owns which memory model** without
+inventing a new driver-specific control plane.
+
+### Current netdev-genl completes the direction
+
+Current kernel documentation goes beyond read-only topology. It contains
+operations such as per-NAPI configuration, queue creation, queue
+statistics, and binding DMA-BUF memory to queues. Queue attributes can
+also carry provider-specific information such as io_uring
+memory-provider or XSK state.
+
+This provides the missing bridge between the Driver Framework and Memory
+axes:
+
+``` text
+Driver Framework                     Memory
+----------------                     ------
+queue object        ───────────────→ memory-provider attachment
+NAPI object         ───────────────→ polling / ownership context
+page_pool object    ───────────────→ recyclable RX memory
+queue statistics    ───────────────→ provider/offload observability
+```
+
+Thus Device Memory TCP, io_uring ZCRX and queue leasing should not be
+described as isolated zero-copy features. They are consumers of a
+broader transition in which queue and memory ownership become explicit
+networking-core concepts.
 
 ## 7. Rust --- from language support to a safe driver model
 
@@ -5475,25 +5705,46 @@ landing evidence.
 
 ## Pass 6 Driver Framework exact-anchor summary
 
-  -----------------------------------------------------------------------
-  Framework                           Exact status after pass 6
-  ----------------------------------- -----------------------------------
-  phylink                             exact infrastructure anchor
-                                      `9525ae83959b...`
+  ---------------------------------------------------------------------
+  Framework                          Exact status after pass 6
+  ---------------------------------- ----------------------------------
+  phylink                            exact infrastructure anchor
+                                     `9525ae83959b...`
 
-  ethtool-netlink                     exact core-interface anchor
-                                      `2b4a8990b7df...`
+  ethtool-netlink                    exact core-interface anchor
+                                     `2b4a8990b7df...`
 
-  auxiliary bus                       final standalone v4 + 5.11 signed
-                                      tag; origin SHA intentionally
-                                      pending
+  auxiliary bus                      final standalone v4 + 5.11 signed
+                                     tag; origin SHA intentionally
+                                     pending
 
-  Rust PHY                            final v11 four-patch shape
-                                      verified; exact mainline SHAs
-                                      pending
+  Rust PHY                           final v11 four-patch shape
+                                     verified; exact mainline SHAs
+                                     pending
 
-  switchdev/devlink/DIM/netdevsim     no speculative SHA inserted
-  -----------------------------------------------------------------------
+  switchdev/devlink/DIM/netdevsim    no speculative SHA inserted
+  ---------------------------------------------------------------------
+
+## Pass 7 integration result
+
+The Driver Framework axis is now derived from the same canonical
+chronology as the rest of the document. Its long-term lineage is:
+
+``` text
+BQL
+ → switchdev / devlink
+ → XDP / phylink
+ → netdevsim / page_pool / DIM
+ → ethtool-netlink / devlink health
+ → auxiliary bus
+ → queue + NAPI + page_pool objects
+ → memory-provider attachment
+ → Rust-safe driver abstractions
+```
+
+The document explicitly separates the Linux 6.8 queue/NAPI **object
+visibility milestone** from later queue creation, leasing and
+memory-provider configuration so that current APIs are not backdated.
 
 # Appendix --- Provenance and research notes
 
