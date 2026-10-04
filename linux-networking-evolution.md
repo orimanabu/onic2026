@@ -10255,29 +10255,325 @@ a development branch with an actually pulled feature.
 
 # 99. Provenance status after pass 9
 
-  -----------------------------------------------------------------------
-  Lineage                             Exact coverage
-  ----------------------------------- -----------------------------------
-  MPTCP 5.6 socket API                `f870fa0b5768` verified
+  ---------------------------------------------------------------------
+  Lineage                            Exact coverage
+  ---------------------------------- ----------------------------------
+  MPTCP 5.6 socket API               `f870fa0b5768` verified
 
-  MPTCP 5.6 RX path                   `648ef4b88673` verified
+  MPTCP 5.6 RX path                  `648ef4b88673` verified
 
-  MPTCP initial selftest              `048d19d444be` verified
+  MPTCP initial selftest             `048d19d444be` verified
 
-  MPTCP/BPF 2022                      all 7 commits verified
+  MPTCP/BPF 2022                     all 7 commits verified
 
-  MPTCP protocol switching            `0dd061a6a115` verified
+  MPTCP protocol switching           `0dd061a6a115` verified
 
-  IOAM v5                             **4/6 exact commits verified**
+  IOAM v5                            **4/6 exact commits verified**
 
-  nexthop object core                 `ab84be7e54fc` verified
+  nexthop object core                `ab84be7e54fc` verified
 
-  nexthop v4 route integration        accepted series verified; partial
-                                      SHA set
+  nexthop v4 route integration       accepted series verified; partial
+                                     SHA set
 
-  resilient nexthop                   baseline previously verified
-  -----------------------------------------------------------------------
+  resilient nexthop                  baseline previously verified
+  ---------------------------------------------------------------------
 
 The remaining SHA gaps are now small enough that they should be treated
 as an appendix normalization task rather than blocking the architectural
 history.
+
+------------------------------------------------------------------------
+
+# 100. Provenance verification pass 10 --- conservative close-out of exact-SHA gaps
+
+## 100.1 IOAM: series/release mapping is complete; SHA mapping remains 4/6
+
+The Linux 5.15 networking pull independently confirms the exact six
+feature subjects:
+
+``` text
+uapi: IPv6 IOAM headers definition
+ipv6: ioam: Data plane support for Pre-allocated Trace
+ipv6: ioam: IOAM Generic Netlink API
+ipv6: ioam: Support for IOAM injection with lwtunnels
+ipv6: ioam: Documentation for new IOAM sysctls
+selftests: net: Test for the IOAM insertion with IPv6
+```
+
+Exact canonical objects already verified:
+
+``` text
+9ee11f0fff20  Data plane support for Pre-allocated Trace
+3edede08ff37  IOAM injection with lwtunnels
+de8e80a54c96  Documentation for new IOAM sysctls
+968691c777af  IOAM IPv6 insertion selftest
+```
+
+The two remaining subjects are known to be in the pulled feature set:
+
+``` text
+uapi: IPv6 IOAM headers definition
+ipv6: ioam: IOAM Generic Netlink API
+```
+
+but this audit does not assign SHA values without an independently
+verifiable canonical object.
+
+Thus:
+
+``` text
+series identity       complete
+release mapping       complete
+subject enumeration  complete
+SHA enumeration       4 / 6
+```
+
+This is a **B only for hash completeness**, not uncertainty about
+whether the feature landed.
+
+------------------------------------------------------------------------
+
+## 100.2 Nexthop: split the provenance into object-core and route-integration generations
+
+The June 2019 networking pull exposes the initial object-core generation
+as a distinct sequence before the final route-integration v4/20 series.
+
+Object-core subjects include:
+
+``` text
+net: nexthop uapi
+net: Initial nexthop code
+nexthop: Add support for IPv4 nexthops
+nexthop: Add support for IPv6 gateways
+nexthop: Add support for lwt encaps
+nexthop: Add support for nexthop groups
+selftests: Add test cases for nexthop objects
+nexthop: Add entry to MAINTAINERS
+```
+
+Exact core anchor:
+
+``` text
+ab84be7e54fc
+net: Initial nexthop code
+```
+
+The second generation is the accepted v4/20 route-integration series:
+
+``` text
+[PATCH v4 net-next 00/20]
+net: Enable nexthop objects with IPv4 and IPv6 routes
+```
+
+with explicit maintainer response:
+
+``` text
+Series applied, thanks.
+```
+
+Known exact route-integration anchors:
+
+``` text
+493ced1a...
+ipv4: Allow routes to use nexthop objects
+
+cab14d1087d9
+selftests: Add version of router_multipath.sh using nexthop objects
+```
+
+### Why this split matters
+
+A single "nexthop objects commit" would hide two architectural steps:
+
+``` text
+step 1:
+create reusable nexthop objects/groups
+        │
+        ▼
+step 2:
+teach IPv4/IPv6 FIB routes to reference those objects
+```
+
+The later resilient-nexthop work then builds on both.
+
+------------------------------------------------------------------------
+
+## 100.3 MPTCP 5.6: exact anchors versus complete protocol series
+
+The initial MPTCP generation has three independently strong exact
+anchors:
+
+``` text
+f870fa0b5768
+mptcp: Add MPTCP socket stubs
+
+648ef4b88673
+mptcp: Implement MPTCP receive path
+
+048d19d444be
+mptcp: add basic kselftest for mptcp
+```
+
+These correspond to three different layers:
+
+``` text
+socket/API infrastructure
+        ↓
+protocol data path
+        ↓
+end-to-end selftest
+```
+
+This is enough to establish the Linux 5.6 native-MPTCP generation
+without pretending that one SHA represents the complete protocol.
+
+The initial series also contains option parsing/creation, handshake and
+send-side work, but exact SHA values for every one of those commits
+remain outside the verified set.
+
+### Canonical wording
+
+Prefer:
+
+``` text
+Linux 5.6 introduced the first native upstream MPTCP implementation through a
+multi-commit series. Exact anchors include f870fa0b5768 for the socket stubs,
+648ef4b88673 for the receive path, and 048d19d444be for the initial kselftest.
+```
+
+Avoid:
+
+``` text
+MPTCP was introduced by commit 048d19d444be
+```
+
+because that commit is only the selftest.
+
+------------------------------------------------------------------------
+
+# 101. What "complete" means for this change log
+
+For a feature to be useful in this historical document, it is not
+necessary to list every mechanical commit.
+
+The audit now distinguishes:
+
+``` text
+architecture completeness
+    Can we explain what changed and why?
+
+landing completeness
+    Can we identify the accepted series/pull and release?
+
+anchor completeness
+    Do we have exact representative mainline commits?
+
+enumeration completeness
+    Do we have every commit in the multi-commit feature?
+```
+
+For the major networking lineages:
+
+``` text
+architecture completeness   high
+landing completeness        high
+anchor completeness         high
+enumeration completeness    intentionally mixed
+```
+
+This avoids spending disproportionate effort reconstructing dozens of
+mechanical refactoring commits while still making every major claim
+auditable.
+
+------------------------------------------------------------------------
+
+# 102. Recommended canonical inventory schema
+
+The final normalized table should use:
+
+``` text
+Date
+LWN article/topic
+Subsystem
+Kernel release
+Status
+Design/RFC provenance
+Accepted series / pull
+Representative mainline commit(s)
+Netdev conference session
+Phase
+Tags
+```
+
+and **not** a single `Commit` column implying that every feature has one
+defining SHA.
+
+Example:
+
+``` text
+Feature:
+IPv6 IOAM Pre-allocated Trace
+
+Accepted series:
+v5 / 6
+
+Representative commits:
+9ee11f0fff20  data plane
+3edede08ff37  lwtunnel
+de8e80a54c96  docs
+968691c777af  selftest
+
+Completeness:
+4/6 exact SHA; 6/6 subjects/release verified
+```
+
+This schema better represents how Linux networking development actually
+lands.
+
+------------------------------------------------------------------------
+
+# 103. Audit state at the end of exact-provenance passes
+
+### Fully strong / Quality A representative provenance
+
+``` text
+MPTCP/BPF mptcp_sock
+update_socket_protocol
+AF_XDP multi-buffer
+Device Memory TCP RX
+Device Memory TCP TX
+BPF qdisc
+netkit core
+netkit queue leasing/remerge
+IPv4 BIG TCP
+BIG TCP over VXLAN/GENEVE
+virtio-net AF_XDP RX small
+virtio-net AF_XDP RX mergeable
+virtio-net AF_XDP TX
+IOAM data plane
+nexthop object core
+AccECN core/negotiation anchors
+```
+
+### Strong landing + partial full enumeration
+
+``` text
+initial MPTCP 5.6
+IPv6 IOAM complete v5 series
+2019 nexthop route integration
+RTNL multi-release conversion
+initial IPv6 BIG TCP
+```
+
+### Intentionally retained as development/RFC status
+
+``` text
+P4TC stalled direction
+kernel QUIC development
+some virtio-net multi-buffer ZC work
+newer SRv6 proposal work
+per-netns conntrack hash RFC
+```
+
+The document is therefore now much closer to a **historical networking
+change database** than a simple LWN reading list.
