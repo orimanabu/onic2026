@@ -3913,41 +3913,41 @@ removal**, not just feature addition.
 
 # 40. Completeness audit: classification table
 
-  ----------------------------------------------------------------------------
-  Topic                          Year Classification       Why it matters
-  ------------------ ---------------- -------------------- -------------------
-  IPv6                           2020 design/API           protocol
-  extension-header                    discussion           extensibility vs
-  processing                                               fast path/offload
+  ---------------------------------------------------------------------------
+  Topic                         Year Classification       Why it matters
+  ------------------ --------------- -------------------- -------------------
+  IPv6                          2020 design/API           protocol
+  extension-header                   discussion           extensibility vs
+  processing                                              fast path/offload
 
-  Threaded NAPI                  2020 merged architecture  moves RX polling
-                                      direction            out of softirq
-                                                           context
+  Threaded NAPI                 2020 merged architecture  moves RX polling
+                                     direction            out of softirq
+                                                          context
 
-  bpfilter rethink               2020 failed/stalled       BPF firewall
-                                      design               architecture
-                                                           history
+  bpfilter rethink              2020 failed/stalled       BPF firewall
+                                     design               architecture
+                                                          history
 
-  SO_REUSEPORT                   2021 socket semantics     scalable listener
-  failover                                                 behavior
+  SO_REUSEPORT                  2021 socket semantics     scalable listener
+  failover                                                behavior
 
-  skb drop reasons               2022 observability        structured
-                                                           packet-drop
-                                                           diagnostics
+  skb drop reasons              2022 observability        structured
+                                                          packet-drop
+                                                          diagnostics
 
-  in-kernel TLS                  2022 API/architecture     kernel-originated
-  handshake                                                secure transports
+  in-kernel TLS                 2022 API/architecture     kernel-originated
+  handshake                                               secure transports
 
-  P4TC                       2023--24 significant          programmable TC
-                                      non-merged proposal  pipeline debate
+  P4TC                      2023--24 significant          programmable TC
+                                     non-merged proposal  pipeline debate
 
-  BPF qdisc                      2025 merged/programming   `struct_ops`
-                                      model                reaches packet
-                                                           scheduling
+  BPF qdisc                     2025 merged/programming   `struct_ops`
+                                     model                reaches packet
+                                                          scheduling
 
-  DCCP removal                   2025 removal/cleanup      simplifies shared
-                                                           transport code
-  ----------------------------------------------------------------------------
+  DCCP removal                  2025 removal/cleanup      simplifies shared
+                                                          transport code
+  ---------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -4981,12 +4981,12 @@ One final sweep remains for:
 
 After that, generate the canonical inventory:
 
-  --------------------------------------------------------------------------
-  Date     LWN      Category   Kernel   Status   Series   Commits   Tags
-           title                                                    
-  -------- -------- ---------- -------- -------- -------- --------- --------
+  -----------------------------------------------------
+  Date LWN Category Kernel Status Series Commits Tags
+  title
+  -----------------------------------------------------
 
-  --------------------------------------------------------------------------
+------------------------------------------------------------------------
 
 Status values will be normalized to:
 
@@ -5002,3 +5002,649 @@ design-discussion
 ```
 
 This table will become the basis for the final completeness check.
+
+------------------------------------------------------------------------
+
+# 53. Final sweep --- late socket, multipath, tunnel, and removal items
+
+## 53.1 Linux 6.15 --- `TCP_RTO_MAX_MS`
+
+Eric Dumazet's series:
+
+-   `[PATCH net-next 0/5] tcp: allow to reduce max RTO`
+-   https://lwn.net/Articles/1008854/
+
+adds:
+
+``` text
+TCP_RTO_MAX_MS          per-socket option
+tcp_rto_max_ms          per-network-namespace sysctl
+```
+
+This addresses applications that need a smaller maximum retransmission
+timeout than the traditional TCP ceiling. `TCP_KEEPINTVL` and
+`TCP_KEEPCNT` do not solve this problem because keepalive timers and
+retransmission backoff are different mechanisms.
+
+Affected areas include:
+
+-   `include/uapi/linux/tcp.h`
+-   `net/ipv4/tcp.c`
+-   `net/ipv4/tcp_timer.c`
+-   `net/ipv4/tcp_output.c`
+-   IPv4 sysctl documentation
+
+LWN's Linux 6.15 merge-window summary records the feature.
+
+-   https://lwn.net/Articles/1015414/
+
+------------------------------------------------------------------------
+
+## 53.2 Linux 6.15 --- BPF network timestamp callbacks
+
+The 6.15 merge window also added BPF callbacks for obtaining timestamps
+at multiple points in the network stack.
+
+LWN: https://lwn.net/Articles/1015414/
+
+Primary use case:
+
+``` text
+packet enters networking path
+        │
+        ├── timestamp A
+        ▼
+processing stage
+        │
+        ├── timestamp B
+        ▼
+later stage
+        │
+        ├── timestamp C
+        ▼
+packet exits
+```
+
+This makes it possible to measure latency *inside* the network stack
+rather than only observing ingress/egress timestamps.
+
+It belongs beside `skb_drop_reason` as an observability milestone:
+
+``` text
+skb_drop_reason
+    → why was the packet dropped?
+
+BPF network timestamps
+    → where did the packet spend time?
+```
+
+------------------------------------------------------------------------
+
+## 53.3 2025 --- local TCP multipath route selection
+
+Willem de Bruijn's series:
+
+-   `[PATCH net-next 0/3] ip: improve tcp sock multipath routing`
+-   https://lwn.net/Articles/1018316/
+-   v2: https://lwn.net/Articles/1019096/
+
+addresses local TCP connections under layer-4 multipath hash policies.
+
+The series fixes/changes three aspects:
+
+1.  source-address selection should match the selected nexthop device;
+2.  multiple local TCP connections should use all available paths;
+3.  connected sockets should not be rehashed unexpectedly by unrelated
+    socket-state changes.
+
+This is a useful follow-up to the earlier nexthop-object/FIB work:
+
+``` text
+nexthop objects
+      │
+      └── scalable representation/control plane
+
+multipath hash policy
+      │
+      └── which nexthop a flow actually selects
+```
+
+------------------------------------------------------------------------
+
+## 53.4 2026 --- double UDP tunnel GRO/GSO
+
+Paolo Abeni's series:
+
+-   `[PATCH v5 net-next 00/10] geneve: introduce double tunnel GSO/GRO support`
+-   2026-01-21
+-   https://lwn.net/Articles/1055518/
+
+explicitly targets container orchestration running inside virtual
+environments, where double UDP encapsulation --- particularly GENEVE ---
+is common.
+
+Typical topology:
+
+``` text
+workload/container
+       │
+inner overlay tunnel
+       │ GENEVE/VXLAN
+       ▼
+VM virtual NIC
+       │
+outer virtual/cloud tunnel
+       │ GENEVE
+       ▼
+physical network
+```
+
+Without support for nested encapsulation, GRO/GSO aggregation is lost
+for inter-VM traffic and packets are segmented too early.
+
+The series adds:
+
+-   generalized device GSO admission features;
+-   GSO-partial support for GENEVE/VXLAN;
+-   GENEVE option/hint for double-tunnel GRO;
+-   selftests.
+
+Both GSO partial and double-encapsulation GRO are disabled by default
+and require explicit configuration.
+
+This is separate from, but closely related to, BIG TCP over UDP tunnels:
+
+``` text
+double-tunnel GSO/GRO
+       │
+       └── preserve ordinary segmentation aggregation across nested tunnels
+
+BIG TCP over VXLAN/GENEVE
+       │
+       └── allow >64KiB BIG-TCP aggregates through UDP tunnels
+```
+
+For OpenShift/OVN/KubeVirt this is one of the most directly relevant
+late-period changes.
+
+------------------------------------------------------------------------
+
+# 54. 2026 merge-window reconciliation
+
+A final pass over LWN's 2026 merge-window summaries found additional
+items that need to appear in the canonical inventory even when they do
+not require full thematic chapters.
+
+## Linux 7.0
+
+LWN records:
+
+-   AccECN enabled for general use;
+-   CAKE multi-queue support;
+-   VSOCK network-namespace support.
+
+Merge-window: https://lwn.net/Articles/1058664/
+
+### CAKE multiqueue
+
+The CAKE qdisc can distribute shaping work across multiple queues/CPUs.
+This is a scalability evolution of an existing sophisticated qdisc
+rather than a new qdisc API.
+
+### VSOCK network namespaces
+
+VSOCK is commonly used for host/guest communication. Adding
+network-namespace awareness makes it fit containerized virtualization
+environments more naturally.
+
+------------------------------------------------------------------------
+
+## Linux 7.1
+
+LWN records:
+
+-   Unix-domain socket `user.*` xattrs;
+-   UDP-Lite removal;
+-   IPv6 can no longer be built as a module;
+-   large removal of legacy networking subsystems/drivers in the latter
+    half.
+
+First half: https://lwn.net/Articles/1067250/
+
+Rest: https://lwn.net/Articles/1067785/
+
+The large removal wave includes ATM, AX.25/amateur-radio pieces, ISDN,
+Bluetooth CMTP, CAIF, and numerous old drivers.
+
+This is kept as a **removal/maintenance milestone**, not as one
+networking feature.
+
+------------------------------------------------------------------------
+
+## Linux 7.2
+
+LWN records:
+
+-   TCP Authentication Option implementation moved to libcrypto;
+-   MPTCP maximum subflows increased from 8 to 64;
+-   continued RTNL-lock reduction;
+-   AppleTalk and additional legacy network support removed.
+
+Merge-window: https://lwn.net/Articles/1078068/
+
+### TCP-AO → libcrypto
+
+TCP-AO itself entered the kernel earlier; the 7.2 change is an
+implementation modernization:
+
+``` text
+TCP-AO
+   │
+older crypto integration
+   ▼
+kernel libcrypto
+   │
+   ├── simpler code
+   └── fewer supported/unused algorithms
+```
+
+### MPTCP 8 → 64 subflows
+
+This is a useful scalability milestone and belongs in the
+release-by-release MPTCP map.
+
+------------------------------------------------------------------------
+
+## Linux 7.3
+
+As of 2026-10-02 Linux 7.3 is still in the release-candidate phase; the
+merge window is complete but the final release has not yet occurred.
+
+LWN's merge-window summary records:
+
+-   BIG TCP over VXLAN and GENEVE.
+
+https://lwn.net/Articles/1089791/
+
+Therefore the canonical inventory status should say:
+
+``` text
+kernel: 7.3
+status: merged in 7.3 development tree / final release pending as of 2026-10-02
+```
+
+rather than simply "Linux 7.3 released".
+
+------------------------------------------------------------------------
+
+# 55. Canonical LWN networking inventory
+
+The following table is the normalized inventory assembled from the
+thematic research and the completeness audits. It is intentionally
+focused on **architectural/core networking coverage** rather than every
+individual NIC-driver posting.
+
+Legend:
+
+``` text
+M   merged/mainline milestone
+F   merged follow-up
+R   RFC / under review
+D   design discussion
+S   stalled/non-merged direction
+X   removal/deprecation
+U   userspace/kernel-interface milestone
+```
+
+  ----------------------------------------------------------------------------------------------------------
+  Date /       LWN topic          Category             Kernel / era    Status              Tags
+  period                                                                                   
+  ------------ ------------------ -------------------- --------------- ------------------- -----------------
+  2019-05      Memory management  RX memory            5.x             D/F                 page_pool, RX,
+               for 400Gb/s                                                                 memory
+               interfaces                                                                  
+
+  2019-05      BPF: what's good,  BPF                  5.x             D                   BPF, XDP
+               what's coming, and                                                          
+               what's needed                                                               
+
+  2019-06      The TCP SACK panic TCP/security         5.2             M/fix               TCP, SACK
+
+  2019-06      Providing wider    BPF/security         5.x             D                   BPF, privilege
+               access to `bpf()`                                                           
+
+  2019-06      nexthop objects    routing/FIB          5.x             M                   FIB, nexthop
+               with IPv4/IPv6                                                              
+               routes                                                                      
+
+  2019-09      Upstreaming        transport            5.6-era         D/M                 MPTCP
+               multipath TCP                                                               
+
+  2019-10      WireGuard and the  VPN/crypto           5.6             D/M                 WireGuard
+               crypto API                                                                  
+
+  2019-12      ethtool Netlink v8 UAPI                 5.x             M                   ethtool, netlink
+
+  2020-01      The trouble with   IPv6                 5.x             D                   IPv6, EH
+               IPv6 extension                                                              
+               headers                                                                     
+
+  2020-01      Accelerating       netfilter/offload    5.3+            M                   nftables,
+               netfilter with                                                              flowtable
+               hardware offload,                                                           
+               parts 1/2                                                                   
+
+  2020-02      Kernel operations  BPF                  5.6             M                   struct_ops, TCP
+               structures in BPF                                                           CC
+
+  2020-06      Rethinking         firewall/BPF         ---             S/D                 bpfilter
+               bpfilter and                                                                
+               user-mode helpers                                                           
+
+  2020-08/10   NAPI polling in    RX execution         5.x             M                   NAPI, softirq
+               kernel threads                                                              
+
+  2020-08      End-to-end network BPF/P4               5.x             D                   BPF,
+               programmability                                                             programmability
+
+  2021-03      BPF meets io_uring BPF/io_uring         5.x             D                   BPF, io_uring
+
+  2021-04      Avoiding           sockets              5.x             M/F                 SO_REUSEPORT
+               unintended                                                                  
+               connection                                                                  
+               failures with                                                               
+               SO_REUSEPORT                                                                
+
+  2021-05      Calling kernel     BPF                  5.x             M                   kfunc
+               functions from BPF                                                          
+
+  2021         bridge per-VLAN    bridge               5.x             M                   bridge, VLAN,
+               multicast                                                                   multicast
+
+  2021         MCTP core protocol protocol             5.x             M                   AF_MCTP
+               stack                                                                       
+
+  2021-08      Nftables reaches   firewall             5.x             U                   nftables
+               1.0                                                                         
+
+  2021-12      Zero-copy network  zero-copy            6.0-era         D/M                 io_uring, ZC TX
+               transmission with                                                           
+               io_uring                                                                    
+
+  2021-12      standalone TC      TC/offload           5.x             M                   TC, HW offload
+               action hardware                                                             
+               offload                                                                     
+
+  2021         IPv6 IOAM          telemetry            5.15/5.16       M                   IOAM, IPv6
+
+  2022-02      Going big with TCP TCP/performance      5.19            M                   BIG TCP
+               packets                                                                     
+
+  2022-02      Better visibility  observability        5.x             M                   skb_drop_reason
+               into                                                                        
+               packet-dropping                                                             
+               decisions                                                                   
+
+  2022-04      Extending          TLS                  5.x             D/M                 KTLS
+               in-kernel TLS                                                               
+               support                                                                     
+
+  2022-06      Adding an          TLS                  5.x             D                   net/handshake
+               in-kernel TLS                                                               
+               handshake                                                                   
+
+  2022         BPF conntrack      conntrack/BPF        6.x             M                   conntrack, BPF
+               lifecycle kfuncs                                                            
+
+  2022         delayed TCP        conntrack            6.x             F                   conntrack, TCP
+               packets and CT                                                              
+               timeout refresh                                                             
+
+  2022         SRv6 Headend       SRv6                 6.x             M                   SRv6
+               Reduced                                                                     
+
+  2022-10      TCP source-port    TCP                  6.x             D                   TCP, privacy
+               fingerprinting                                                              
+
+  2022-11      Moving past TCP in transport            6.x             D                   datacenter
+               the data center,                                                            
+               part 2                                                                      
+
+  2023         IPv4 BIG TCP       TCP/performance      6.3             M                   BIG TCP, IPv4
+
+  2023         Netlink protocol   UAPI                 6.x             M                   Netlink, YAML,
+               specs / YNL                                                                 YNL
+
+  2023         SCM_PIDFD /        sockets              6.x             M                   pidfd, Unix
+               SO_PEERPIDFD                                                                sockets
+
+  2023         MPTCP protocol     MPTCP/BPF            6.x             M                   MPTCP, BPF
+               switching with BPF                                                          
+
+  2023         SRv6               SRv6                 6.x             M/F                 SRv6
+               PSP/NEXT-C-SID                                                              
+
+  2023         partial TC HW      TC/offload           6.x             M                   TC, offload
+               offload                                                                     
+               continuation                                                                
+
+  2023-11      The                virtual netdev       6.7             M                   netkit, BPF
+               BPF-programmable                                                            
+               network device                                                              
+
+  2023--24     virtio-net AF_XDP  VM networking        6.x             R/M-parts           virtio-net,
+               zero-copy series                                                            AF_XDP
+
+  2024         Device Memory TCP  zero-copy/RX         6.12            M                   devmem, netmem
+               development                                                                 
+
+  2024-06      P4TC hits a brick  TC/P4                ---             S/D                 P4TC
+               wall                                                                        
+
+  2024         RTNL-less qdisc    scalability          6.x             M/F                 RTNL, qdisc
+               dumps                                                                       
+
+  2024-09      in-kernel QUIC     transport/security   ---             R                   QUIC
+               initial series                                                              
+
+  2024-11      struct sockaddr    sockets/UAPI         6.x             D/F                 sockaddr
+               flexible-array                                                              
+               issue                                                                       
+
+  2024-12      The Homa network   transport            ---             R/D                 Homa
+               protocol                                                                    
+
+  2025-03      Warming up to      memory/RX            6.x             D/M                 netmem, pages
+               frozen pages for                                                            
+               networking                                                                  
+
+  2025         BPF qdisc          TC/BPF               6.x             M                   qdisc, struct_ops
+
+  2025         io_uring zero-copy zero-copy/RX         6.15            M                   io_uring,
+               RX                                                                          page_pool
+
+  2025         TCP_RTO_MAX_MS     TCP API              6.15            M                   TCP, RTO
+
+  2025         BPF network        observability        6.15            M                   BPF, latency
+               timestamp                                                                   
+               callbacks                                                                   
+
+  2025         Device Memory TCP  zero-copy/TX         6.16            M                   devmem
+               TX                                                                          
+
+  2025         DCCP removal       protocol removal     6.x             X                   DCCP
+
+  2025-05      Faster firewalls   firewall/BPF         userspace/BPF   U/D                 bpfilter
+               with bpfilter                                                               
+
+  2025         local TCP          routing              6.x             M/F                 ECMP, TCP
+               multipath routing                                                           
+               improvements                                                                
+
+  2025-07      QUIC for the       transport/security   ---             R/D                 QUIC
+               kernel                                                                      
+
+  2025         AccECN core series TCP/ECN              6.18            M                   AccECN
+
+  2025         UDP RX             UDP/performance      6.18            M                   UDP
+               optimization                                                                
+
+  2025         DIBS               local transport      6.18            M                   DIBS
+
+  2025         default socket     socket memory        6.18            M                   rmem
+               rmem 4MB                                                                    
+
+  2025         per-netns          conntrack            ---             R                   conntrack, netns
+               conntrack hash RFC                                                          
+
+  2025-11      A struct sockaddr  sockets/UAPI         6.x             D/F                 sockaddr
+               sequel                                                                      
+
+  2026-01      netkit queue       VM/container         7.x-era         R/M                 netkit, AF_XDP
+               leasing +          networking                                               
+               io_uring/AF_XDP                                                             
+
+  2026-01      double             tunnel/performance   7.x-era         R/M                 GENEVE, VXLAN
+               GENEVE/VXLAN                                                                
+               tunnel GRO/GSO                                                              
+
+  2026-02      More accurate      TCP/ECN              7.0 follow-up   F/D                 AccECN
+               congestion                                                                  
+               notification for                                                            
+               TCP                                                                         
+
+  2026         CAKE multiqueue    qdisc                7.0             M                   CAKE
+
+  2026         VSOCK network      virtualization       7.0             M                   VSOCK, netns
+               namespaces                                                                  
+
+  2026         UDP-Lite removal   protocol removal     7.1             X                   UDP-Lite
+
+  2026         legacy network     removal              7.1             X                   ATM, AX25, ISDN,
+               subsystem removal                                                           CAIF
+               wave                                                                        
+
+  2026         TCP-AO → libcrypto TCP/security         7.2             F                   TCP-AO
+
+  2026         MPTCP max subflows MPTCP                7.2             F                   MPTCP
+               8→64                                                                        
+
+  2026-07      netkit/BPF         VM networking        7.x             D/F                 netkit
+               user-space update                                                           
+
+  2026-08      Examining other    BPF/netns            ---             D/R                 BPF, netns
+               network namespaces                                                          
+               using BPF                                                                   
+
+  2026-08      BIG TCP over       tunnel/TCP           7.3 dev         M-pending-release   BIG TCP
+               VXLAN/GENEVE                                                                
+
+  2026         conntrack          conntrack            7.x             F                   conntrack
+               timeout-policy                                                              
+               lifetime                                                                    
+
+  2026         flowtable GC       flowtable            7.x             F                   flowtable, GC
+               confirmation race                                                           
+               fix                                                                         
+  ----------------------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 56. Canonical status rules
+
+To avoid overstating upstream state, the inventory uses the following
+rules.
+
+### `merged`
+
+Verified as present in a mainline release or mainline development tree.
+
+### `merged-follow-up`
+
+Not the introduction of a feature; modifies/scales/fixes an already
+merged architecture.
+
+### `RFC` / `under-review`
+
+LWN or mailing-list coverage exists, but this document has not
+established that the complete feature was merged.
+
+### `stalled`
+
+A significant design effort whose proposed architecture did not become
+the expected mainline solution.
+
+### `removed`
+
+Code/protocol/subsystem removed from mainline.
+
+### `userspace-milestone`
+
+Primarily a userspace release or userspace/kernel-interface maturity
+milestone.
+
+### `design-discussion`
+
+Important for understanding Linux networking direction but not itself a
+kernel feature.
+
+------------------------------------------------------------------------
+
+# 57. Coverage conclusion
+
+The audit now covers the major Linux networking architecture lines
+between 2019-05-07 and 2026-10-02:
+
+``` text
+packet memory:
+page_pool → netmem → devmem / io_uring ZC
+
+packet size:
+GRO/GSO → BIG TCP → tunnel BIG TCP
+
+programmability:
+XDP/BPF → struct_ops → socket lookup → netkit → BPF qdisc
+
+virtual networking:
+virtio-net → AF_XDP ZC → multi-buffer → netkit queue leasing
+
+control plane:
+ioctl → Generic Netlink → YAML/YNL
+
+routing:
+FIB → nexthop objects → multipath refinements
+
+firewall:
+nftables → flowtable → HW offload
+
+observability:
+skb_drop_reason → BPF network timestamps
+
+locking/scalability:
+global RTNL → narrower locking → per-netns RTNL work
+
+transport:
+TCP → MPTCP / AccECN / TCP-AO
+      + QUIC/Homa development
+
+protocol maintenance:
+DECnet → DCCP → UDP-Lite and other legacy removals
+```
+
+The remaining work is no longer broad discovery. It is **verification
+and normalization**:
+
+1.  replace remaining approximate dates with exact LWN publication
+    dates;
+2.  attach exact mainline commit hashes where verified;
+3.  resolve every `R/M-parts` item into per-patch merged status;
+4.  deduplicate articles that appear both as patch postings and feature
+    articles;
+5.  verify that every canonical inventory row has at least one primary
+    upstream source;
+6.  generate a compact release-by-release appendix from the canonical
+    inventory.
+
+This distinction is important: the thematic search is substantially
+complete, while commit-level provenance is intentionally still stricter
+and incomplete where evidence has not yet been verified.
