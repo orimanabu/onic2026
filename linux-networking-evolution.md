@@ -10973,34 +10973,34 @@ Kernel Recipes archive:
 
 # 106. Kernel Recipes → LWN → mainline mapping
 
-  -------------------------------------------------------------------------------
-  Kernel             Year Archive      Change-log lineage  Phase
-  Recipes                 category                         
-  ------------- --------- ------------ ------------------- ----------------------
-  XDP closer         2019 networking   XDP →               design/architecture
-  integration                          page_pool/AF_XDP →  
-  with network                         netkit              
-  stack                                                    
+  ------------------------------------------------------------------------------
+  Kernel            Year Archive      Change-log lineage  Phase
+  Recipes                category                         
+  ------------- -------- ------------ ------------------- ----------------------
+  XDP closer        2019 networking   XDP →               design/architecture
+  integration                         page_pool/AF_XDP →  
+  with network                        netkit              
+  stack                                                   
 
-  BPF at             2019 networking   BPF networking →    deployment/design
-  Facebook                             struct_ops/socket   
-                                       hooks/netkit        
+  BPF at            2019 networking   BPF networking →    deployment/design
+  Facebook                            struct_ops/socket   
+                                      hooks/netkit        
 
-  Faster IO          2019 storage      io_uring →          pre-networking
-  through                              networking TX/RX    foundation
-  io_uring                                                 
+  Faster IO         2019 storage      io_uring →          pre-networking
+  through                             networking TX/RX    foundation
+  io_uring                                                
 
-  What's new         2022 storage      io_uring → ZC       foundation/merge-era
-  with io_uring                        networking          
+  What's new        2022 storage      io_uring → ZC       foundation/merge-era
+  with io_uring                       networking          
 
-  On the way to      2023 storage      io_uring ZC TX/RX   design/merge-era
-  io_uring                                                 
-  networking                                               
+  On the way to     2023 storage      io_uring ZC TX/RX   design/merge-era
+  io_uring                                                
+  networking                                              
 
-  Netconf 2023       2023 networking   SO_DEVMEM, BIG TCP, multi-lineage workshop
-  Workshop                             XDP/BPF, IPsec,     
-                                       nftables, TCP/ML    
-  -------------------------------------------------------------------------------
+  Netconf 2023      2023 networking   SO_DEVMEM, BIG TCP, multi-lineage workshop
+  Workshop                            XDP/BPF, IPsec,     
+                                      nftables, TCP/ML    
+  ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -12183,70 +12183,70 @@ a core networking memory-management primitive.
 
 # 118. LPC timeline mapped to the major change-log lineages
 
-  ---------------------------------------------------------------------------------
-            Year LPC topic          Change-log lineage           Phase
-  -------------- ------------------ ---------------------------- ------------------
-            2019 Multipath TCP      MPTCP 5.6                    pre-merge
-                 Upstreaming                                     
+  -------------------------------------------------------------------------------
+          Year LPC topic          Change-log lineage           Phase
+  ------------ ------------------ ---------------------------- ------------------
+          2019 Multipath TCP      MPTCP 5.6                    pre-merge
+               Upstreaming                                     
 
-            2019 Programmable       SK_LOOKUP                    pre-merge
-                 socket lookup with                              
-                 BPF                                             
+          2019 Programmable       SK_LOOKUP                    pre-merge
+               socket lookup with                              
+               BPF                                             
 
-            2019 netfilter hardware nftables/flowtable/offload   design/merge-era
-                 offloads                                        
+          2019 netfilter hardware nftables/flowtable/offload   design/merge-era
+               offloads                                        
 
-            2020 Programmable Qdisc BPF qdisc                    early design
-                 with eBPF                                       
+          2020 Programmable Qdisc BPF qdisc                    early design
+               with eBPF                                       
 
-            2020 BPF TCP header     BPF TCP programmability      design/merge-era
-                 option/CC/socket                                
-                 storage                                         
+          2020 BPF TCP header     BPF TCP programmability      design/merge-era
+               option/CC/socket                                
+               storage                                         
 
-            2020 OVS + AF_XDP       AF_XDP/virtual networking    application
+          2020 OVS + AF_XDP       AF_XDP/virtual networking    application
 
-            2021 SO_REUSEPORT       SO_REUSEPORT failover        merge/post-merge
-                 socket migration                                
+          2021 SO_REUSEPORT       SO_REUSEPORT failover        merge/post-merge
+               socket migration                                
 
-            2021 TSO/GRO/Jumbo for  XDP multi-buffer             pre-merge
-                 XDP                                             
+          2021 TSO/GRO/Jumbo for  XDP multi-buffer             pre-merge
+               XDP                                             
 
-            2021 bpfilter           BPF firewall                 design
+          2021 bpfilter           BPF firewall                 design
 
-            2022 high-speed Linux   BIG TCP/ZC/devmem            architecture
-                 networking                                      
+          2022 high-speed Linux   BIG TCP/ZC/devmem            architecture
+               networking                                      
 
-            2022 machine-readable   YNL                          pre-merge
-                 Netlink YAML                                    
+          2022 machine-readable   YNL                          pre-merge
+               Netlink YAML                                    
 
-            2022 MPTCP BPF +        MPTCP extensibility          merge/design
-                 Netlink                                         
+          2022 MPTCP BPF +        MPTCP extensibility          merge/design
+               Netlink                                         
 
-            2022 XDP hardware hints packet metadata              design
+          2022 XDP hardware hints packet metadata              design
 
-            2022 packet queueing in programmable queueing        RFC
-                 XDP                                             
+          2022 packet queueing in programmable queueing        RFC
+               XDP                                             
 
-            2023 io_uring ZC        io_uring ZCRX                pre-merge
-                 receive                                         
+          2023 io_uring ZC        io_uring ZCRX                pre-merge
+               receive                                         
 
-            2024 Per Netns RTNL     RTNL breakup                 pre/merge-era
+          2024 Per Netns RTNL     RTNL breakup                 pre/merge-era
 
-            2024 network            virtio/AF_XDP/netkit         architecture
-                 virtualization                                  
-                 overhead                                        
+          2024 network            virtio/AF_XDP/netkit         architecture
+               virtualization                                  
+               overhead                                        
 
-            2025 zero-copy in       netkit queue leasing         design/merge-era
-                 containers                                      
+          2025 zero-copy in       netkit queue leasing         design/merge-era
+               containers                                      
 
-            2025 packet metadata    XDP/BPF metadata             ongoing
+          2025 packet metadata    XDP/BPF metadata             ongoing
 
-            2025 XDP on AMD GPU     devmem/P2PDMA/XDP            post-merge
-                                                                 extension
+          2025 XDP on AMD GPU     devmem/P2PDMA/XDP            post-merge
+                                                               extension
 
-            2025 MANA RX page_pool  page_pool                    post-merge
-                                                                 application
-  ---------------------------------------------------------------------------------
+          2025 MANA RX page_pool  page_pool                    post-merge
+                                                               application
+  -------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -12773,69 +12773,69 @@ enough of the physical data path to containers and VMs.
 
 # 125. Updated LPC canonical inventory
 
-  -----------------------------------------------------------------------------
-                Year Session          LPC area          Canonical role
-  ------------------ ---------------- ----------------- -----------------------
-                2019 Multipath TCP    Networking        MPTCP pre-merge
-                     Upstreaming                        
+  ---------------------------------------------------------------------------
+              Year Session          LPC area          Canonical role
+  ---------------- ---------------- ----------------- -----------------------
+              2019 Multipath TCP    Networking        MPTCP pre-merge
+                   Upstreaming                        
 
-                2019 Programmable     Networking        SK_LOOKUP pre-merge
-                     socket lookup                      
-                     with BPF                           
+              2019 Programmable     Networking        SK_LOOKUP pre-merge
+                   socket lookup                      
+                   with BPF                           
 
-                2019 Challenges of    Refereed/RDMA     DMA/P2P/device-memory
-                     the RDMA                           problem-space
-                     subsystem                          
+              2019 Challenges of    Refereed/RDMA     DMA/P2P/device-memory
+                   the RDMA                           problem-space
+                   subsystem                          
 
-                2019 RDMA MC          RDMA              HMM/DMA-BUF/P2P
-                                                        supporting context
+              2019 RDMA MC          RDMA              HMM/DMA-BUF/P2P
+                                                      supporting context
 
-                2020 xen-netfront and Networking+BPF    virtual-NIC XDP design
-                     virtio_net XDP                     
-                     offloading                         
+              2020 xen-netfront and Networking+BPF    virtual-NIC XDP design
+                   virtio_net XDP                     
+                   offloading                         
 
-                2020 Userspace OVS    Networking+BPF    hybrid HW/XDP/AF_XDP
-                     with HW Offload                    datapath
-                     and AF_XDP                         
+              2020 Userspace OVS    Networking+BPF    hybrid HW/XDP/AF_XDP
+                   with HW Offload                    datapath
+                   and AF_XDP                         
 
-                2020 A programmable   Networking+BPF    BPF-qdisc early design
-                     Qdisc with eBPF                    
+              2020 A programmable   Networking+BPF    BPF-qdisc early design
+                   Qdisc with eBPF                    
 
-                2021 TSO/GRO/Jumbo    BPF+Networking    XDP multi-buffer
-                     frames for XDP                     precursor
+              2021 TSO/GRO/Jumbo    BPF+Networking    XDP multi-buffer
+                   frames for XDP                     precursor
 
-                2021 io_uring: BPF    Refereed          io_uring/BPF context
-                     controlled I/O                     
+              2021 io_uring: BPF    Refereed          io_uring/BPF context
+                   controlled I/O                     
 
-                2022 High-speed Linux eBPF+Networking   BIG-TCP/ZC architecture
-                     TCP                                
+              2022 High-speed Linux eBPF+Networking   BIG-TCP/ZC architecture
+                   TCP                                
 
-                2022 Netlink YAML     eBPF+Networking   YNL pre-merge
+              2022 Netlink YAML     eBPF+Networking   YNL pre-merge
 
-                2022 MPTCP BPF +      eBPF+Networking   MPTCP extensibility
-                     Netlink                            
+              2022 MPTCP BPF +      eBPF+Networking   MPTCP extensibility
+                   Netlink                            
 
-                2022 PCIe topology to VFIO/IOMMU/PCI    virtualized P2P
-                     guest for P2P                      constraint
+              2022 PCIe topology to VFIO/IOMMU/PCI    virtualized P2P
+                   guest for P2P                      constraint
 
-                2023 Zero Copy        eBPF+Networking   io_uring ZCRX pre-merge
-                     Receive using                      
-                     io_uring                           
+              2023 Zero Copy        eBPF+Networking   io_uring ZCRX pre-merge
+                   Receive using                      
+                   io_uring                           
 
-                2024 Per Netns RTNL   Networking        RTNL breakup
+              2024 Per Netns RTNL   Networking        RTNL breakup
 
-                2024 Network          Networking        virtual-network
-                     virtualization                     optimization
-                     overhead                           
+              2024 Network          Networking        virtual-network
+                   virtualization                     optimization
+                   overhead                           
 
-                2025 Zero-copy in     Networking        netkit queue leasing
-                     containers                         
+              2025 Zero-copy in     Networking        netkit queue leasing
+                   containers                         
 
-                2025 Packet Metadata  Networking        metadata API evolution
+              2025 Packet Metadata  Networking        metadata API evolution
 
-                2025 XDP on AMD GPUs  Networking        devmem/P2PDMA
-                                                        post-merge extension
-  -----------------------------------------------------------------------------
+              2025 XDP on AMD GPUs  Networking        devmem/P2PDMA
+                                                      post-merge extension
+  ---------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -13094,28 +13094,28 @@ global RTNL → unlocked flags → RCU readers → per-netns RTNL → subsystem 
 
 # 129. Source-role matrix
 
-  -----------------------------------------------------------------------
-  Source                              Best used for
-  ----------------------------------- -----------------------------------
-  Kernel Recipes                      architectural motivation and
-                                      production experience
+  ---------------------------------------------------------------------
+  Source                             Best used for
+  ---------------------------------- ----------------------------------
+  Kernel Recipes                     architectural motivation and
+                                     production experience
 
-  Linux Plumbers Conference           cross-subsystem API/design
-                                      discussion and unresolved problems
+  Linux Plumbers Conference          cross-subsystem API/design
+                                     discussion and unresolved problems
 
-  Netdev                              networking-specific implementation
-                                      and datapath design
+  Netdev                             networking-specific implementation
+                                     and datapath design
 
-  LWN                                 independent explanation, review
-                                      history and merge interpretation
+  LWN                                independent explanation, review
+                                     history and merge interpretation
 
-  lore / patchwork                    exact revision and accepted-series
-                                      evidence
+  lore / patchwork                   exact revision and accepted-series
+                                     evidence
 
-  git.kernel.org                      canonical mainline commits
+  git.kernel.org                     canonical mainline commits
 
-  release pulls/tags                  release-level confirmation
-  -----------------------------------------------------------------------
+  release pulls/tags                 release-level confirmation
+  ---------------------------------------------------------------------
 
 ``` text
 Why?            → KR / LPC / Netdev
@@ -13139,3 +13139,492 @@ Which release?  → release pull/tag
 
 The document is intended to function as both a Linux networking history
 and an auditable source map.
+
+------------------------------------------------------------------------
+
+# 131. LWN article completeness audit
+
+## 131.1 Method
+
+The audit uses two independent discovery paths.
+
+``` text
+A. Release-oriented sweep
+   LWN Kernel Index
+      ↓
+   every merge-window summary from Linux 5.2 through Linux 7.3
+      ↓
+   inspect Networking/BPF/io_uring-related entries
+
+B. Topic-oriented sweep
+   TCP / UDP / socket / routing / nexthop
+   BPF / XDP / AF_XDP
+   netfilter / nftables / conntrack
+   MPTCP / TLS / QUIC
+   io_uring / zero-copy / device memory
+   netlink / YNL
+   virtio / netkit
+```
+
+This is more reliable than using a search engine alone: important
+networking changes are sometimes documented only in LWN's merge-window
+summaries.
+
+Article types are tagged as:
+
+``` text
+[F] feature/explanatory article
+[P] patch-series archive page
+[M] merge-window/release summary
+[C] conference report
+```
+
+A feature may legitimately have more than one LWN entry.
+
+## 131.2 Newly recovered or newly promoted entries
+
+### 2019
+
+``` text
+2019-05-08 [C/F] Memory management for 400Gb/s interfaces
+2019-05-10 [M]   The first half of the 5.2 merge window
+2019-05-20 [M]   The rest of the 5.2 merge window
+2019-06-27 [F]   Providing wider access to bpf()
+2019-07-12 [M]   5.3 Merge window, part 1
+2019-07-22 [M]   5.3 Merge window, part 2
+2019-08-28 [P]   Programming socket lookup with BPF
+2019-09-23 [M]   5.4 Merge window, part 1
+2019-09-26 [C/F] Upstreaming multipath TCP
+2019-09-30 [M]   5.4 Merge window, part 2
+2019-10-23 [F]   BPF and the realtime patch set
+2019-12-02 [M]   5.5 Merge window, part 1
+2019-12-09 [M]   The end of the 5.5 merge window
+```
+
+Important release-level findings recovered by the merge-window sweep
+include:
+
+``` text
+5.3:
+0.0.0.0/8 acceptance
+cgroup BPF setsockopt/getsockopt
+per-RTT socket BPF hook
+io_uring sendmsg/recvmsg
+
+5.4:
+BPF SYN-cookie hook for TC/XDP
+BPF CO-RE/libbpf relocation foundation
+
+5.5:
+network-interface alternative names
+TIPC encryption/authentication
+VSOCK multi-transport
+Wi-Fi airtime queue limits
+```
+
+### 2020
+
+``` text
+2020-01-02 [F] A medley of performance-related BPF patches
+2020-01-24 [F] The rapid growth of io_uring
+2020-01-30 [M] The 5.6 merge window opens
+2020-02-07 [F] Kernel operations structures in BPF
+2020-02-10 [M] The rest of the 5.6 merge window
+2020-04-03 [M] 5.7 Merge window part 1
+2020-04-13 [M] 5.7 Merge window part 2
+2020-06-05 [M] 5.8 Merge window, part 1
+2020-07-12 [P] BPF XDP link
+2020-08-07 [M] 5.9 Merge window, part 1
+2020-08-17 [M] 5.9 Merge window, part 2
+2020-08-21 [P] bpf: add MPTCP subflow support
+2020-10-09 [F] NAPI polling in kernel threads
+2020-10-16 [M] 5.10 Merge window, part 1
+2020-10-26 [M] The rest of the 5.10 merge window
+```
+
+Release-level networking details include:
+
+``` text
+5.6:
+WireGuard
+ETS qdisc
+BPF struct_ops/TCP congestion control
+initial MPTCP
+
+5.7:
+bareudp
+802.11 hardware encapsulation offload
+
+5.8:
+XDP buffer-allocation API
+
+5.9:
+BPF TCP/UDP socket iterators
+BPF_PROG_TYPE_SK_LOOKUP
+```
+
+The `Programming socket lookup with BPF` RFC in 2019 plus the 5.9
+merge-window report now provide a clear LWN-side design-to-landing trail
+for SK_LOOKUP.
+
+### 2021
+
+Canonical feature articles already indexed remain important:
+
+``` text
+2021-03-04 [F] BPF meets io_uring
+2021-04-23 [F] Avoiding unintended connection failures with SO_REUSEPORT
+2021-05-13 [F] Calling kernel functions from BPF
+2021-08-27 [F] Nftables reaches 1.0
+2021-12-30 [F] Zero-copy network transmission with io_uring
+```
+
+The audit additionally promotes all merge-window summaries for:
+
+``` text
+5.11
+5.12
+5.13
+5.14
+5.15
+5.16
+```
+
+as release-level networking sources.
+
+This is important for changes such as:
+
+``` text
+TCP zero-copy RX
+SO_REUSEPORT failover
+per-VLAN bridge multicast
+IPv6 IOAM
+MCTP
+SO_RESERVE_MEM
+```
+
+even when there is no separate feature article for each one.
+
+### 2022
+
+``` text
+2022-02-02 [P] tcp: BIG TCP implementation
+2022-02-14 [F] Going big with TCP packets
+2022-02-25 [F] Better visibility into packet-dropping decisions
+2022-03/04 [M] 5.18 merge-window summaries
+2022-05/06 [M] 5.19 merge-window summaries
+2022-06-02 [M] weekly/merge coverage confirming BIG TCP + MPTCP userspace API
+2022-08 [M] 6.0 merge-window summaries
+2022-10 [M] 6.1 merge-window summaries
+2022-11-02 [P/RFC] zero-copy RX for io_uring v3
+```
+
+The 5.19 merge-window coverage is particularly important because it
+confirms together:
+
+``` text
+BIG TCP merged
+skb-drop annotations expanded
+MPTCP TCP fallback
+new userspace API for MPTCP flow management
+```
+
+The early io_uring ZCRX pages are retained as `[P/RFC]`; they are not
+presented as mainline functionality.
+
+## 131.3 2023--2024 audit
+
+### 2023
+
+The release sweep covers:
+
+``` text
+6.2
+6.3
+6.4
+6.5
+6.6
+6.7
+```
+
+High-value feature/patch entries include:
+
+``` text
+IPv4 BIG TCP patch series
+Netlink/YNL specification work
+Device Memory TCP RFC/revisions
+io_uring ZCRX RFC/revisions
+AF_XDP multi-buffer
+2023-11-06 [F] The BPF-programmable network device
+```
+
+The 6.3 merge-window summaries are retained as release evidence for IPv4
+BIG TCP.
+
+### 2024
+
+``` text
+2024-06-10 [F] P4TC hits a brick wall
+2024-06-27 [F] Direct-to-device networking
+```
+
+and merge-window summaries for:
+
+``` text
+6.8
+6.9
+6.10
+6.11
+6.12
+6.13
+```
+
+are canonical release-level sources.
+
+Two especially important merge-window anchors are:
+
+``` text
+6.12:
+Device Memory TCP RX merged
+
+6.13:
+per-network-namespace RTNL infrastructure
+new traffic-shaping API
+```
+
+P4TC remains tagged `RFC/development/stalled`, not a mainline feature.
+
+## 131.4 2025 audit
+
+Feature articles/patch archives include:
+
+``` text
+2025-03-13 [F] Warming up to frozen pages for networking
+2025-05-14 [F] Faster firewalls with bpfilter
+2025-02→05 [P] Device memory TCP TX revisions
+2025-07-22 [F] QUIC for the kernel
+```
+
+The release sweep covers:
+
+``` text
+6.14
+6.15
+6.16
+6.17
+6.18
+6.19 merge-window start in December
+```
+
+Important networking changes that are easy to miss without merge-window
+auditing:
+
+``` text
+6.14:
+RxRPC huge UDP frames + RACK-TLP
+tcp_tw_reuse_delay
+IP-TFS
+
+6.15:
+io_uring zero-copy RX
+TCP_RTO_MAX_MS
+BPF network timestamp callbacks
+continued RTNL breakup
+
+6.16:
+Device Memory TCP TX
+
+6.17:
+RFC6675 TCP loss-detection removal
+
+6.18:
+AccECN
+UDP RX optimization
+DIBS
+default socket receive buffer → 4MB
+TCP PSP
+
+6.19:
+TCP TX locking/scalability improvement
+container-oriented socket global-memory-limit exemption
+```
+
+The 47% UDP RX number is retained only as the benchmark result reported
+in the 6.18 merge-window article, not as a general performance
+guarantee.
+
+## 131.5 2026 audit through 2026-10-02
+
+Feature/conference articles include:
+
+``` text
+2026-02-18 [F] More accurate congestion notification for TCP
+2026-07-24 [C/F] An update on netkit and the use of BPF in user space
+2026-08-05 [C/F] Examining other network namespaces using BPF
+```
+
+Release sweep:
+
+``` text
+7.0
+7.1
+7.2
+7.3 merge window
+```
+
+Important release-level networking anchors:
+
+``` text
+7.0:
+AccECN follow-up/default-use generation
+
+7.1:
+UDP-Lite removal
+IPv6-as-module removal
+Unix socket user.* xattrs
+
+7.2:
+continued networking/BPF/MPTCP work; release summaries retained even where
+the networking changes are incremental
+
+7.3:
+BIG TCP over VXLAN and GENEVE
+```
+
+The 7.3 merge-window article is especially important because it provides
+LWN release-level confirmation that BIG TCP over UDP tunnels landed in
+the development cycle.
+
+## 131.6 Completeness status
+
+The audit now distinguishes three notions of "complete":
+
+``` text
+Release coverage:
+HIGH
+Every kernel development cycle from 5.2 through the 7.3 merge window has an LWN
+merge-window path in the audit.
+
+Major feature coverage:
+HIGH
+Every major lineage in the canonical inventory has at least one LWN feature,
+patch-series, conference, or merge-window anchor.
+
+Every networking-related LWN page:
+BEST-EFFORT, NOT PROVABLY EXHAUSTIVE
+LWN contains mailing-list mirrors, brief items, comments, driver-specific material,
+conference pages, and generic BPF articles whose relevance boundary is subjective.
+```
+
+Therefore the defensible wording is:
+
+> This is a release-complete and major-feature-comprehensive LWN
+> networking audit for 2019-05-07 through 2026-10-02, with best-effort
+> coverage of individual patch-series and feature pages.
+
+It should not be described as a mathematically exhaustive list of every
+LWN URL containing network-related material.
+
+# 132. LWN audit rules for the canonical inventory
+
+For each feature, retain:
+
+``` text
+1. explanatory feature article, if one exists;
+2. important initial RFC page;
+3. final/merge-near patch-series page;
+4. merge-window article confirming landing;
+5. conference report when it materially explains design motivation.
+```
+
+Do not retain every revision of every series in the top-level reading
+list. Full revision history belongs in the feature dossier.
+
+This avoids a common distortion:
+
+``` text
+many LWN URLs
+≠
+many independent features
+```
+
+while still preserving an auditable trail from design to mainline.
+
+# 133. Newly strengthened LWN provenance chains
+
+## SK_LOOKUP
+
+``` text
+2019 [P] Programming socket lookup with BPF
+  ↓
+LPC 2019 discussion
+  ↓
+2020 [M] 5.9 merge-window report
+  ↓
+BPF_PROG_TYPE_SK_LOOKUP mainline
+```
+
+## BIG TCP
+
+``` text
+Netdev 0x15
+  ↓
+2022 [P] tcp: BIG TCP implementation
+  ↓
+2022 [F] Going big with TCP packets
+  ↓
+5.19 [M] merge-window confirmation
+  ↓
+2023 IPv4 BIG TCP [P/M]
+  ↓
+2026 tunnel BIG TCP [P]
+  ↓
+7.3 [M] VXLAN/GENEVE landing confirmation
+```
+
+## io_uring ZCRX
+
+``` text
+2022 Kernel Recipes design discussion
+  ↓
+2022 [P/RFC] zctap/io_uring ZCRX
+  ↓
+2023 LPC/Kernel Recipes/Netdev
+  ↓
+LWN v1...v13 patch-series trail
+  ↓
+6.15 [M] merge-window/mainline confirmation
+```
+
+## Device Memory TCP
+
+``` text
+2023 Netconf/Netdev design
+  ↓
+2024 [F] Direct-to-device networking
+  ↓
+v26 accepted series
+  ↓
+6.12 [M] RX landing
+  ↓
+2025 TX revisions
+  ↓
+v14/9
+  ↓
+6.16 [M] TX landing
+```
+
+## RTNL breakup
+
+``` text
+earlier unlocked/RCU work
+  ↓
+LPC 2024 Per Netns RTNL
+  ↓
+6.13 [M] per-netns RTNL
+  ↓
+6.15+ [M] continued dependency reduction
+```
+
+These chains are now preferred over citing a single LWN page as if it
+represented the entire history of a feature.
