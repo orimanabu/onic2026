@@ -7403,3 +7403,538 @@ Next verification order:
 The goal remains to upgrade each row to quality **A** where the upstream
 history permits it, without inventing a single "feature commit" for
 genuinely multi-commit features.
+
+------------------------------------------------------------------------
+
+# 70. Provenance verification pass 2 --- AccECN, RTNL, MPTCP/BPF, nexthop, AF_XDP
+
+## 70.1 AccECN --- correction and exact core anchors
+
+Earlier revisions of this document stopped the review history too early
+at v16. The protocol series continued:
+
+``` text
+v16  2025-09-06
+v17  2025-09-08
+...
+v19  2025-09-16
+```
+
+The v17 cover letter explicitly disabled AccECN enablement until the
+complete feature had been accepted. v19 had been reduced to the ten core
+protocol patches.
+
+Verified mainline feature anchors:
+
+``` text
+542a495cbaa6dc57a310da62b501fdf318657cad
+tcp: AccECN core
+
+3cae34274c79e0c60ccd1c10516973af1aed2a7c
+tcp: accecn: AccECN negotiation
+```
+
+The core commit implements Accurate ECN accounting but deliberately does
+not by itself provide negotiation or the AccECN option; those arrive in
+subsequent commits.
+
+Therefore:
+
+``` text
+542a495cbaa6
+    = core accounting anchor
+
+NOT
+    = complete AccECN feature
+```
+
+The accepted lineage must be treated as a series containing:
+
+-   core Accurate ECN state/accounting;
+-   negotiation;
+-   receive byte counters;
+-   delivered-byte accounting;
+-   SACK option preparation;
+-   AccECN TCP option;
+-   option send control/failure handling.
+
+The core series entered the Linux 6.18 development cycle. Later releases
+continue deployment/CC/offload integration.
+
+**Quality: A for core + negotiation anchors; B for the complete later
+integration chain.**
+
+------------------------------------------------------------------------
+
+## 70.2 RTNL breakup --- correction: migration, not a one-release switch
+
+The Linux 6.13 networking pull describes per-netns RTNL as:
+
+> a very large, in-progress effort
+
+and says the new behavior was disabled by default.
+
+The key debug/migration mechanism is:
+
+``` text
+CONFIG_DEBUG_NET_SMALL_RTNL
+```
+
+Its help text is unusually explicit:
+
+``` text
+rtnl_lock()
+    │
+    ▼
+rtnl_net_lock()
+    │
+    ├── global RTNL
+    └── small per-netns RTNL mutex
+
+during conversion:
+    both locks are taken
+
+after conversion goal:
+    global rtnl_lock() can disappear
+    and rtnetlink gains per-netns scalability
+```
+
+A representative series patch is:
+
+``` text
+rtnetlink: Add per-netns RTNL.
+```
+
+which adds the per-netns mutex, locking helpers, lock ordering rules and
+the `DEBUG_NET_SMALL_RTNL` knob.
+
+### 6.13 scope
+
+The 6.13 pull lists work including:
+
+-   RCU-ifying FIB control-path pieces;
+-   per-netns locking helpers;
+-   namespacing the IPv4 address hash;
+-   `rtnl_register_many()`;
+-   moving validation out of RTNL;
+-   converting phonet handlers to RCU;
+-   converting IPv4 address manipulation to per-netns RTNL.
+
+### Important current-state correction
+
+The debug knob remains present in later kernel source, so this document
+must not describe 6.13 as "global RTNL replaced by per-netns RTNL".
+
+Correct timeline:
+
+``` text
+pre-6.13
+global RTNL
+    │
+    ▼
+6.13
+per-netns lock infrastructure +
+dual-lock debug conversion
+    │
+    ▼
+6.15 ... 7.x
+operation-by-operation RTNL dependency reduction
+    │
+    ▼
+target architecture
+fine/per-netns locking where possible
+```
+
+**Quality: A for the 6.13 migration architecture; per-operation
+conversion remains a multi-release provenance set rather than one
+feature commit.**
+
+------------------------------------------------------------------------
+
+## 70.3 MPTCP + BPF protocol switching
+
+The BPF MPTCP series evolved substantially before merge.
+
+A key design milestone was v6/v7:
+
+``` text
+update_socket_protocol()
+```
+
+hooked from `__sys_socket()`.
+
+Purpose:
+
+``` text
+legacy application
+
+socket(AF_INET, SOCK_STREAM, 0)
+              │
+              ▼
+BPF / security hook:
+update_socket_protocol()
+              │
+              ├── leave IPPROTO_TCP
+              └── return IPPROTO_MPTCP
+```
+
+This avoids the limitations of `mptcpize`/`LD_PRELOAD`, including
+applications that do not use libc and environments where launch-time
+environment changes are difficult.
+
+The series went through at least:
+
+``` text
+v6  introduces update_socket_protocol
+v7  hook details
+v8/v9 cleanup and validation
+later revisions before integration
+```
+
+A 2026 selftest fix independently confirms that the `mptcpify` BPF
+program in current kernels hooks `update_socket_protocol()` to rewrite
+eligible TCP socket creation into `IPPROTO_MPTCP`.
+
+### Important semantic detail
+
+The hook sees the raw socket `type` before normal masking of:
+
+``` text
+SOCK_CLOEXEC
+SOCK_NONBLOCK
+```
+
+which caused the 2026 `mptcpify` selftest/application mismatch and
+required masking `SOCK_TYPE_MASK` in the BPF program.
+
+This is a useful post-merge provenance point: it demonstrates that the
+API is not merely an RFC artifact.
+
+**Quality: B** --- merged/current behavior is independently verified,
+but the exact introduction hash should still be taken from the final
+accepted series rather than guessed from an RFC revision.
+
+------------------------------------------------------------------------
+
+## 70.4 Nexthop objects --- 2019 initial architecture
+
+Final initial series:
+
+``` text
+[PATCH v3 net-next 00/20]
+net: Enable nexthop objects with IPv4 and IPv6 routes
+2019-06-07
+```
+
+The author describes it as the **final set of the initial nexthop object
+work**.
+
+Motivating measurement:
+
+``` text
+~700k IPv4 routes
+1 hop       ~18 sec
+4 paths     ~28 sec
+```
+
+at the start of the work, with major costs attributed to repeated
+`synchronize_rcu()` and repeated validation of
+device/gateway/encapsulation information.
+
+The object model changes:
+
+``` text
+route
+  └── embedded/repeated nexthop information
+
+to
+
+route
+  └── nexthop ID
+          │
+          └── independently managed nexthop object/group
+```
+
+This aligns Linux better with routing-daemon and hardware models and
+enables later resilient groups.
+
+**Quality: C→B** --- final series and merge-era provenance verified;
+exact individual initial commit hashes remain to be enumerated.
+
+------------------------------------------------------------------------
+
+## 70.5 Resilient nexthop groups --- 2021
+
+LWN/netdev archives show the kernel series implementing resilient
+nexthop groups.
+
+The design introduces a bucket table:
+
+``` text
+flow hash
+   │
+   ▼
+bucket
+   │
+   ▼
+nexthop
+```
+
+When group membership or weight changes, buckets can migrate in a
+controlled way rather than remapping essentially every flow.
+
+Kernel-side series components include:
+
+-   resilient NH-group UAPI;
+-   group data structures;
+-   bucket implementation;
+-   notifications;
+-   netlink handlers;
+-   bucket get/dump;
+-   activity reporting;
+-   final enablement.
+
+The iproute2 support explicitly references kernel commit:
+
+``` text
+2a0186a37700b0d5b8cc40be202a62af44f02fa2
+```
+
+as the kernel-side resilient-nexthop-group implementation baseline.
+
+Example:
+
+``` text
+ip nexthop add id 10 group 1/2 type resilient \
+    buckets 8 idle_timer 60 unbalanced_timer 300
+```
+
+This gives a clean lineage:
+
+``` text
+2019 nexthop objects
+       │
+       ▼
+2021 resilient nexthop groups
+       │
+       ▼
+later local TCP / multipath selection refinements
+```
+
+**Quality: A/B** --- kernel baseline hash and final userspace API
+verified; the complete kernel multi-commit series can still be
+enumerated.
+
+------------------------------------------------------------------------
+
+## 70.6 AF_XDP multi-buffer --- Linux 6.6
+
+Final accepted development series:
+
+``` text
+[PATCH v7 bpf-next 00/24] xsk: multi-buffer support
+```
+
+Core verified RX commit:
+
+``` text
+804627751b4281dd95148e7564759145da67855e
+xsk: add support for AF_XDP multi-buffer on Rx path
+```
+
+The implementation maps one packet across multiple AF_XDP descriptors
+and uses:
+
+``` text
+XDP_PKT_CONTD
+```
+
+to tell userspace that the packet continues in the next descriptor.
+
+TX preparation commit:
+
+``` text
+b7f72a30e9ac2555b05afc6cfddc9dbc98e1eb8d
+xsk: introduce wrappers and helpers for supporting multi-buffer in Tx path
+```
+
+The accepted series also contains:
+
+-   `XSK_USE_SG`;
+-   EOP/continuation handling;
+-   RX multi-buffer;
+-   TX multi-buffer;
+-   zero-length descriptor handling;
+-   ZC maximum-fragment Netlink attribute;
+-   i40e/ice driver support;
+-   documentation;
+-   selftests.
+
+A 2026 bug fix carries:
+
+``` text
+Fixes: 804627751b42
+("xsk: add support for AF_XDP multi-buffer on Rx path")
+```
+
+which independently confirms the introduction anchor.
+
+### Why this matters
+
+``` text
+single-buffer AF_XDP
+     │
+packet must fit one UMEM frame
+     ▼
+multi-buffer AF_XDP
+     │
+packet spans descriptors
+     ▼
+jumbo / fragmented XDP representation
+```
+
+This is an important prerequisite for combining AF_XDP zero-copy with
+larger packets and modern multi-buffer drivers.
+
+**Quality: A.**
+
+------------------------------------------------------------------------
+
+# 71. virtio-net AF_XDP --- status must be split by capability
+
+The long virtio-net AF_XDP effort should not be represented as one
+binary "merged/not merged" feature.
+
+The series evolved through:
+
+``` text
+2023  large initial AF_XDP zero-copy series
+2023  net-next v1 19-patch series
+2024  virtnet preparation/refactoring
+2024  v5 15-patch zero-copy series
+2024  TX-focused series
+2025  zero-copy multi-buffer mergeable-RX RFC
+```
+
+This history contains three different questions:
+
+``` text
+A. Does virtio-net have the core/refactoring needed for AF_XDP?
+B. Does it support AF_XDP zero-copy for a given RX/TX mode?
+C. Does it support mergeable multi-buffer zero-copy?
+```
+
+The 2025 RFC for:
+
+``` text
+virtio-net: support zerocopy multi buffer XDP in mergeable
+```
+
+is explicit evidence that multi-buffer zero-copy in mergeable receive
+mode was still being developed separately.
+
+Therefore the canonical inventory should avoid a row such as:
+
+``` text
+virtio-net AF_XDP zero-copy | merged
+```
+
+without naming the mode/capability.
+
+Instead use capability rows:
+
+``` text
+virtio-net AF_XDP preparation       merged pieces
+virtio-net AF_XDP ZC RX/TX          verify per series/release
+mergeable multi-buffer AF_XDP ZC    RFC/development at 2025 point
+```
+
+**Quality: C pending a capability-by-capability mainline diff audit.**
+
+------------------------------------------------------------------------
+
+# 72. IOAM provenance --- current verified level
+
+The initial IPv6 IOAM series and current kernel implementation are both
+verified.
+
+Initial series:
+
+``` text
+Support for the IOAM Pre-allocated Trace with IPv6
+```
+
+Current code still implements:
+
+``` text
+IOAM6_TYPE_PREALLOC
+```
+
+in IPv6 hop-by-hop option processing.
+
+Later evolution includes a 2024 Generic Netlink multicast-event series
+for exporting IOAM trace data to userspace.
+
+This supports the conceptual evolution already documented:
+
+``` text
+IOAM packet trace implementation
+       │
+       ▼
+configuration / encapsulation
+       │
+       ▼
+trace export to userspace
+       │
+       ▼
+direct export / security work
+```
+
+**Quality: B/C** --- behavior and series lineage are verified; exact
+initial merge hashes remain for the next commit-enumeration pass.
+
+------------------------------------------------------------------------
+
+# 73. Quality table after pass 2
+
+  Feature                                     Previous                       Now
+  ------------------------------ --------------------- -------------------------
+  AccECN core                                        C                   **A/B**
+  RTNL migration architecture                        C                     **A**
+  MPTCP BPF protocol switching                       C                     **B**
+  nexthop objects                                    C                     **B**
+  resilient nexthop groups               not separated                   **A/B**
+  AF_XDP multi-buffer              previously verified                     **A**
+  virtio-net AF_XDP                          ambiguous   **C, capability-split**
+  IPv6 IOAM                                          C                   **B/C**
+
+Corrections introduced in this pass:
+
+1.  AccECN review history extends beyond v16 to v19.
+2.  Linux 6.13 is the start/major milestone of per-netns RTNL
+    conversion, not completion.
+3.  virtio-net AF_XDP must be described per RX/TX/mergeable/multi-buffer
+    capability.
+4.  AF_XDP multi-buffer RX introduction is exactly anchored at
+    `804627751b42`.
+
+------------------------------------------------------------------------
+
+# 74. Next exact-commit pass
+
+Remaining high-value commit enumeration:
+
+1.  initial MPTCP merge into Linux 5.6;
+2.  final `update_socket_protocol()` introduction commit;
+3.  MPTCP subflow BPF iterator/kfunc commits;
+4.  all 2019 initial nexthop-object commits;
+5.  all resilient-nexthop kernel commits around `2a0186a37700`;
+6.  initial IPv6 IOAM commit series;
+7.  virtio-net AF_XDP mainline capability matrix;
+8.  initial IPv6 BIG TCP series;
+9.  BIG TCP UDP-tunnel commits in 7.3 development;
+10. per-operation RTNL conversions in 6.13→7.3 where they represent
+    major API/locking milestones.
+
+The next pass should also start replacing mirror commit links with
+canonical `git.kernel.org` links wherever the exact object is known.
