@@ -867,7 +867,395 @@ tracepoints + eBPF
  → metadata filtering + packet journey reconstruction
 ```
 
-## B.13 Retis source trail
+## B.14 2023 OVSCon --- Retis as an OVS kernel/userspace correlator
+
+OVSCon 2023のRetis発表は、Retisを単なるgeneric Linux tracing
+toolとしてではなく、 OVS datapath
+troubleshootingのための統合observability toolとして理解する重要資料。
+
+発表ではnetwork tracingの問題を三つに整理している。
+
+``` text
+packet mutates
+    → tracking is required
+
+many places/components
+    → modular collectors are required
+
+many packets
+    → filtering is required
+```
+
+2023時点でRetisはOVS kernel datapathをfirst-class targetとして扱い、
+`openvswitch:ovs_dp_upcall`などのkernel tracepointに加え、
+`ovs-vswitchd`側のUSDT probesを利用してupcallを追跡していた。
+
+``` text
+OVS kernel datapath
+       │
+       │ flow miss
+       ▼
+ovs_dp_upcall                ← kernel tracepoint
+       │
+       ▼
+netlink socket
+       │
+       ▼
+ovs-vswitchd handler
+       │
+       ▼
+upcall_recv                  ← USDT
+       │
+       ▼
+classification / translation
+       │
+       ▼
+flow_put / flow_exec         ← USDT
+       │
+       ▼
+kernel datapath
+       │
+       ▼
+ovs_execute_actions
+```
+
+この点は重要で、eBPF/kprobe/tracepointだけではkernel→userspace→kernelという
+OVS slow path全体を一つのpacket journeyとして相関しにくい。
+Retisはkernel probesとUSDTを組み合わせてこの境界を越える。
+
+2023資料ではcollector modelも明確になっている。
+
+``` text
+skb          packet/skb information
+skb-tracking logical packet ID, clone/modification tracking
+skb-drop     drop reason
+ovs          OVS datapath + upcall tracking
+ct           conntrack state
+nft          nftables table/chain/verdict
+```
+
+したがってRetisは単なるpacket dumperではなく、 **multiple networking
+subsystemsのcontextを同じevent streamへ載せる** architectureを持つ。
+
+------------------------------------------------------------------------
+
+## B.15 OVS tracking --- packet identity is harder than skb identity
+
+OVSCon
+2023資料ではRetisのtrackingが`struct sk_buff *`だけに依存しないことも
+重要である。
+
+packetは:
+
+``` text
+NAT
+clone
+encapsulation
+userspace upcall
+```
+
+などでrepresentationやidentityが変化する。
+
+Retisはskb tracking ID、packet contentのhash、thread/event
+orderingなどを 状況に応じて利用してOVS upcallを相関する。
+
+これは:
+
+``` text
+same skb pointer
+      ≠
+same logical network packet
+```
+
+というnetwork observability上の本質的問題への対応である。
+
+したがってpacket trackingはkernel ABIではなくtool-side
+heuristic/correlation logicであり、各tracking
+boundaryにはassumptionがあることを明示する。
+
+------------------------------------------------------------------------
+
+## B.16 2024 OVSCon --- from upcall tracing to flow enrichment
+
+OVSCon 2024では2023年のarchitectureを維持しつつ、Retisはさらに:
+
+``` text
+skb
+ct
+ovs
+nft
+skb-drop
+packet filters
+metadata filters
+stack traces
+pcap
+Python bindings
+```
+
+を統合する方向へ進んでいる。
+
+OVS-specificな重要な進展が **OVS flow enrichment**。
+
+Retisはkernel datapathの`ovs_flow_tbl_lookup_stats`を(kret)probeし、
+
+``` text
+UFID
+flow pointer
+actions pointer
+lookup result
+```
+
+を取得する。
+
+さらにruntimeでOVS unixctlへ問い合わせ:
+
+``` text
+dpctl/get-flow
+ofproto/detrace
+```
+
+などを使ってkernel datapath flowをOVS/OpenFlow
+representationへ関連付ける。
+
+概念的には:
+
+``` text
+actual packet
+    ↓
+kernel networking event
+    ↓
+OVS datapath lookup
+    ↓
+UFID / sw_flow / actions
+    ↓
+Retis flow enrichment
+    ↓
+ODP flow/actions
+    ↓
+OpenFlow representation
+```
+
+となる。
+
+これは単なる「packetはOVSを通った」という観測から、
+
+**そのpacketがどのdatapath flow/actionと対応したか**
+
+を説明する方向への進化。
+
+ただし2024資料自身がflow deletion/update
+trackingやupcall時のflow表示などに
+制約があることを明示しており、完全なOVS state reconstructionではない。
+
+------------------------------------------------------------------------
+
+## B.17 `ofproto/trace` and Retis --- simulation vs live observation
+
+OVSには以前から`ofproto/trace`という強力なtroubleshooting
+mechanismがある。
+
+役割を単純化すると:
+
+``` text
+ofproto/trace
+      │
+      ▼
+given/synthetic packet
+      │
+      ▼
+simulate OVS/OpenFlow processing
+      │
+      ▼
+"OVS pipeline should do this"
+```
+
+Retisは:
+
+``` text
+actual packet
+      │
+      ▼
+live kernel/userspace probes
+      │
+      ▼
+observe real execution
+      │
+      ▼
+"this packet actually did this"
+```
+
+という役割。
+
+両者は競合するというより補完的。
+
+``` text
+               OVS troubleshooting
+
+             ┌──────────────────┐
+             │ expected behavior │
+             │   ofproto/trace   │
+             └────────┬─────────┘
+                      │ compare
+             ┌────────▼─────────┐
+             │ actual behavior   │
+             │      Retis        │
+             └──────────────────┘
+```
+
+特にconntrack state、kernel datapath behavior、upcall、runtime
+stateなどを含む 問題ではlive observationが重要になる。
+
+一方、OpenFlow pipeline logicそのものを理解するにはsimulation-based
+traceも 依然として有用。
+
+------------------------------------------------------------------------
+
+## B.18 2025 --- arbitrary-point packet dumping becomes user-facing
+
+2025年1月のRed Hat Developer記事は、Retisのgeneric Linux
+networking側の価値を 明確に説明している。
+
+traditional capture:
+
+``` text
+NIC driver
+    │
+    ├── PF_PACKET / tcpdump
+    │
+network stack
+```
+
+では基本的にdriverとnetwork stackの境界付近のpacket stateを観測する。
+
+Retis:
+
+``` text
+netif_receive_skb()   ← dump
+       ↓
+IP                    ← dump
+       ↓
+netfilter             ← dump
+       ↓
+OVS                   ← dump
+       ↓
+TCP/UDP               ← dump
+       ↓
+net_dev_start_xmit    ← dump
+```
+
+ではskb-aware kernel function/tracepointをcapture
+pointとして選択できる。
+
+さらに複数probeを同時に使い、packet trackingによってflowを再構成できる。
+
+Retisで収集したpacketを`pcap`へ変換しtcpdump/Wiresharkへ渡せる点も重要。
+
+``` text
+kernel-internal capture
+        ↓
+      Retis
+        ↓
+       pcap
+        ↓
+tcpdump / Wireshark
+```
+
+つまり新しいkernel observabilityを既存packet-analysis
+ecosystemへ橋渡ししている。
+
+------------------------------------------------------------------------
+
+## B.19 Revised Retis evolution
+
+追加資料を踏まえるとRetisの発展は次のように整理できる。
+
+``` text
+Linux kernel foundations
+
+tracepoints / kprobes
+        +
+       eBPF
+        +
+       BTF
+        +
+skb_drop_reason
+        │
+        ▼
+2023 Retis / OVSCon
+        │
+        ├─ arbitrary kernel probes
+        ├─ skb tracking
+        ├─ skb-drop
+        ├─ conntrack / nftables
+        └─ OVS upcall tracking
+             kernel ↔ ovs-vswitchd
+        │
+        ▼
+2024 Retis / OVSCon
+        │
+        ├─ metadata filtering
+        ├─ richer post-processing
+        ├─ Python integration
+        └─ OVS flow enrichment
+             actual packet
+                ↔ datapath flow
+                ↔ OpenFlow
+        │
+        ▼
+2025 Retis
+        │
+        ├─ arbitrary-point packet dumping
+        ├─ pcap export
+        └─ kernel metadata filtering
+        │
+        ▼
+network-stack journey analysis
+```
+
+------------------------------------------------------------------------
+
+## B.20 Observability evolution --- final interpretation
+
+この資料全体ではRetisを次の位置に置く。
+
+``` text
+COUNTERS
+"something happened"
+      ↓
+PACKET CAPTURE
+"this packet crossed this interface"
+      ↓
+KERNEL TRACING
+"this code path handled this packet"
+      ↓
+STRUCTURED REASONS
+"this is why it was dropped"
+      ↓
+PACKET TRACKING
+"these events belong to the same logical packet"
+      ↓
+CROSS-SUBSYSTEM CORRELATION
+"the packet crossed IP/NF/CT/OVS..."
+      ↓
+KERNEL ↔ USERSPACE CORRELATION
+"the OVS upcall went to ovs-vswitchd and came back"
+      ↓
+FLOW ENRICHMENT
+"this actual packet corresponds to this OVS/OpenFlow state"
+```
+
+この意味でRetisはLinux kernel networkingの新しいforwarding
+architectureではない。
+
+**Linux networking stackが長年かけて獲得したprogrammability、typed
+metadata、 tracepoints、structured drop
+semanticsを統合し、複雑化したdatapathを explainableにするtooling layer**
+
+として扱うのが最も正確。
+
+------------------------------------------------------------------------
+
+## B.21 Retis source trail
 
 この系譜のRetis側の主要資料として以下を扱う。
 
