@@ -764,7 +764,8 @@ lore で照合できたものだけを確定情報として追加する。
 4.  Device Memory TCP RX
 5.  Device Memory TCP TX
 6.  io_uring zero-copy TX/RX
-7.  page_pool / netmem / DIBS
+7.  page_pool / netmem / memory-provider; DIBS (separate shared-memory
+    lineage)
 8.  RTNL breakup
 9.  AccECN
 10. UDP receive optimization
@@ -1172,3 +1173,374 @@ commit とみなさない。
 8.  nftables / flowtable / conntrack
 9.  virtio-net / TAP / VM networking
 10. BIG TCP IPv4 / tunnel follow-ups
+
+------------------------------------------------------------------------
+
+# 16. Commit-level pass 2 --- memory providers, io_uring ZC RX, RTNL, AccECN, DIBS
+
+## 16.1 `page_pool` → `netmem` abstraction
+
+**Subsystem:** netdev memory management / XDP / page_pool\
+**Role:** Device Memory TCP と io_uring zero-copy RX の共通基盤
+
+`page_pool` は NIC RX datapath 向けに page/page-fragment を高速 recycle
+する allocator である。 従来は `struct page` が network receive buffer
+の基本単位だったが、device memory のように 通常の system-RAM page
+ではない memory を network stack で扱うには、この前提が障害になる。
+
+そのため network stack の buffer representation を `struct page`
+から抽象化する `netmem` 系列が進められた。
+
+重要な patch series の一つ:
+
+-   `Split netmem from struct page`
+-   page_pool allocation / DMA sync / recycle path を `netmem` に変換
+-   XDP と `skb_frag` も `netmem` を扱う方向へ変更
+-   mlx5 / hns3 / mvneta など initial users を変換
+
+LWN archive: https://lwn.net/Articles/919663/
+
+### Device Memory TCP との接続
+
+Device Memory TCP RFC v5 は major change として明示的に:
+
+-   "Abstract page from net stack" series の上へ rebase
+-   `struct page` の代わりに新しい `netmem` type を利用
+-   page_pool の device-memory support を `netmem` ベースに再設計
+
+としている。
+
+LWN archive: https://lwn.net/Articles/955571/
+
+したがって系列は、
+
+``` text
+page_pool
+    │
+    ▼
+struct page 前提
+    │
+    ▼
+netmem abstraction
+    │
+    ├───────────────┐
+    ▼               ▼
+Device Memory TCP   io_uring ZC RX
+```
+
+と整理できる。
+
+------------------------------------------------------------------------
+
+## 16.2 io_uring zero-copy RX --- Linux 6.15
+
+**Feature:** io_uring zero-copy network receive\
+**Kernel:** Linux 6.15\
+**Authors:** David Wei et al.（mainline に至る系列）\
+**Subsystem:** io_uring / netdev / page_pool / netmem / TCP/UDP
+
+### Long development history
+
+zero-copy RX + io_uring の試み自体は 2022 年以前から存在する。
+
+-   2022-01: Hao Xu --- `[RFC 0/3] io_uring zerocopy receive`
+    -   https://lwn.net/Articles/882416/
+-   2022-10/11: Jonathan Lemon --- io_uring/zctap RFC v2/v3
+    -   https://lwn.net/Articles/911743/
+    -   https://lwn.net/Articles/913659/
+-   2023-08: David Wei ---
+    `[RFC PATCH 00/11] Zero copy network RX using io_uring`
+    -   https://lwn.net/Articles/942809/
+-   2023-12: RFC v3
+    -   https://lwn.net/Articles/955805/
+-   2024-03: RFC v4
+    -   https://lwn.net/Articles/965214/
+-   2024-10: non-RFC v1
+    -   https://lwn.net/Articles/993299/
+-   2024-10: v7
+    -   https://lwn.net/Articles/996435/
+-   2024-12: v9
+    -   https://lwn.net/Articles/1002729/
+-   2025-01: v10
+    -   https://lwn.net/Articles/1004591/
+-   2025-02: net-next v13
+    -   https://lwn.net/Articles/1008076/
+
+### Important architectural change
+
+RFC v4 以降、Device Memory TCP と共通 infrastructure
+を使う方向へ統合された。 v9 の changelog は、merged `net_iov + netmem`
+infrastructure の上へ rebase したことを 明記している。
+
+mainline 直前の v13 は、page_pool が kernel pages ではなく userspace
+pages を NIC RX queue に供給する構造を説明している。
+
+``` text
+normal RX
+
+NIC
+ │ DMA
+ ▼
+kernel page
+ │ memcpy
+ ▼
+userspace
+
+
+io_uring ZC RX
+
+userspace page
+      ▲
+      │ page_pool / memory provider
+      │
+NIC ──┘ DMA directly
+```
+
+socket `read` は payload copy ではなく「どの userspace memory に data
+があるか」を 通知する操作へ近づく。
+
+### Mainline
+
+Linux 6.15 merge-window coverage は initial zero-copy reception via
+io_uring の merge を 明記している。
+
+-   https://lwn.net/Articles/1015414/
+-   release: https://lwn.net/Articles/1022457/
+
+### Relationship to Device Memory TCP
+
+v13 patch description 自身が、
+
+> overall approach is similar to the devmem TCP proposal
+
+と説明し、netdev core infrastructure を Device Memory TCP
+と共有している。
+
+したがって、
+
+``` text
+                 netmem / net_iov
+                       │
+                 page_pool provider
+                  ┌────┴────┐
+                  ▼         ▼
+             devmem TCP   io_uring ZCRX
+                  │         │
+          device memory   user memory
+```
+
+という共通 architecture として理解するのが適切。
+
+------------------------------------------------------------------------
+
+## 16.3 RTNL lock breakup / per-netns RTNL
+
+**Subsystem:** network-device configuration / scalability\
+**Primary issue:** global RTNL contention
+
+RTNL は長年 networking subsystem の巨大な serialization point だった。
+
+``` text
+namespace A ─┐
+namespace B ─┼── global RTNL ──► serialized
+namespace C ─┘
+```
+
+container/network-namespace
+数が増えるほど、互いに独立しているはずの操作まで global lock
+上で競合する。
+
+### Linux 6.13
+
+6.13 には RTNL を per-network-namespace lock にする work が入り、
+namespace-heavy workload の contention 削減を狙った。
+
+ただし regression risk が高いため、この段階では default disabled
+であり、 `DEBUG_NET_SMALL_RTNL` で有効化する形だった。
+
+LWN: https://lwn.net/Articles/998990/
+
+### Linux 6.15
+
+6.15 でも RTNL breakup は継続しており、LWN はこれを "big networking
+lock" の contention bottleneck 解消作業として記録している。
+
+LWN: https://lwn.net/Articles/1015414/
+
+### Architecture direction
+
+``` text
+global RTNL
+     │
+     ▼
+per-netns RTNL
+     │
+     ▼
+smaller / finer-grained locking domains
+```
+
+この系列は container/Kubernetes のように network namespace
+が大量に存在する環境で 特に重要。
+
+**Commit verification:** RTNL breakup は多数の preparatory conversion
+commits に またがるため、単一 introduction commit として扱わない。series
+単位で継続追跡する。
+
+------------------------------------------------------------------------
+
+## 16.4 AccECN --- Linux 6.18 onward
+
+**Feature:** Accurate Explicit Congestion Notification\
+**Subsystem:** TCP / congestion signaling
+
+従来の ECN は congestion information を coarse に伝えるが、AccECN は CE
+marking の 量をより正確に sender へ feedback できるようにする。
+
+``` text
+classic ECN:
+ congestion occurred?  → coarse feedback
+
+AccECN:
+ amount / evolution of CE marking
+          ↓
+ more accurate congestion feedback
+```
+
+Linux 6.18 merge-window coverage は AccECN work が merge
+されたことを明記する。
+
+LWN: https://lwn.net/Articles/1040203/
+
+AccECN は複数 release にまたがって deployment/default behavior
+が進化するため、 6.18 の単発 feature とせず follow-up を別途追跡する。
+
+------------------------------------------------------------------------
+
+## 16.5 UDP receive-path optimization --- Linux 6.18
+
+**Subsystem:** UDP / receive path / performance
+
+6.18 merge-window coverage では Eric Dumazet の測定として UDP receive
+performance 47% improvement が報告されている。
+
+LWN: https://lwn.net/Articles/1040203/
+
+### Interpretation warning
+
+この `47%` は Linux UDP stack が全 workload で
+47%高速化したという意味ではない。 packet size、CPU、queue
+configuration、benchmark method など特定条件下の測定結果として 扱う。
+
+commit-level change log では performance number と mechanism
+を分離して記録する。
+
+------------------------------------------------------------------------
+
+## 16.6 Direct Internal Buffer Sharing (DIBS) --- Linux 6.18
+
+**Feature:** Direct Internal Buffer Sharing\
+**Subsystem:** networking / shared-memory transports / s390 / SMC-D
+
+DIBS は `page_pool/netmem` の単純な後継ではない点に注意する。
+これは既存の internal shared-memory transport components を generic
+abstraction として 整理する別系列である。
+
+Initial RFC:
+
+-   `[RFC net-next 00/17] dibs - Direct Internal Buffer Sharing`
+-   2025-08-06
+-   https://lwn.net/Articles/1032749/
+
+v3:
+
+-   `[PATCH net-next v3 00/14] dibs - Direct Internal Buffer Sharing`
+-   2025-09-18
+-   https://lwn.net/Articles/1038688/
+
+6.18 merge-window coverage は DIBS merge を明記している。
+
+-   https://lwn.net/Articles/1040203/
+
+### Important correction to earlier classification
+
+以前の章では DIBS を `page_pool → netmem → DIBS`
+のように一続きに見える形で 記載していたが、これは技術的には粗すぎる。
+
+より正確には:
+
+``` text
+RX buffer / memory-provider lineage
+
+page_pool
+   │
+ netmem
+   ├── Device Memory TCP
+   └── io_uring ZC RX
+
+
+shared-memory transport lineage
+
+ISM / SMC-D
+   │
+   ▼
+ DIBS
+```
+
+であり、両者は「copy/buffer overhead
+を減らす」という大きな方向性は共有するものの、 直接の継承関係ではない。
+
+この訂正を本 change log の正式な分類とする。
+
+------------------------------------------------------------------------
+
+# 17. Updated architecture map
+
+今回の upstream 照合を反映すると、memory/zero-copy
+系列は以下のように整理するのが より正確。
+
+``` text
+                        Linux networking memory evolution
+
+        ┌───────────────────────────────────────────┐
+        │ RX buffer / external-memory infrastructure │
+        └───────────────────────────────────────────┘
+
+          page allocation/recycling
+                    │
+                page_pool
+                    │
+                  netmem
+                    │
+           ┌────────┴────────┐
+           ▼                 ▼
+    Device Memory TCP    io_uring ZC RX
+           │                 │
+     DMA-BUF/device      userspace memory
+        memory
+
+
+        ┌───────────────────────────────────────────┐
+        │ internal shared-memory transport           │
+        └───────────────────────────────────────────┘
+
+             ISM / SMC-D mechanisms
+                    │
+                    ▼
+                   DIBS
+```
+
+------------------------------------------------------------------------
+
+# 18. Next commit-level pass
+
+残る優先系列:
+
+1.  io_uring zero-copy **TX** --- initial RFC → mainline
+2.  BPF `struct_ops` / TCP congestion control
+3.  MPTCP development + BPF integration
+4.  nftables / flowtable / conntrack
+5.  BIG TCP IPv4 + VXLAN/GENEVE follow-ups
+6.  virtio-net / TAP / KubeVirt-oriented zero-copy networking
+7.  AccECN individual patch/commit history
+8.  UDP RX optimization individual commits
+9.  RTNL breakup individual series / enabling progression
