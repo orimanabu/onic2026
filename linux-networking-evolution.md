@@ -714,9 +714,9 @@ C/D は現在の canonical milestone table では使用していないが、将�
 
 | Release | 正規 milestone | Grade | Evidence / status |
 |---|---|---|---|
-| 3.0 | namespace / setns() era foundation | B | release-generation |
+| 3.0 | namespace FD / setns() (`CLONE_NEWNET`) foundation | A | `setns()` and network-namespace reassociation documented since Linux 3.0 |
 | 3.3 | DQL/BQL; team; net_prio; TCP memcg | A | release; exact DQL anchor |
-| 3.5 | CoDel / fq_codel | A | release; exact anchors retained in Part VII |
+| 3.5 | CoDel / fq_codel | A | release; CoDel exact anchor retained; fq_codel release attribution confirmed |
 | 3.6 | TSQ; TFO client; IPv4 route-cache removal | A | release-generation; detailed anchors not reproduced in Part VII |
 | 3.7 | VXLAN; TFO server; IPv6 NAT | A | release verified |
 | 3.9 | TCP/UDP SO_REUSEPORT; conntrack labels; VM sockets | A | release; SO_REUSEPORT infrastructure anchor retained |
@@ -725,11 +725,11 @@ C/D は現在の canonical milestone table では使用していないが、将�
 | 3.13 | nftables | A | release; exact core anchor retained in Part VII |
 | 3.14 | TCP autocorking | B | release-generation |
 | 3.15 | internal BPF ISA rework toward eBPF/native-JIT-friendly format | A | release-generation |
-| 3.18 | bpf() syscall/maps/verifier generation; DCTCP; Geneve/FOU | A | release-generation; selected anchors only |
+| 3.18 | bpf() syscall/maps/verifier generation; DCTCP; Geneve/FOU | A | release-generation |
 | 3.19 | ipvlan; switchdev origin; SO_ATTACH_BPF | A | release-generation |
 | 4.1 | cls_bpf / act_bpf eBPF support; kprobe BPF | B | early TC/tracing eBPF milestone |
 | 4.3 | VRF; LWT; OVS conntrack | A | series + release |
-| 4.6 | devlink | B | release origin; exact origin set pending |
+| 4.6 | devlink | A | release + exact origin anchor |
 | 4.7 | TC BPF direct packet access | A | release milestone |
 | 4.8 | XDP | A | initial series + release |
 | 4.9 | BBR | A | release; exact anchor retained |
@@ -748,7 +748,7 @@ C/D は現在の canonical milestone table では使用していないが、将�
 | 5.5 | mac80211 Airtime Queue Limits (AQL) | B | release-generation |
 | 5.6 | MPTCP; WireGuard; BPF struct_ops/TCP CC; ethtool Generic Netlink | A | release; exact ethtool anchor retained |
 | 5.9 | BPF_PROG_TYPE_SK_LOOKUP | A | exact anchor retained in Part VII |
-| 5.11 | auxiliary bus | B | release + final-series/tag evidence; feature-origin SHA pending |
+| 5.11 | auxiliary bus | A | release + exact origin anchor |
 | 5.12 | threaded NAPI | A | release |
 | 5.15 | IPv6 IOAM core; MCTP; bridge per-VLAN multicast | A | release |
 | 5.17 | kfree_skb_reason / structured drop-reason foundation | A | release |
@@ -759,16 +759,16 @@ C/D は現在の canonical milestone table では使用していないが、将�
 | 6.3 | YNL/YAML Netlink tooling; IPv4 BIG TCP | A | YNL origin contained in v6.3-rc1; IPv4 BIG TCP release attribution confirmed |
 | 6.6 | AF_XDP multi-buffer; TCX / bpf_mprog multi-program attachment | A | release |
 | 6.7 | netkit; initial TCP-AO | A | release; netkit anchor retained |
-| 6.8 | Rust phylib + Rust Asix reference PHY; queue/NAPI netdev-genl visibility | B | release/final-series + docs |
+| 6.8 | Rust phylib + Rust Asix reference PHY; queue/NAPI netdev-genl visibility | B | Rust PHY and queue-object anchors exact; broader NAPI/object generation remains composite |
 | 6.11 | virtio-net AF_XDP RX zero-copy | A | release-generation; detailed anchors not reproduced in Part VII |
 | 6.12 | Device Memory TCP RX | B | final series verified; implementation SHA list not reproduced |
 | 6.13 | per-netns RTNL infrastructure/migration milestone | B | milestone, not completion |
 | 6.15 | io_uring ZCRX; further RTNL breakup | A | merge/series evidence |
-| 6.16 | Device Memory TCP TX; BPF qdisc; DCCP removal | A | final series verified; key BPF-qdisc anchors retained |
+| 6.16 | Device Memory TCP TX; BPF qdisc; DCCP removal | A | release/final-series generation; BPF-qdisc exact inventory pending |
 | 6.18 | AccECN core; UDP RX evolution; DIBS separate shared-memory lineage | B | release-generation |
 | 7.0 | cake_mq / multi-queue-aware sch_cake; IPv6 BIG TCP without synthetic HBH jumbo header | A | net-next-7.0 / v7.0 release generation |
 | 7.1 | RX HW queue leasing | A | revised RX merge contained in v7.1-rc1; TX remains unmerged |
-| 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255 | A | three limit-expansion commits contained in v7.2-rc1 |
+| 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255 | A | two limit-expansion commits contained in v7.2-rc1; remaining series patches are preparation/selftests |
 | 7.3-rc / mainline | BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE | A-rc | net-next-7.3 merged 2026-08-20; final 7.3 pending |
 
 **7.3 status note:** 調査基準日時点では final 7.3 は未リリースのため `A-rc` とする。正式リリースを確認した時点で `A` へ更新する。
@@ -1825,14 +1825,10 @@ provenance pass should enumerate:
 ``` text
 switchdev initial core series
 
-devlink initial mainline commit set
 VF representor generic model
 DIM / net_dim introduction
 page_pool initial landing and subsequent DMA/recycle redesign
-netdevsim initial landing
 ethtool-netlink merge boundary
-auxiliary bus exact merge
-Rust PHY 6.8 exact commit set
 Rust net_device / PCI / DMA / IRQ abstraction landing status
 netdev-genl queue/NAPI object landing boundaries
 ```
@@ -1924,7 +1920,7 @@ indexに集約します。
 ``` text
                      v5.0                    2026
 
-packet memory        early page_pool  →      page_pool maturation / netmem / providers
+packet memory        early page_pool  →      page_pool maturation / memory providers
 fast path            XDP/AF_XDP       →      AF_XDP MB / netkit / queue lease
 aggregation          GRO/GSO          →      BIG TCP / tunnel BIG TCP
 BPF                   packet/socket    →      struct_ops/netkit/BPF qdisc
@@ -2006,6 +2002,21 @@ boundaries that remain important for verification or future re-audit.
 
 ここに示すのは代表的な **anchor commit** であり、feature series の全commitを列挙するものではない。
 
+### Part IV TODO から確定できた origin / landing anchors
+
+以下は exact commit と release containment を確認できたため、従来の「SHA pending」から確定扱いへ移す。
+
+| Item | Exact mainline anchor | First containing tag |
+|---|---|---|
+| devlink | `bfcd3a46617209454cfc0947ab093e37fd1e84ef` — `Introduce devlink infrastructure` | v4.6-rc1 |
+| netdevsim | `83c9e13aa39aed5cf9a2f8dd69770b7c35ba1281` | v4.16-rc1 |
+| auxiliary bus | `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` — `Add auxiliary bus support` | v5.11-rc1 |
+| Rust PHY abstractions | `f20fd5449ada3872dcd67aca397f0e27ca2e8ad6` — `rust: core abstractions for network PHY drivers` | v6.8-rc1 |
+| netdev-genl queue object | `bc877956272f0521fef107838555817112a450dc` — `netdev-genl: spec: Extend netdev netlink spec in YAML for queue` | v6.8-rc1 |
+
+Net DIMについては、algorithm自体は4.16以前からmlx5e内に存在しており、4.16は「共通libraryへの切り出し」という表現を維持する。本版では、提示されたDIM SHAを一次Git objectとして再確認できていないため exact inventory への追加は保留する。
+
+
   ---------------------------------------------------------------------------------------------------------------------------------------------
   Feature                 Mainline anchor                              Subject / role
   ----------------------- -------------------------------------------- ------------------------------------------------------------------------
@@ -2046,6 +2057,14 @@ boundaries that remain important for verification or future re-audit.
   net-next 7.3 merge      `91ec2035134982b98fab0609a9fd8480e8217dc1`   `Merge tag 'net-next-7.3' ...`
   ---------------------------------------------------------------------------------------------------------------------------------------------
 
+
+**MPTCP 7.2 limit expansion anchors:** 8-patch series のうち上限値を直接引き上げる commit は2つである。
+
+- `c8646664fbf1c0beb0990cef391cb52d3c909e78` — subflows と accepted `ADD_ADDR` の上限をともに 64 へ拡大
+- `e845e6397d78bf6b842cfa8b5818ca8189f7e22e` — endpoint 上限を 255 へ拡大
+
+残りは preparation / selftest であり、「three limit-expansion commits」とは数えない。
+
 ## Evidence grades
 
 Grade の正本は Part II と canonical dataset です。Part VII は
@@ -2084,7 +2103,7 @@ Appendix は evidence catalog である。そこに現れる日付は RFC date�
 | DIM / `net_dim` | B | Linux 4.16 Net DIM generation; Linux 5.3 common `lib/dim` generalization; exact SHAs pending |
 | `cake_mq` | A | `net-next-7.0` pull explicitly lists multi-queue-aware `sch_cake`; canonical generation Linux 7.0 |
 
-**Queue-leasing release boundary:** initial merge `77b9c4a438fc...` と revert `8766d61a1d33...` はともに v7.0 merge window 内で相殺され、v7.0 release には含まれない。revised RX implementation `15089225889b...` は v7.1-rc1 に含まれる。TX queue leasing は未 merge である。
+**Queue-leasing release boundary:** initial merge `77b9c4a438fc66e2ab004c411056b3fb71a54f2c` と revert `8766d61a1d33cb5f15bfdd6ce9832bbe1fc649c2` はともに v7.0 merge window 内で相殺され、v7.0 release には含まれない。revised RX implementation `15089225889ba4b29f0263757cd66932fa676cb0` は v7.1-rc1 に含まれる。TX queue leasing は未 merge である。
 
 # Appendix --- Source index（非正規）
 
