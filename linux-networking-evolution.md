@@ -3913,41 +3913,41 @@ removal**, not just feature addition.
 
 # 40. Completeness audit: classification table
 
-  --------------------------------------------------------------------------
-  Topic                        Year Classification       Why it matters
-  ------------------ -------------- -------------------- -------------------
-  IPv6                         2020 design/API           protocol
-  extension-header                  discussion           extensibility vs
-  processing                                             fast path/offload
+  -------------------------------------------------------------------------
+  Topic                       Year Classification       Why it matters
+  ------------------ ------------- -------------------- -------------------
+  IPv6                        2020 design/API           protocol
+  extension-header                 discussion           extensibility vs
+  processing                                            fast path/offload
 
-  Threaded NAPI                2020 merged architecture  moves RX polling
-                                    direction            out of softirq
-                                                         context
+  Threaded NAPI               2020 merged architecture  moves RX polling
+                                   direction            out of softirq
+                                                        context
 
-  bpfilter rethink             2020 failed/stalled       BPF firewall
-                                    design               architecture
-                                                         history
+  bpfilter rethink            2020 failed/stalled       BPF firewall
+                                   design               architecture
+                                                        history
 
-  SO_REUSEPORT                 2021 socket semantics     scalable listener
-  failover                                               behavior
+  SO_REUSEPORT                2021 socket semantics     scalable listener
+  failover                                              behavior
 
-  skb drop reasons             2022 observability        structured
-                                                         packet-drop
-                                                         diagnostics
+  skb drop reasons            2022 observability        structured
+                                                        packet-drop
+                                                        diagnostics
 
-  in-kernel TLS                2022 API/architecture     kernel-originated
-  handshake                                              secure transports
+  in-kernel TLS               2022 API/architecture     kernel-originated
+  handshake                                             secure transports
 
-  P4TC                     2023--24 significant          programmable TC
-                                    non-merged proposal  pipeline debate
+  P4TC                    2023--24 significant          programmable TC
+                                   non-merged proposal  pipeline debate
 
-  BPF qdisc                    2025 merged/programming   `struct_ops`
-                                    model                reaches packet
-                                                         scheduling
+  BPF qdisc                   2025 merged/programming   `struct_ops`
+                                   model                reaches packet
+                                                        scheduling
 
-  DCCP removal                 2025 removal/cleanup      simplifies shared
-                                                         transport code
-  --------------------------------------------------------------------------
+  DCCP removal                2025 removal/cleanup      simplifies shared
+                                                        transport code
+  -------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -6413,3 +6413,498 @@ not counted as in-window conference entries.
 
 Future provenance work should add a `Netdev` column to the canonical LWN
 inventory where a direct conference counterpart exists.
+
+------------------------------------------------------------------------
+
+# 62. Provenance index --- Netdev → LWN → patch series → mainline
+
+この章は canonical inventory の主要項目について、conference talk と
+upstream development の位置関係を横断的に追えるようにした索引である。
+
+`Netdev phase`:
+
+-   **pre-merge** --- mainline merge 前の設計・prototype・proposal
+-   **merge-era** --- patch review / merge と同時期
+-   **post-merge** --- mainline 後の運用・performance・次世代設計
+-   **parallel** --- 同じ問題領域だが直接の実装系列とは断定しない
+
+  -------------------------------------------------------------------------------------------------------------------------------
+  Feature           Netdev counterpart   Phase                   LWN / upstream       Kernel milestone  Provenance interpretation
+                                                                 milestone                              
+  ----------------- -------------------- ----------------------- -------------------- ----------------- -------------------------
+  BIG TCP           0x15 (2021) ---      pre-merge               LWN *Going big with  5.19              conference
+                    **BIG TCP**, Eric                            TCP packets*; IPv6                     prototype/design → LWN
+                    Dumazet                                      BIG TCP series                         analysis → merge
+
+  IPv4 BIG TCP      BIG TCP 0x15 as      pre-merge               2023 IPv4 BIG TCP    6.3               original design
+                    origin                                       series                                 generalized to IPv4
+
+  BIG TCP over      BIG TCP 0x15 as      historical origin       BIG TCP for UDP      7.3 development   BIG TCP extended to
+  tunnels           origin; later tunnel                         tunnels series                         VXLAN/GENEVE
+                    work                                                                                
+
+  TCP RX zero-copy  0x14 --- **The Path  pre-merge               multiple later ZC RX multi-release     early socket/TCP
+                    To TCP 4K MTU and RX                         RFCs                                   receive-copy reduction
+                    ZeroCopy**                                                                          work
+
+  Device Memory TCP 0x16 **Merging the   pre-merge → merge-era   Device Memory TCP    6.12 RX           unusually clear
+                    Networking Worlds**                          RFC series                             conference→RFC→mainline
+                    → 0x17 **Device                                                                     lineage
+                    Memory TCP** → 0x18                                                                 
+                    devmem/io_uring BoF                                                                 
+
+  io_uring ZC RX    0x16 **Merging the   pre-merge → post-merge  2022--25 RFC/patch   6.15              design → implementation →
+                    Networking Worlds**                          series                                 joint review → post-merge
+                    → 0x17 **Zero Copy                                                                  refinement
+                    Receive using                                                                       
+                    io_uring** → 0x18                                                                   
+                    BoF → 0x1A **ZCRX:                                                                  
+                    Progress and Next                                                                   
+                    Steps**                                                                             
+
+  page_pool         0x19 **Diagnosing    post-merge              page_pool/netmem     established infra operational/lifetime
+                    Page Pool Leaks**                            development                            debugging after broad
+                                                                                                        adoption
+
+  netmem            0x17/0x18 devmem +   merge-era/parallel      netmem abstraction   6.x               enabling memory
+                    ZCRX talks                                   series                                 abstraction used by
+                                                                                                        devmem/ZCRX
+
+  BPF qdisc         0x17 **eBPF Qdisc: a pre-merge               BPF qdisc            2025-era          research/prototype
+                    generic building                             `struct_ops` series                    direction → upstream BPF
+                    block for traffic                                                                   qdisc
+                    control**                                                                           
+
+  P4TC              0x17 **Integrating   pre-merge               LWN *P4TC hits a     not established   conference design →
+                    eBPF Into The P4TC                           brick wall*          as mainline       upstream review
+                    Datapath**                                                        feature           resistance/stall
+
+  XDP SYN proxy /   0x15 **Accelerating  pre-merge               BPF conntrack        6.x               XDP needs CT/SYN-cookie
+  conntrack         synproxy with XDP**                          kfunc/helper work                      primitives → richer BPF
+                                                                                                        networking API
+
+  nexthop           0x15 **Resilient     post-origin             2019 nexthop-object  5.x onward        object model → resilient
+  objects/groups    nexthop groups**                             series                                 grouping/selection
+
+  MPTCP             0x14 **Using         merge-era → post-merge  LWN *Upstreaming     5.6 onward        initial deployment →
+                    Upstream MPTCP**;                            multipath TCP*;                        mature workflow/scaling
+                    0x19 **MPTCP:                                later BPF/subflow                      
+                    present, future...**                         work                                   
+
+  IPv6 IOAM         0x14                 pre/merge → post        IPv6 IOAM patch      5.15/5.16 onward  implementation → export →
+                    **Implementation of                          series                                 security
+                    IPv6 IOAM in Linux                                                                  
+                    Kernel**; 0x19                                                                      
+                    **IOAM Direct                                                                       
+                    Exporting**; 0x1A                                                                   
+                    **Securing IOAM**                                                                   
+
+  KTLS / kernel     0x14 KTLS offload +  pre/merge               LWN kernel-TLS       6.x               KTLS record path →
+  handshake         handshake                                    handshake articles;                    generic kernel-consumer
+                    performance; 0x17                            `net/handshake`                        handshake
+                    TLS handshake BoF                                                                   
+
+  TC HW offload     0x14 conntrack HW    merge-era               standalone TC action 5.x/6.x           common flow/action
+                    offload / HTB HW                             HW-offload series                      representation → richer
+                    offload; 0x15 TC                                                                    HW lifecycle
+                    flower/police talks                                                                 
+
+  SO_TIMESTAMPING / 0x17                 post/parallel           `skb_drop_reason`,   6.x               packet causality + timing
+  observability     SO_TIMESTAMPING;                             BPF timestamp                          observability
+                    0x19 **future of                             callbacks                              
+                    SO_TIMESTAMPING**;                                                                  
+                    0x1A observability                                                                  
+                    BoF                                                                                 
+
+  SRv6              0x19 SRv6            post/ongoing            Headend Reduced,     6.x/7.x           mainline behavior
+                    Linux/FRR/eBPF BoF;                          PSP, NEXT-C-SID, MUP                   growth +
+                    0x1A SRv6 workshop                                                                  operational/planning
+                                                                                                        feedback
+
+  shared-memory     0x19 **Communication parallel / new proposal DIBS and local       6.18+ / RFC       common goal: remove
+  networking        via ISM**; 0x1A                              shared-memory work                     same-host copies; not one
+                    **kernel                                                                            direct code lineage
+                    shared-memory socket                                                                
+                    transport**                                                                         
+
+  QUIC              0x1A **Linux QUIC:   merge-era/development   2024--26 kernel QUIC RFC/development   conference presentation
+                    Bringing a Modern                            RFC series; LWN                        of active upstream
+                    Secure Transport                             *QUIC for the                          architecture
+                    into the Kernel**                            kernel*                                
+
+  TCP contemporary  0x19 **State of the  post/ongoing            AccECN, RX tuning,   6.15--7.x         useful umbrella talks for
+  evolution         union in TCP land**;                         RTO API, performance                   late-period TCP changes
+                    0x1A **TCP State of                          work                                   
+                    the union (2026)**                                                                  
+
+  netkit / devmem   0x1A **Accelerating  post/ongoing            netkit + queue       6.7 onward        netkit expands from
+                    Software RDMA (RXE)                          leasing/devmem                         virtual netdev to
+                    with Netkit and                              development                            queue/memory
+                    Devmem**                                                                            infrastructure
+  -------------------------------------------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 63. Detailed provenance chains
+
+## 63.1 BIG TCP
+
+``` text
+Netdev 0x15 (2021)
+"BIG TCP"
+Eric Dumazet
+        │
+        │ design/prototype
+        ▼
+upstream BIG TCP patch work
+        │
+        ▼
+LWN (2022)
+"Going big with TCP packets"
+        │
+        ▼
+Linux 5.19
+IPv6 BIG TCP
+        │
+        ├── Linux 6.3: IPv4 BIG TCP
+        │
+        ├── 2026: IPv6 HBH dependency removal
+        │
+        └── Linux 7.3 development:
+            BIG TCP over VXLAN/GENEVE
+```
+
+**Interpretation:** Netdev is not merely a later presentation of the
+merged feature. In this case it records the design before mainline
+adoption.
+
+Netdev 0x15 materials describe the motivation as reducing TCP/IP stack
+overhead at 200/400-Gbit speeds by allowing much larger TSO/GRO
+aggregates.
+
+------------------------------------------------------------------------
+
+## 63.2 Device Memory TCP + io_uring ZCRX
+
+``` text
+Netdev 0x14 (2020)
+TCP RX zero-copy discussion
+        │
+        ▼
+Netdev 0x16 (2022)
+"Merging the Networking Worlds"
+        │
+        │ asks how to combine:
+        │ sockets + io_uring + AF_XDP/RDMA-like memory/queue control
+        ▼
+┌──────────────────────────┐
+│ Netdev 0x17 (2023)       │
+│                          │
+│ Device Memory TCP        │
+│ Zero Copy RX w/ io_uring │
+└────────────┬─────────────┘
+             │
+             ▼
+Netdev 0x18 (2024)
+Devmem TCP & io_uring ZC BoF
+             │
+       ┌─────┴──────┐
+       ▼            ▼
+Linux 6.12      Linux 6.15
+Devmem TCP RX   io_uring ZCRX
+                    │
+                    ▼
+Netdev 0x1A (2026)
+"ZCRX: Progress and Next Steps"
+```
+
+**Interpretation:** this is the strongest provenance chain in the
+document. Netdev captures the problem definition, concrete
+implementations, integration discussion, and post-merge operational/API
+issues.
+
+The 0x17 io_uring talk explicitly describes preserving the Linux TCP
+stack while DMAing payload data into userspace-visible memory, rather
+than replacing the stack with a kernel-bypass datapath.
+
+------------------------------------------------------------------------
+
+## 63.3 BPF qdisc
+
+``` text
+Linux 5.6
+BPF struct_ops for TCP congestion control
+        │
+        ▼
+Netdev 0x17 (2023)
+"eBPF Qdisc: a generic building block for traffic control"
+        │
+        ▼
+BPF qdisc upstream series
+        │
+        ▼
+2025 networking merge work
+```
+
+**Interpretation:** `struct_ops` evolves from replacing TCP operation
+tables to replacing or implementing scheduling operations in the
+traffic-control layer.
+
+This is more informative than treating BPF qdisc as an isolated 2025
+feature.
+
+------------------------------------------------------------------------
+
+## 63.4 MPTCP
+
+``` text
+2019 LWN
+"Upstreaming multipath TCP"
+        │
+        ▼
+Linux 5.6
+initial upstream MPTCP
+        │
+        ▼
+Netdev 0x14 (2020)
+"Using Upstream MPTCP in Linux Systems"
+        │
+        ▼
+userspace path-manager / multiple subflows
+        │
+        ▼
+BPF protocol selection + subflow visibility
+        │
+        ▼
+Netdev 0x19 (2025)
+"MPTCP: present, future, and its development workflow"
+        │
+        ▼
+Linux 7.2
+max subflows 8 → 64
+```
+
+**Interpretation:** Netdev 0x14 is deployment-oriented shortly after
+initial upstreaming; 0x19 is a mature-project/status discussion.
+
+------------------------------------------------------------------------
+
+## 63.5 IOAM
+
+``` text
+Netdev 0x14 (2020)
+"Implementation of IPv6 IOAM in Linux Kernel"
+        │
+        ▼
+upstream IPv6 IOAM series
+        │
+        ▼
+Linux 5.15 / 5.16 era
+IOAM + encapsulation
+        │
+        ▼
+Netdev 0x19 (2025)
+IOAM Direct Exporting
+        │
+        ▼
+Netdev 0x1A (2026)
+Securing IOAM in the Linux Kernel
+```
+
+**Interpretation:** the topic evolves from implementing telemetry
+carriage to exporting the telemetry efficiently and then protecting its
+integrity/trust.
+
+------------------------------------------------------------------------
+
+## 63.6 KTLS / kernel handshake
+
+``` text
+KTLS record layer
+       │
+       ▼
+Netdev 0x14
+KTLS HW offload
+TLS handshake performance
+       │
+       ▼
+LWN 2022
+Extending in-kernel TLS support
+Adding an in-kernel TLS handshake
+       │
+       ▼
+net/handshake generic upcall
+       │
+       ▼
+Netdev 0x17
+TLS handshake for in-kernel consumers BoF
+       │
+       ▼
+NVMe/TCP TLS and later kernel consumers
+```
+
+The important distinction remains:
+
+``` text
+KTLS
+    ≠ "all TLS runs inside the kernel"
+
+net/handshake
+    = common mechanism allowing kernel socket consumers
+      to coordinate handshake work, including userspace assistance
+```
+
+------------------------------------------------------------------------
+
+## 63.7 P4TC vs BPF qdisc
+
+Netdev helps separate two superficially similar programmable-TC
+directions.
+
+``` text
+P4TC
+  │
+  ├── P4 pipeline/object model
+  ├── Netdev 0x17 P4TC+BPF
+  └── substantial upstream API/design resistance
+          │
+          └── LWN: "P4TC hits a brick wall"
+
+
+BPF qdisc
+  │
+  ├── existing TC qdisc framework
+  ├── BPF struct_ops
+  ├── Netdev 0x17 eBPF qdisc
+  └── later upstream merge work
+```
+
+They should therefore remain separate rows in the canonical inventory.
+
+------------------------------------------------------------------------
+
+# 64. Canonical inventory --- Netdev counterpart field
+
+For the final normalized inventory, add these fields:
+
+``` text
+Date
+LWN title/topic
+Category
+Kernel
+Status
+Patch series
+Mainline commit(s)
+Netdev edition
+Netdev session
+Netdev phase
+Tags
+```
+
+Example:
+
+  ----------------------------------------------------------------------------------------------------------
+  LWN /       Kernel            Status                 Netdev      Session           Phase
+  feature                                                                            
+  ----------- ----------------- ---------------------- ----------- ----------------- -----------------------
+  BIG TCP     5.19              merged                 0x15        BIG TCP           pre-merge
+
+  Device      6.12              merged                 0x17 / 0x18 Device Memory TCP pre/merge-era
+  Memory TCP                                                       / Devmem+io_uring 
+  RX                                                               BoF               
+
+  io_uring    6.15              merged                 0x17 / 0x18 Zero Copy RX /    pre→post
+  ZCRX                                                 / 0x1A      BoF / Progress    
+                                                                   and Next Steps    
+
+  BPF qdisc   2025-era          merged                 0x17        eBPF Qdisc        pre-merge
+
+  P4TC        ---               stalled/under-review   0x17        eBPF Into P4TC    pre-merge
+                                lineage                            Datapath          
+
+  MPTCP       5.6+              merged/evolving        0x14 / 0x19 Using Upstream    merge→post
+                                                                   MPTCP / present & 
+                                                                   future            
+
+  IPv6 IOAM   5.15/5.16+        merged/evolving        0x14 / 0x19 implementation /  pre→post
+                                                       / 0x1A      export / security 
+
+  QUIC        RFC/development   under review           0x1A        Linux QUIC        merge-era/development
+  ----------------------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 65. How to use the provenance index
+
+The document can now be read in three directions.
+
+### Start from a kernel release
+
+``` text
+Linux 6.15
+   │
+   └── io_uring ZCRX
+          │
+          ├── LWN merge-window
+          ├── lore patch series
+          └── Netdev 0x17 → 0x18 → 0x1A
+```
+
+### Start from an LWN article
+
+``` text
+LWN "Going big with TCP packets"
+   │
+   ├── Netdev 0x15 design talk
+   ├── Linux 5.19 merge
+   ├── IPv4 follow-up
+   └── tunnel follow-up
+```
+
+### Start from a Netdev talk
+
+``` text
+Netdev 0x17 Device Memory TCP
+   │
+   ├── RFC revisions
+   ├── netmem/page_pool prerequisites
+   ├── LWN coverage
+   └── Linux 6.12 merge
+```
+
+This makes Netdev a provenance source rather than a detached conference
+bibliography.
+
+------------------------------------------------------------------------
+
+# 66. Remaining provenance work
+
+The next verification pass should fill the remaining empty cells rather
+than add more themes:
+
+1.  exact LWN publication date and article ID for every canonical row;
+2.  exact lore/netdev patch-series URL;
+3.  mainline commit hash(es) from `git.kernel.org`;
+4.  exact first kernel release;
+5.  Netdev slide/paper/video URL where available;
+6.  `pre-merge`, `merge-era`, `post-merge`, or `parallel`
+    classification;
+7.  explicit `RFC/not merged` markers where appropriate.
+
+Priority order for exact commit provenance:
+
+``` text
+BIG TCP
+Device Memory TCP
+io_uring ZCRX
+BPF qdisc
+netkit
+MPTCP/BPF
+AccECN
+RTNL breakup
+nexthop objects
+IOAM
+```
+
+These have the strongest Netdev↔LWN↔upstream relationships and will
+provide the highest value if fully verified first.
