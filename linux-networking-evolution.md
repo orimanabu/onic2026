@@ -2878,6 +2878,599 @@ ownership/lifetime の効率化にある。
 
 ------------------------------------------------------------------------
 
+# Part III-A --- Network Device Driver Framework Evolution
+
+This section deliberately does **not** enumerate individual NIC drivers.
+It follows the common infrastructure which changed what a Linux network
+driver is expected to implement, and which moved repeated driver-local
+mechanisms into reusable kernel frameworks.
+
+## 1. Architectural thesis
+
+The driver-side evolution can be summarized as:
+
+``` text
+driver-local mechanisms
+        ↓
+common queue / CPU scaling primitives
+        ↓
+common hardware-control and offload models
+        ↓
+common RX-memory / interrupt / link-management frameworks
+        ↓
+introspectable netdev objects and queue/memory ownership
+        ↓
+typed / memory-safe driver abstractions in Rust
+```
+
+This is a sixth axis crossing the performance, programmability, memory,
+control-plane and observability axes already used elsewhere in this
+document.
+
+## 2. Starting point at Linux 3.0
+
+By the Linux 3.0 era, NAPI and multiqueue networking were already
+established. RPS/RFS had arrived in 2.6.35 and XPS in 2.6.38, so the
+v3.x story begins with a driver model already centered on:
+
+``` text
+RX/TX descriptor rings
+IRQ / MSI-X
+NAPI poll contexts
+multiple RX/TX queues
+RSS in hardware
+RPS/RFS/XPS in the stack
+ethtool + net_device_ops
+```
+
+The important v3.x change is therefore not the invention of NAPI, but
+increasing coordination between drivers and common networking-core
+algorithms.
+
+## 3. Linux 3.2 --- DQL/BQL: queue control moves into common core
+
+DQL/BQL is one of the clearest early examples.
+
+``` text
+old:
+  each driver/hardware queue can accumulate excessive TX backlog
+
+DQL/BQL:
+  common dynamic queue-limit algorithm
+  + driver reports queued/completed bytes
+  + core dynamically controls outstanding data
+```
+
+Exact DQL core anchor already audited elsewhere in this document:
+
+``` text
+75957ba36c05b979701e9ec64b37819adc12f830
+dql: Dynamic queue limits
+```
+
+LWN series: https://lwn.net/Articles/469651/
+https://lwn.net/Articles/469652/
+
+Driver-framework significance: performance policy begins moving out of
+individual drivers into reusable net core infrastructure.
+
+## 4. Linux 4.x --- hardware becomes a first-class Linux networking object
+
+### 4.1 switchdev
+
+switchdev turns switch ASIC forwarding into a Linux driver model rather
+than a proprietary SDK-controlled island.
+
+LWN: https://lwn.net/Articles/675826/ https://lwn.net/Articles/676096/
+
+The model represents physical switch ports as normal netdevices and lets
+bridge, VLAN, routing and related kernel objects drive hardware offload.
+
+``` text
+Linux bridge / FIB / VLAN / TC
+          ↓
+     switchdev model
+          ↓
+     switch ASIC driver
+          ↓
+        hardware
+```
+
+This is a major change in driver responsibility: a driver becomes an
+implementation of Linux networking semantics in hardware.
+
+### 4.2 devlink --- device-wide control plane
+
+Initial devlink series: https://lwn.net/Articles/677967/
+
+devlink fills a gap left by `net_device`: many settings belong to the
+whole ASIC/device, not one network interface.
+
+Examples include:
+
+``` text
+device resources
+port splitting
+shared buffers
+eswitch mode
+device parameters
+firmware / health
+```
+
+Linux 5.1 later adds devlink health reporting/recovery as a generic
+mechanism.
+
+This establishes a useful split:
+
+``` text
+net_device / ethtool
+  interface-facing behavior
+
+devlink
+  device / ASIC / resource / health behavior
+```
+
+### 4.3 phylink and SFP
+
+The 2015 phylink/SFP work addresses a recurring driver problem: MAC,
+PHY, PCS/SerDes and hot-pluggable SFP combinations could not be modeled
+cleanly by simple PHY attachment.
+
+RFC: https://lwn.net/Articles/667055/
+
+Conceptually:
+
+``` text
+MAC driver
+   │
+ phylink
+   ├── PHY
+   ├── PCS / SerDes
+   └── SFP module
+```
+
+This progressively removes link-mode state-machine duplication from
+Ethernet MAC drivers.
+
+### 4.4 VF representors and SmartNIC/DPU control
+
+Representors extend the switchdev idea to SR-IOV embedded switches and
+later SmartNIC/DPU architectures.
+
+LWN: https://lwn.net/Articles/692942/
+
+A representor is both a control-plane representation of a VF/SF and a
+netdevice endpoint through which the normal Linux stack can control the
+virtual switch.
+
+This is the foundation for the now-familiar:
+
+``` text
+PF / uplink
+   │
+embedded switch
+ ├─ VF representor
+ ├─ VF representor
+ └─ SF / other representors
+       ↓
+bridge / TC / OVS / routing
+       ↓
+hardware offload
+```
+
+### 4.5 XDP changes the driver fast path
+
+Linux 4.8 introduces first-generation XDP. From the driver's point of
+view the important change is that the RX path gains a programmable hook
+before skb allocation / normal stack processing.
+
+Kernel Recipes 2018 explicitly describes XDP as a programmable layer
+running in device driver context:
+https://archives.kernel-recipes.org/document/xdp-a-new-programmable-network-layer/
+
+This creates new common driver responsibilities:
+
+``` text
+construct xdp_buff
+run XDP program
+handle PASS / DROP / TX / REDIRECT
+support ndo_xdp_xmit
+manage RX memory so buffers can move between RX/XDP/TX
+```
+
+The last point directly motivates page_pool.
+
+### 4.6 DIM --- interrupt moderation becomes a common library
+
+Netdev 0x12 (2018) presented DIM as a driver-independent Dynamic
+Interrupt Moderation library.
+
+https://www.netdevconf.info/0x12/
+
+Rather than every driver inventing adaptive interrupt/coalescing
+algorithms:
+
+``` text
+driver samples events/bytes/packets
+        ↓
+common DIM algorithm
+        ↓
+profile decision
+        ↓
+driver programs hardware moderation
+```
+
+This is another example of extracting policy from drivers into common
+netdev infrastructure.
+
+### 4.7 page_pool --- RX memory management becomes shared infrastructure
+
+The page_pool work was motivated by drivers independently reinventing
+high-speed DMA page recycling. A 2016 RFC explicitly described it as a
+generic API for streaming-DMA page pools, and the refurbished
+implementation appears in the 2018 XDP-era work.
+
+Key late series: https://lists.openwall.net/netdev/2018/03/31/91
+
+Modern page_pool provides a common allocation/recycling/DMA model for
+skb and XDP buffers.
+
+``` text
+before:
+ driver-specific RX allocator
+ driver-specific recycling
+ driver-specific DMA lifetime tricks
+
+after:
+        page_pool
+       /         \
+     skb       xdp_frame
+       \         /
+     common recycling
+```
+
+Its importance grows well beyond the original XDP motivation. By Netdev
+0x19, page_pool is described as the standard RX datapath
+memory-management mechanism, and newer zero-copy features require
+drivers to integrate with it.
+
+## 5. Linux 5.x --- driver management APIs become structured and observable
+
+### 5.1 devlink health
+
+Linux 5.1 adds generic devlink health reporting and recovery.
+
+Netdev 0x13 describes the goals as:
+
+``` text
+real-time alerting
+driver debug information
+self-healing / recovery
+vendor-support data collection
+```
+
+Conference:
+https://netdevconf.org/0x13/loadsessions/devlink-health-reporting-and-recovery-system.html
+
+This changes hardware error handling from driver-specific logs/private
+tools toward a common operational model.
+
+### 5.2 ethtool ioctl → Generic Netlink
+
+The ethtool netlink work addresses limitations of the old ioctl ABI:
+extensibility, races, error reporting and lack of notifications.
+
+Series: https://lwn.net/Articles/808028/
+https://lwn.net/Articles/810618/
+
+Architecturally this is not just a userspace-tool rewrite. It creates a
+structured, extensible management API between userspace, networking core
+and drivers.
+
+### 5.3 netdevsim and selftest-driven driver API design
+
+`netdevsim` becomes an important test vehicle for driver-facing APIs.
+Current netdev maintainer documentation explicitly encourages new driver
+configuration APIs to have netdevsim/selftest coverage, while also
+requiring a real driver use case.
+
+This changes the development model:
+
+``` text
+new driver API
+   ↓
+generic implementation
+   ↓
+netdevsim model + selftests
+   ↓
+real hardware driver
+```
+
+Driver frameworks are increasingly expected to be testable without the
+physical NIC.
+
+### 5.4 auxiliary bus --- one PCI device, multiple subsystem drivers
+
+Merged for Linux 5.11, the auxiliary bus addresses complex devices
+exposing Ethernet, RDMA, vDPA and related functions from shared
+hardware.
+
+Instead of ad-hoc cross-driver glue:
+
+``` text
+              PCI function
+                   │
+              parent/core
+             /      |      \
+        netdev     RDMA    vDPA
+       auxiliary drivers / devices
+```
+
+This becomes increasingly important for SmartNIC/IPU/DPU architectures.
+
+## 6. Linux 6.x--7.x --- queues and memory become explicit framework objects
+
+### 6.1 page_pool becomes observable
+
+2023 page_pool netlink introspection associates pools with netdevices
+and NAPI IDs and exports allocation/recycling/memory information.
+
+LWN: https://lwn.net/Articles/948718/
+
+This is an important architectural transition:
+
+``` text
+page_pool as hidden driver implementation detail
+                 ↓
+page_pool as identifiable / observable netdev resource
+```
+
+### 6.2 queue and NAPI objects move toward a generic netdev API
+
+Netdev 0x17 discusses exposing queues and NAPI instances through
+`netdev-genl`.
+
+https://netdevconf.info/0x17/sessions/talk/netlink-apis-to-exposeconfigure-netdev-objects.html
+
+The proposed/ongoing model makes properties such as these explicit:
+
+``` text
+queue
+ ├─ NAPI instance
+ ├─ stats
+ ├─ memory model
+ └─ XDP / zero-copy capabilities
+
+NAPI
+ ├─ NAPI ID
+ ├─ device
+ ├─ IRQ
+ └─ thread / CPU relationship
+```
+
+This is a conceptual shift from "the driver owns opaque rings" toward
+"queues and memory are objects negotiated among driver, kernel and
+userspace".
+
+It directly connects to Device Memory TCP, io_uring ZCRX and
+queue-leasing work elsewhere in this document.
+
+### 6.3 page_pool → netmem → memory providers
+
+The driver-framework view of the memory lineage is:
+
+``` text
+driver-private RX recycling
+        ↓
+page_pool
+        ↓
+page_pool as common driver contract
+        ↓
+netmem abstraction
+        ↓
+memory providers
+        ↓
+host pages / userspace memory / device memory
+```
+
+Kernel Recipes 2024's io_uring zero-copy discussion makes the dependency
+explicit: zero-copy RX requires support from NIC hardware, firmware and
+driver, and uses page_pool / netmem plus queue configuration.
+
+This means modern high-speed network drivers are increasingly
+**memory-provider-aware** rather than simply allocating `struct page`
+objects.
+
+## 7. Rust --- from language support to a safe driver model
+
+### 7.1 Linux 6.1: Rust enters the kernel
+
+Linux 6.1 introduces the initial Rust-for-Linux support. This does not
+yet mean that network drivers can generally be written in Rust;
+driver-facing abstractions must be built subsystem by subsystem.
+
+### 7.2 2023: first network-device and PHY abstraction work
+
+A June 2023 proposal adds minimum Rust abstractions for `net_device`
+drivers and a Rust dummy driver:
+
+https://lwn.net/Articles/934517/
+
+In parallel, PHY abstractions mature through repeated review.
+
+### 7.3 Linux 6.8: Rust PHY support reaches mainline
+
+Linux 6.8 is the first major networking-driver milestone. LWN's
+merge-window coverage says Rust support for creating network PHY drivers
+was added, including abstractions and an Asix reference PHY driver.
+
+https://lwn.net/Articles/957188/
+
+This is more significant architecturally than the size of the example
+driver:
+
+``` text
+C phylib API
+     ↓
+sound Rust abstraction boundary
+     ↓
+safe Rust PHY driver
+```
+
+The abstraction decides where `unsafe` is contained and what
+lifetime/state guarantees can be expressed in the type system.
+
+### 7.4 Driver core, PCI, platform, DMA, MMIO and IRQ abstractions
+
+Writing a real high-performance NIC driver needs much more than
+`net_device_ops`:
+
+``` text
+PCI / platform probing
+MMIO
+DMA mapping
+IRQ
+device resources
+lifetime / removal handling
+networking abstractions
+```
+
+The 2024--2026 Rust driver-core work therefore matters directly to
+future network drivers, even when developed outside `net/`.
+
+Kernel Recipes:
+https://kernel-recipes.org/en/2024/schedule/interfacing-kernel-c-apis-from-rust/
+https://kernel-recipes.org/en/2025/schedule/so-you-want-to-write-a-driver-in-rust/
+https://kernel-recipes.org/en/2026/schedule/enforcing-device-driver-lifecycle-rules-at-compile-time/
+
+The 2026 driver-model work frames a major goal as converting lifecycle
+conventions into compile-time invariants:
+
+``` text
+C driver:
+ conventions + documentation + review
+
+Rust driver:
+ lifetime + ownership + type state
+             ↓
+ compile-time lifecycle constraints
+```
+
+### 7.5 Rust is not merely a C-to-Rust rewrite
+
+The deeper significance is that common driver frameworks become **safe
+abstraction boundaries**.
+
+The long-term lineage is therefore:
+
+``` text
+common C driver framework
+  NAPI / phylib / devlink / page_pool / DMA / PCI
+                   ↓
+well-defined ownership and lifecycle contracts
+                   ↓
+Rust abstractions around those contracts
+                   ↓
+more driver logic can live in safe Rust
+```
+
+Netdev 0x17's Rust networking tutorial emphasized memory safety and
+prevention of use-after-free, double-free and data-race classes, while
+Kernel Recipes 2026 extends this idea to device lifecycle rules
+themselves.
+
+## 8. Conference lineage
+
+### Netdev
+
+Netdev is the strongest conference source for driver-framework
+implementation:
+
+``` text
+2016  switchdev / hardware-offload model
+2018  DIM, switchdev/NOS, offload and driver API work
+2019  devlink health
+2023  Rust networking tutorial
+      queue/NAPI netdev-genl objects
+2024  Driver and H/W APIs workshop
+      memory pools / queues / devlink / fwctl
+2025  page_pool leak diagnostics
+2026  dedicated Device Driver Workshop
+```
+
+### Kernel Recipes
+
+Kernel Recipes is especially useful for architecture:
+
+``` text
+2018  XDP as a programmable layer in driver context
+2019  XDP integration and generic packet-buffer ideas
+2024  zero-copy networking + page_pool/netmem/memory providers
+      Rust/C API abstraction discussion
+2025  practical Rust driver development
+2026  compile-time enforcement of driver lifecycle rules
+```
+
+## 9. Revised six-axis model
+
+The complete document can now use six interacting axes:
+
+``` text
+PERFORMANCE
+  BQL → TSQ → pacing → BIG TCP
+
+PROGRAMMABILITY
+  BPF → TC → XDP → AF_XDP → struct_ops → netkit
+
+MEMORY
+  page_pool → netmem → memory providers → devmem/io_uring ZCRX
+
+CONTROL PLANE
+  rtnetlink → devlink/ethtool-netlink/YNL → fine-grained RTNL
+
+OBSERVABILITY
+  tracepoints/BTF → drop reasons → Retis/pwru → resource introspection
+
+DRIVER FRAMEWORK
+  NAPI/multiqueue
+   → DQL/BQL
+   → switchdev/devlink/phylink
+   → XDP/DIM/page_pool
+   → netdevsim/ethtool-netlink/auxiliary bus
+   → queue+NAPI+memory objects
+   → Rust safe driver abstractions
+```
+
+The key insight is that the driver-framework axis is not independent. It
+is the layer that makes the other five axes implementable across
+heterogeneous hardware without every driver reinventing the same
+mechanisms.
+
+## 10. Topics worth a second exact-commit audit
+
+Before assigning every item a precise kernel release/commit, a follow-up
+provenance pass should enumerate:
+
+``` text
+switchdev initial core series
+phylink first mainline landing
+devlink initial mainline commit set
+VF representor generic model
+DIM / net_dim introduction
+page_pool initial landing and subsequent DMA/recycle redesign
+netdevsim initial landing
+ethtool-netlink merge boundary
+auxiliary bus exact merge
+Rust PHY 6.8 exact commit set
+Rust net_device / PCI / DMA / IRQ abstraction landing status
+netdev-genl queue/NAPI object landing boundaries
+```
+
+As with the rest of this document, review proposals should not be
+promoted to mainline facts until landing is verified.
+
+------------------------------------------------------------------------
+
 # Part IV --- Observability / Explainability
 
 ## B. Observability / Explainability evolution
