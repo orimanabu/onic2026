@@ -7,7 +7,7 @@ title: Linux Networking Evolution
 > **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras, Parts III–V the lineages / driver-framework / observability story. Part VI is the only normative release chronology, Part VII the provenance ledger, and Appendix material is supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02  
-**構成改訂:** 2026-10-04（r18）
+**構成改訂:** 2026-10-04（r19）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
@@ -422,9 +422,9 @@ mTCP は Linux kernel TCP processing の CPU cost に対して user-level TCP st
 
 これらは upstream Linux release milestone ではないため Part VI には追加せず、architecture の動機を説明する research evidence として扱う。
 
-## Virtual networking — veth/virtio → netkit/queue ownership
+## Virtual networking — datapath と queue assignment の並行進化
 
-v5.0 の典型:
+v5.0 前後の典型的な virtual datapath は次のような形だった。
 
 ``` text
 container → veth → host stack → NIC
@@ -432,48 +432,61 @@ container → veth → host stack → NIC
 guest virtio-net → QEMU/vhost/TAP → bridge/OVS → NIC
 ```
 
-現在は複数の branch がある。
+その後は一つの後継系列ではなく、複数の branch が並行して発展した。
 
 ``` text
-virtio-net
-├─ vhost
-├─ vDPA
-├─ SR-IOV/VFIO
-└─ AF_XDP zero-copy
+VM datapath:
+  virtio-net ∥ vhost ∥ vDPA ∥ SR-IOV/VFIO
+                    ↕
+              AF_XDP zero-copy
 
-container:
-veth → netkit → BPF-native datapath → RX queue leasing
+container datapath:
+  veth ∥ netkit / BPF-native path
+
+queue / zero-copy assignment:
+  AF_XDP / io_uring ↔ RX HW queue leasing
 ```
 
-v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、v7.1 RX HW queue leasing は 「full kernel bypass」よりも、
+`∥` は parallel evolution、`↔` は相互作用する別 lineage を表す。netkit は veth の単純な後継ではなく、 RX HW queue leasing も netkit から派生した機能ではない。queue lease は virtual-device queue と physical-device queue の対応を明示し、AF_XDP や memory-provider 型の queue-bound API を container/virtual-device 側から利用可能にする **assignment mechanism** として位置付ける。
 
-**kernel が ownership/control を保持し、data movement を最小化する**
-
-方向として読むと理解しやすい。
+v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、v7.1 RX HW queue leasing に共通して見える方向性は、 full kernel bypass そのものではなく、**kernel の control / protection model を維持しながら data movement と datapath overhead を減らす選択肢を増やしたこと**である。
 
 ------------------------------------------------------------------------
 
 ## TCP / UDP / transport
 
-### TCP
+この節は **transport protocol 自体の semantics / feedback / path management** に絞る。 TCP 上で使われるという理由だけで、memory、aggregation、programmability の milestone を ここへ再収容しない。
+
+### Transport protocol evolution
+
+| Theme                         | Representative milestones  | この節で追う意味                           |
+|-------------------------------|----------------------------|--------------------------------------------|
+| connection establishment      | TFO client / server        | handshake latency / early data             |
+| congestion control / feedback | DCTCP · BBR · PLB · AccECN | congestion signal と sender behavior       |
+| multipath                     | MPTCP                      | 複数 path / subflow の transport semantics |
+| authentication                | TCP-AO                     | TCP connection authentication              |
+
+これらも一本の派生系列ではない。
 
 ``` text
-TCP zero-copy RX (`TCP_ZEROCOPY_RECEIVE`, 4.18)
-  ↓
-v5.0 era (EDT pacing already present since 4.20)
-  ├─ BPF congestion control
-  ├─ MPTCP (5.6)
-  ├─ BIG TCP (5.19)
-  ├─ TCP-AO/security
-  ├─ Device Memory TCP
-  └─ AccECN
+connection establishment:       TFO
+congestion control / feedback:  DCTCP ∥ BBR ∥ PLB ∥ AccECN
+multipath:                       MPTCP
+authentication:                  TCP-AO
 ```
 
-MPTCP は initial upstream から multi-subflow、userspace path manager、 Generic Netlink、BPF integration へ進化した。
+MPTCP は initial upstream から multi-subflow、userspace path manager、Generic Netlink、 BPF integration へ発展したが、BBR や BIG TCP の後継ではない。
+
+### 他の architecture lineage へ置く TCP 関連機能
+
+- **BIG TCP** — `Packet aggregation` を参照。
+- **Device Memory TCP** — `Packet memory` を参照。
+- **BPF congestion control / struct_ops** — `BPF` を参照。
+- **`TCP_ZEROCOPY_RECEIVE` / io_uring ZCRX** — zero-copy / memory-delivery mechanism として `io_uring networking` および `Packet memory` を参照。
 
 ### UDP
 
-v5.0 自体が `MSG_ZEROCOPY` と GRO の節目。その後は GRO/GSO、 tunnel/encapsulation、high packet-rate RX、receive-buffer scaling が進む。 QUIC や overlay networking の基盤として UDP の重要性も増した。
+UDP は GRO/GSO、tunnel/encapsulation、high packet-rate RX、receive-buffer scaling の 基盤として発展してきた。ここでは UDP 固有の protocol lineage と、PERFORMANCE / VIRTUAL-OVERLAY 側で扱う packet aggregation・tunnel acceleration を混同しない。
 
 ------------------------------------------------------------------------
 
@@ -961,88 +974,24 @@ IPsec hardware pipeline
 
 This is the same architectural pattern seen in switchdev and TC offload: the kernel keeps the canonical networking semantics while the driver maps those semantics onto hardware.
 
-## Rust — language support から safe driver model へ
+## Rust — common driver contracts を safe abstraction として表現する parallel track
 
-### Context: Linux 6.1 — Rust が kernel に入る
+Rust は networking architecture の主 lineage ではなく、common C driver contracts が明確になるほど、 その ownership / lifetime / state-machine boundary を型安全な abstraction として表現できる、という **parallel language-safety track** として扱う。
 
-> これは networking milestone として Part VI に採用した項目ではなく、6.8 の Rust PHY milestone を理解するための kernel-wide contextual reference である。
-
-Linux 6.1 introduces the initial Rust-for-Linux support. This does not yet mean that network drivers can generally be written in Rust; driver-facing abstractions must be built subsystem by subsystem.
-
-### 2023 — 初期 network-device / PHY abstraction
-
-A June 2023 proposal adds minimum Rust abstractions for `net_device` drivers and a Rust dummy driver:
-
-https://lwn.net/Articles/934517/
-
-In parallel, PHY abstractions mature through repeated review.
-
-### Linux 6.8 — Rust PHY support が mainline へ
-
-Linux 6.8 is the first major networking-driver milestone. LWN’s merge-window coverage says Rust support for creating network PHY drivers was added, including abstractions and an Asix reference PHY driver.
-
-https://lwn.net/Articles/957188/
-
-This is more significant architecturally than the size of the example driver:
+Linux 6.1 の Rust-for-Linux 導入は kernel-wide context であり、networking の canonical milestone ではない。本書での networking milestone は、6.8 の Rust PHY abstraction / Asix reference PHY を代表点とする。release attribution と exact anchor は Part VI / VII にのみ置く。
 
 ``` text
-C phylib API
-     ↓
-sound Rust abstraction boundary
-     ↓
-safe Rust PHY driver
+common C driver contracts
+  phylib · NAPI · devlink · page_pool · DMA / device lifecycle
+                         ⇒
+             explicit lifetime / state boundaries
+                         ⇒
+                safe Rust abstractions
 ```
 
-The abstraction decides where `unsafe` is contained and what lifetime/state guarantees can be expressed in the type system.
+重要なのは C implementation を Rust に置換したことではなく、driver framework が持つ lifetime、ownership、state transition、resource cleanup の contract を `unsafe` boundary の内側へ 閉じ込め、safe code から利用できる API として表現できることである。
 
-### Driver core / PCI / platform / DMA / MMIO / IRQ abstraction
-
-Writing a real high-performance NIC driver needs much more than `net_device_ops`:
-
-``` text
-PCI / platform probing
-MMIO
-DMA mapping
-IRQ
-device resources
-lifetime / removal handling
-networking abstractions
-```
-
-The 2024–2026 Rust driver-core work therefore matters directly to future network drivers, even when developed outside `net/`. なお Kernel Recipes 2024 の Andreas Hindborg の講演は block-device driver API を具体例とした講演であり、networking talk ではない。本書では Rust/C API boundary の一般的な driver-framework lesson としてのみ参照する。
-
-Kernel Recipes: https://kernel-recipes.org/en/2024/schedule/interfacing-kernel-c-apis-from-rust/ https://kernel-recipes.org/en/2025/schedule/so-you-want-to-write-a-driver-in-rust/ https://kernel-recipes.org/en/2026/schedule/enforcing-device-driver-lifecycle-rules-at-compile-time/
-
-Kernel Recipes 2026 の公式 schedule と講演ページで Danilo Krummrich の “Enforcing Device Driver Lifecycle Rules at Compile Time” の実在を確認できる。この講演は networking-specific ではなく Rust driver-core / Linux device model の講演である。その driver-model work は lifecycle conventions を compile-time invariants に変換することを主要な目標としている:
-
-``` text
-C driver:
- conventions + documentation + review
-
-Rust driver:
- lifetime + ownership + type state
-             ↓
- compile-time lifecycle constraints
-```
-
-### Rust は単なる C から Rust への書き換えではない
-
-The deeper significance is that common driver frameworks become **safe abstraction boundaries**.
-
-The long-term lineage is therefore:
-
-``` text
-common C driver framework
-  NAPI / phylib / devlink / page_pool / DMA / PCI
-                   ↓
-well-defined ownership and lifecycle contracts
-                   ↓
-Rust abstractions around those contracts
-                   ↓
-more driver logic can live in safe Rust
-```
-
-Netdev 0x17’s Rust networking tutorial emphasized memory safety and prevention of use-after-free, double-free and data-race classes, while Kernel Recipes 2026 extends this idea to device lifecycle rules themselves.
+real NIC driver には PHY だけでなく PCI/platform probing、DMA、MMIO、IRQ、device removal など kernel-wide driver-core abstraction も必要である。したがって Rust networking の成熟は networking subsystem 単独では完結しない。ただしその conference/review の詳細年表は本文の主題ではないため、 Appendix の research/conference provenance に集約する。
 
 ## Conference に見る lineage
 
@@ -1064,16 +1013,7 @@ Netdev is the strongest conference source for driver-framework implementation:
 
 ### Kernel Recipes
 
-Kernel Recipes is especially useful for architecture:
-
-``` text
-2018  XDP as a programmable layer in driver context
-2019  XDP integration and generic packet-buffer ideas
-2024  zero-copy networking (abstract: kernel-stack / vanilla-TCP compatibility; implementation details: live blog + upstream evidence)
-      Rust/C API abstraction discussion (block-device example; not a networking talk)
-2025  practical Rust driver development
-2026  compile-time enforcement of driver lifecycle rules (Rust driver-core/device model; not networking-specific)
-```
+Kernel Recipes は zero-copy networking と Rust/C driver abstraction の architecture context を補う。 個々の講演年表と provenance は Appendix に集約する。
 
 ## Part IV から Part V へ — common contracts から operability へ
 
@@ -1214,29 +1154,29 @@ Evidence class は次の語彙だけを用いる。
 
 ### 3.0–3.18（Era 1 期）
 
-| Release    | Milestone                            | Axis                           | Domain            | Evidence class |
-|:-----------|:-------------------------------------|:-------------------------------|:------------------|----------------|
-| 3.0        | namespace FD / setns()               | CONTROL PLANE                  | —                 | TAG            |
-| 3.3        | DQL/BQL                              | PERFORMANCE / DRIVER FRAMEWORK | —                 | TAG+ANCHOR     |
-| 3.3        | team                                 | —                              | VIRTUAL / OVERLAY | TAG            |
-| 3.5        | CoDel                                | PERFORMANCE                    | —                 | TAG+ANCHOR     |
-| 3.5        | fq_codel                             | PERFORMANCE                    | —                 | TAG            |
-| 3.6        | TSQ                                  | PERFORMANCE                    | —                 | TAG            |
-| 3.6        | TFO client                           | —                              | TRANSPORT         | TAG            |
-| 3.6        | IPv4 route-cache removal             | CONTROL PLANE                  | —                 | TAG            |
-| 3.7        | VXLAN                                | —                              | VIRTUAL / OVERLAY | TAG            |
-| 3.7        | TFO server                           | —                              | TRANSPORT         | TAG            |
-| 3.7        | IPv6 NAT                             | CONTROL PLANE                  | —                 | TAG            |
-| 3.9        | TCP/UDP SO_REUSEPORT                 | PERFORMANCE                    | —                 | TAG+ANCHOR     |
-| 3.11       | SO_BUSY_POLL                         | PERFORMANCE                    | —                 | TAG            |
-| 3.12 | sch_fq / TCP pacing / TSO autosizing generation | PERFORMANCE | — | TAG |
-| 3.13       | nftables                             | CONTROL PLANE                  | —                 | TAG+ANCHOR     |
-| 3.14       | TCP autocorking                      | PERFORMANCE                    | —                 | GENERATION     |
-| 3.15       | internal BPF ISA rework              | PROGRAMMABILITY                | —                 | TAG            |
-| 3.18       | bpf() / maps / verifier generation   | PROGRAMMABILITY                | —                 | TAG            |
-| 3.18       | DCTCP                                | —                              | TRANSPORT         | TAG            |
-| 3.18       | Geneve                               | —                              | VIRTUAL / OVERLAY | TAG            |
-| 3.18       | FOU                                  | —                              | VIRTUAL / OVERLAY | TAG            |
+| Release | Milestone                                       | Axis                           | Domain            | Evidence class |
+|:--------|:------------------------------------------------|:-------------------------------|:------------------|----------------|
+| 3.0     | namespace FD / setns()                          | CONTROL PLANE                  | —                 | TAG            |
+| 3.3     | DQL/BQL                                         | PERFORMANCE / DRIVER FRAMEWORK | —                 | TAG+ANCHOR     |
+| 3.3     | team                                            | —                              | VIRTUAL / OVERLAY | TAG            |
+| 3.5     | CoDel                                           | PERFORMANCE                    | —                 | TAG+ANCHOR     |
+| 3.5     | fq_codel                                        | PERFORMANCE                    | —                 | TAG            |
+| 3.6     | TSQ                                             | PERFORMANCE                    | —                 | TAG            |
+| 3.6     | TFO client                                      | —                              | TRANSPORT         | TAG            |
+| 3.6     | IPv4 route-cache removal                        | CONTROL PLANE                  | —                 | TAG            |
+| 3.7     | VXLAN                                           | —                              | VIRTUAL / OVERLAY | TAG            |
+| 3.7     | TFO server                                      | —                              | TRANSPORT         | TAG            |
+| 3.7     | IPv6 NAT                                        | CONTROL PLANE                  | —                 | TAG            |
+| 3.9     | TCP/UDP SO_REUSEPORT                            | PERFORMANCE                    | —                 | TAG+ANCHOR     |
+| 3.11    | SO_BUSY_POLL                                    | PERFORMANCE                    | —                 | TAG            |
+| 3.12    | sch_fq / TCP pacing / TSO autosizing generation | PERFORMANCE                    | —                 | TAG            |
+| 3.13    | nftables                                        | CONTROL PLANE                  | —                 | TAG+ANCHOR     |
+| 3.14    | TCP autocorking                                 | PERFORMANCE                    | —                 | GENERATION     |
+| 3.15    | internal BPF ISA rework                         | PROGRAMMABILITY                | —                 | TAG            |
+| 3.18    | bpf() / maps / verifier generation              | PROGRAMMABILITY                | —                 | TAG            |
+| 3.18    | DCTCP                                           | —                              | TRANSPORT         | TAG            |
+| 3.18    | Geneve                                          | —                              | VIRTUAL / OVERLAY | TAG            |
+| 3.18    | FOU                                             | —                              | VIRTUAL / OVERLAY | TAG            |
 
 ### 3.19–4.20（Era 2 期）
 
@@ -1279,69 +1219,70 @@ Evidence class は次の語彙だけを用いる。
 
 ### 5.0–6.1（Era 3 期）
 
-| Release               | Milestone                           | Axis             | Domain               | Evidence class |
-|:----------------------|:------------------------------------|:-----------------|:---------------------|----------------|
-| 5.0                   | UDP GRO                             | PERFORMANCE      | —                    | TAG            |
-| 5.0                   | UDP MSG_ZEROCOPY                    | PERFORMANCE      | —                    | TAG            |
-| 5.1                   | devlink health                      | DRIVER FRAMEWORK | —                    | TAG            |
-| 5.1                   | BPF spinlocks                       | PROGRAMMABILITY  | —                    | TAG            |
-| 5.1                   | BPF dead-code elimination (DCE)     | PROGRAMMABILITY  | —                    | TAG            |
-| 5.1 | mac80211 airtime accounting/scheduling | PERFORMANCE | — | TAG |
-| 5.3                   | nexthop objects                     | CONTROL PLANE    | —                    | TAG            |
-| 5.3                   | DIM generalized into lib/dim        | DRIVER FRAMEWORK | —                    | GENERATION     |
-| 5.5                   | mac80211 AQL                        | PERFORMANCE      | —                    | TAG            |
-| 5.6                   | MPTCP                               | —                | TRANSPORT            | TAG            |
-| 5.6                   | WireGuard                           | —                | SECURITY / TRANSPORT | TAG            |
-| 5.6                   | BPF struct_ops / TCP CC             | PROGRAMMABILITY  | TRANSPORT            | TAG            |
-| 5.6                   | ethtool Generic Netlink             | DRIVER FRAMEWORK | —                    | TAG+ANCHOR     |
-| 5.9                   | BPF_PROG_TYPE_SK_LOOKUP             | PROGRAMMABILITY  | —                    | TAG+ANCHOR     |
-| 5.11                  | auxiliary bus                       | DRIVER FRAMEWORK | —                    | TAG+ANCHOR     |
-| 5.12                  | threaded NAPI                       | DRIVER FRAMEWORK | —                    | TAG            |
-| 5.17                  | structured drop-reason foundation   | OBSERVABILITY    | —                    | TAG            |
-| 5.18                  | XDP multi-buffer / frags generation | PROGRAMMABILITY  | —                    | GENERATION     |
-| 5.19                  | IPv6 BIG TCP                        | PERFORMANCE      | —                    | TAG+ANCHOR     |
-| 5.19                  | drop-reason expansion               | OBSERVABILITY    | —                    | TAG            |
-| 6.0                   | io_uring SEND_ZC                    | PERFORMANCE      | —                    | TAG            |
-| 6.0                   | io_uring multishot receive          | PERFORMANCE      | —                    | TAG            |
+| Release | Milestone                              | Axis             | Domain               | Evidence class |
+|:--------|:---------------------------------------|:-----------------|:---------------------|----------------|
+| 5.0     | UDP GRO                                | PERFORMANCE      | —                    | TAG            |
+| 5.0     | UDP MSG_ZEROCOPY                       | PERFORMANCE      | —                    | TAG            |
+| 5.1     | devlink health                         | DRIVER FRAMEWORK | —                    | TAG            |
+| 5.1     | BPF spinlocks                          | PROGRAMMABILITY  | —                    | TAG            |
+| 5.1     | BPF dead-code elimination (DCE)        | PROGRAMMABILITY  | —                    | TAG            |
+| 5.1     | mac80211 airtime accounting/scheduling | PERFORMANCE      | —                    | TAG            |
+| 5.3     | nexthop objects                        | CONTROL PLANE    | —                    | TAG            |
+| 5.3     | DIM generalized into lib/dim           | DRIVER FRAMEWORK | —                    | GENERATION     |
+| 5.5     | mac80211 AQL                           | PERFORMANCE      | —                    | TAG            |
+| 5.6     | MPTCP                                  | —                | TRANSPORT            | TAG            |
+| 5.6     | WireGuard                              | —                | SECURITY / TRANSPORT | TAG            |
+| 5.6     | BPF struct_ops / TCP CC                | PROGRAMMABILITY  | TRANSPORT            | TAG            |
+| 5.6     | ethtool Generic Netlink                | DRIVER FRAMEWORK | —                    | TAG+ANCHOR     |
+| 5.9     | BPF_PROG_TYPE_SK_LOOKUP                | PROGRAMMABILITY  | —                    | TAG+ANCHOR     |
+| 5.11    | auxiliary bus                          | DRIVER FRAMEWORK | —                    | TAG+ANCHOR     |
+| 5.12    | threaded NAPI                          | DRIVER FRAMEWORK | —                    | TAG            |
+| 5.17    | structured drop-reason foundation      | OBSERVABILITY    | —                    | TAG            |
+| 5.18    | XDP multi-buffer / frags generation    | PROGRAMMABILITY  | —                    | GENERATION     |
+| 5.19    | IPv6 BIG TCP                           | PERFORMANCE      | —                    | TAG+ANCHOR     |
+| 5.19    | drop-reason expansion                  | OBSERVABILITY    | —                    | TAG            |
+| 6.0     | io_uring SEND_ZC                       | PERFORMANCE      | —                    | TAG            |
+| 6.0     | io_uring multishot receive             | PERFORMANCE      | —                    | TAG            |
 
 ### 6.2–7.3-rc（Era 4 期）
 
-| Release        | Milestone                                | Axis                             | Domain               | Evidence class |
-|:---------------|:-----------------------------------------|:---------------------------------|:---------------------|----------------|
-| 6.2            | TCP PLB                                  | —                                | TRANSPORT            | TAG            |
-| 6.2            | XFRM/IPsec packet offload                | DRIVER FRAMEWORK                 | SECURITY             | TAG+ANCHOR     |
-| 6.3            | YNL / YAML Netlink tooling               | CONTROL PLANE                    | —                    | TAG            |
-| 6.3            | IPv4 BIG TCP                             | PERFORMANCE                      | —                    | TAG            |
-| 6.6            | AF_XDP multi-buffer                      | MEMORY / PROGRAMMABILITY         | —                    | TAG            |
-| 6.6            | TCX / bpf_mprog                          | PROGRAMMABILITY                  | —                    | TAG            |
-| 6.7            | netkit                                   | PROGRAMMABILITY                  | VIRTUAL / OVERLAY    | TAG+ANCHOR     |
-| 6.7            | TCP-AO                                   | —                                | SECURITY / TRANSPORT | TAG            |
-| 6.8            | Rust phylib / Asix reference PHY         | DRIVER FRAMEWORK                 | —                    | TAG+ANCHOR     |
-| 6.8            | queue/NAPI netdev-genl visibility        | DRIVER FRAMEWORK / OBSERVABILITY | —                    | GENERATION     |
-| 6.11           | virtio-net AF_XDP RX zero-copy           | MEMORY                           | VIRTUAL / OVERLAY    | TAG            |
-| 6.12           | Device Memory TCP RX                     | MEMORY                           | —                    | SERIES         |
-| 6.13 | per-netns RTNL infrastructure milestone | CONTROL PLANE | — | SERIES |
-| 6.15           | io_uring ZCRX                            | MEMORY                           | —                    | SERIES+TAG     |
-| 6.15           | further RTNL breakup                     | CONTROL PLANE                    | —                    | SERIES+TAG     |
-| 6.16           | Device Memory TCP TX                     | MEMORY                           | —                    | SERIES+TAG     |
-| 6.16           | BPF qdisc                                | PROGRAMMABILITY                  | —                    | SERIES+TAG     |
-| 6.18           | AccECN core                              | —                                | TRANSPORT            | GENERATION     |
-| 6.18           | UDP RX evolution                         | PERFORMANCE                      | —                    | GENERATION     |
-| 6.19 | `dev_queue_xmit()` llist TX scheduling | PERFORMANCE | — | TAG |
-| 6.19 | threaded-NAPI kthread busy-poll extension | DRIVER FRAMEWORK | — | TAG |
-| 6.19           | WireGuard YNL-described Netlink          | CONTROL PLANE                    | SECURITY             | TAG            |
-| 7.0            | cake_mq                                  | PERFORMANCE                      | —                    | TAG            |
-| 7.0 | IPv6 BIG TCP without synthetic HBH jumbo header | PERFORMANCE | — | TAG |
-| 7.0            | AccECN enablement                        | —                                | TRANSPORT            | TAG            |
-| 7.0 | large RX buffers for memory providers / io_uring ZCRX | MEMORY | — | TAG |
-| 7.1            | RX HW queue leasing                      | MEMORY / DRIVER FRAMEWORK        | —                    | TAG            |
-| 7.1            | dedicated qdisc-drop tracepoint          | OBSERVABILITY                    | —                    | TAG            |
-| 7.2            | MPTCP PM limit expansion                 | —                                | TRANSPORT            | TAG            |
-| 7.2            | PPPoE GRO/GSO                            | PERFORMANCE                      | —                    | TAG            |
-| 7.3-rc         | BIG TCP over VXLAN/GENEVE                | PERFORMANCE                      | VIRTUAL / OVERLAY    | MAINLINE       |
-| 7.3-rc         | RTNL-less FIB-rule updates               | CONTROL PLANE                    | —                    | MAINLINE       |
-| 7.3-rc         | devmem buffers \>PAGE_SIZE               | MEMORY                           | —                    | MAINLINE       |
-| 7.3-rc | per-netns netdev-unregistration infrastructure | CONTROL PLANE | — | MAINLINE |
+| Release | Milestone                                             | Axis                             | Domain               | Evidence class |
+|:--------|:------------------------------------------------------|:---------------------------------|:---------------------|----------------|
+| 6.2     | TCP PLB                                               | —                                | TRANSPORT            | TAG            |
+| 6.2     | XFRM/IPsec packet offload                             | DRIVER FRAMEWORK                 | SECURITY             | TAG+ANCHOR     |
+| 6.3     | YNL / YAML Netlink tooling                            | CONTROL PLANE                    | —                    | TAG            |
+| 6.3     | IPv4 BIG TCP                                          | PERFORMANCE                      | —                    | TAG            |
+| 6.6     | AF_XDP multi-buffer                                   | MEMORY / PROGRAMMABILITY         | —                    | TAG            |
+| 6.6     | TCX / bpf_mprog                                       | PROGRAMMABILITY                  | —                    | TAG            |
+| 6.7     | netkit                                                | PROGRAMMABILITY                  | VIRTUAL / OVERLAY    | TAG+ANCHOR     |
+| 6.7     | TCP-AO                                                | —                                | SECURITY / TRANSPORT | TAG            |
+| 6.8     | Rust phylib / Asix reference PHY                      | DRIVER FRAMEWORK                 | —                    | TAG+ANCHOR     |
+| 6.8     | queue/NAPI netdev-genl visibility                     | DRIVER FRAMEWORK / OBSERVABILITY | —                    | GENERATION     |
+| 6.11    | virtio-net AF_XDP RX zero-copy                        | MEMORY                           | VIRTUAL / OVERLAY    | TAG            |
+| 6.12    | Device Memory TCP RX                                  | MEMORY                           | —                    | SERIES         |
+| 6.13    | per-netns RTNL infrastructure milestone               | CONTROL PLANE                    | —                    | SERIES         |
+| 6.15    | io_uring ZCRX                                         | MEMORY                           | —                    | SERIES+TAG     |
+| 6.15    | further RTNL breakup                                  | CONTROL PLANE                    | —                    | SERIES+TAG     |
+| 6.16    | Device Memory TCP TX                                  | MEMORY                           | —                    | SERIES+TAG     |
+| 6.16    | BPF qdisc                                             | PROGRAMMABILITY                  | —                    | SERIES+TAG     |
+| 6.18    | AccECN core                                           | —                                | TRANSPORT            | GENERATION     |
+| 6.18    | UDP RX evolution                                      | PERFORMANCE                      | —                    | GENERATION     |
+| 6.19    | `dev_queue_xmit()` llist TX scheduling                | PERFORMANCE                      | —                    | TAG            |
+| 6.19    | threaded-NAPI kthread busy-poll extension             | DRIVER FRAMEWORK                 | —                    | TAG            |
+| 6.19    | WireGuard YNL-described Netlink                       | CONTROL PLANE                    | SECURITY             | TAG            |
+| 7.0     | cake_mq                                               | PERFORMANCE                      | —                    | TAG            |
+| 7.0     | IPv6 BIG TCP without synthetic HBH jumbo header       | PERFORMANCE                      | —                    | TAG            |
+| 7.0     | AccECN enablement                                     | —                                | TRANSPORT            | TAG            |
+| 7.0     | large RX buffers for memory providers / io_uring ZCRX | MEMORY                           | —                    | TAG            |
+| 7.1     | RX HW queue leasing                                   | MEMORY / DRIVER FRAMEWORK        | —                    | TAG            |
+| 7.1     | dedicated qdisc-drop tracepoint                       | OBSERVABILITY                    | —                    | TAG            |
+| 7.2     | MPTCP PM limit expansion                              | —                                | TRANSPORT            | TAG            |
+| 7.2     | PPPoE GRO/GSO                                         | PERFORMANCE                      | —                    | TAG            |
+| 7.3-rc  | BIG TCP over VXLAN/GENEVE                             | PERFORMANCE                      | VIRTUAL / OVERLAY    | MAINLINE       |
+| 7.3-rc  | RTNL-less FIB-rule updates                            | CONTROL PLANE                    | —                    | MAINLINE       |
+| 7.3-rc  | devmem buffers \>PAGE_SIZE                            | MEMORY                           | —                    | MAINLINE       |
+| 7.3-rc  | per-netns netdev-unregistration infrastructure        | CONTROL PLANE                    | —                    | MAINLINE       |
+
 ### provenance 正規化を残す architecture-critical items
 
 `netmem`、memory providers、page_pool introspection、BTF、vDPA は本文の architecture story 上重要だが、 この版では origin / integration / enablement のどれを1行の canonical milestone とするかを 一次 evidence で再正規化できていない。したがって release を推測して B/GENERATION 行を作らず、 Part VII の **Open provenance items** に明示的に残す。
@@ -1496,9 +1437,20 @@ released tag
 
 # Changelog / Errata（非正規）
 
+- **r19:** TCP/UDP 節を transport semantics に限定し、BIG TCP / Device Memory TCP / BPF CC / zero-copy を各 architecture lineage へ戻した。
+
+- **r19:** Virtual networking を datapath と queue-assignment の parallel lineage に再描画し、`netkit → queue leasing` の派生表現を廃止。
+
+- **r19:** Part IV の Rust 本文を architecture 上の意味に圧縮し、conference/review の細部を Appendix 側へ寄せた。
+
+- **r19:** Part VI の range 見出しから Era 名を除去し、Era=Part II / chronology=Part VI の役割分担を明確化。
+
 - **r18:** Part VI を Axis / Domain の独立列へ変更し、Era/Grade 列を削除。束ね行を分割し、Evidence class を唯一の evidence-status 列とした。
+
 - **r18:** Part I の baseline を v3.0 / v5.0 / 2026 に整理し、軸→本文節の地図と図記法を追加。
+
 - **r18:** PERFORMANCE の queueing lineage を独立化し、io_uring / 6.19 cross-lineage の重複を整理。
+
 - **r18:** Part IV から raw SHA / release-attribution / 編集経緯を除去し、Part VII の open items を未解決 provenance に限定。
 
 この節は canonical chronology / provenance の一部ではない。版間の編集上の変更だけを記録する。
