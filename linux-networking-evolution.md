@@ -3913,41 +3913,41 @@ removal**, not just feature addition.
 
 # 40. Completeness audit: classification table
 
-  ------------------------------------------------------------------------------
-  Topic                            Year Classification       Why it matters
-  ------------------ ------------------ -------------------- -------------------
-  IPv6                             2020 design/API           protocol
-  extension-header                      discussion           extensibility vs
-  processing                                                 fast path/offload
+  ----------------------------------------------------------------------------
+  Topic                          Year Classification       Why it matters
+  ------------------ ---------------- -------------------- -------------------
+  IPv6                           2020 design/API           protocol
+  extension-header                    discussion           extensibility vs
+  processing                                               fast path/offload
 
-  Threaded NAPI                    2020 merged architecture  moves RX polling
-                                        direction            out of softirq
-                                                             context
+  Threaded NAPI                  2020 merged architecture  moves RX polling
+                                      direction            out of softirq
+                                                           context
 
-  bpfilter rethink                 2020 failed/stalled       BPF firewall
-                                        design               architecture
-                                                             history
+  bpfilter rethink               2020 failed/stalled       BPF firewall
+                                      design               architecture
+                                                           history
 
-  SO_REUSEPORT                     2021 socket semantics     scalable listener
-  failover                                                   behavior
+  SO_REUSEPORT                   2021 socket semantics     scalable listener
+  failover                                                 behavior
 
-  skb drop reasons                 2022 observability        structured
-                                                             packet-drop
-                                                             diagnostics
+  skb drop reasons               2022 observability        structured
+                                                           packet-drop
+                                                           diagnostics
 
-  in-kernel TLS                    2022 API/architecture     kernel-originated
-  handshake                                                  secure transports
+  in-kernel TLS                  2022 API/architecture     kernel-originated
+  handshake                                                secure transports
 
-  P4TC                         2023--24 significant          programmable TC
-                                        non-merged proposal  pipeline debate
+  P4TC                       2023--24 significant          programmable TC
+                                      non-merged proposal  pipeline debate
 
-  BPF qdisc                        2025 merged/programming   `struct_ops`
-                                        model                reaches packet
-                                                             scheduling
+  BPF qdisc                      2025 merged/programming   `struct_ops`
+                                      model                reaches packet
+                                                           scheduling
 
-  DCCP removal                     2025 removal/cleanup      simplifies shared
-                                                             transport code
-  ------------------------------------------------------------------------------
+  DCCP removal                   2025 removal/cleanup      simplifies shared
+                                                           transport code
+  ----------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -4461,3 +4461,544 @@ tags
 ```
 
 and compare that inventory against the thematic chapters above.
+
+------------------------------------------------------------------------
+
+# 46. Completeness audit pass 3 --- IOAM, ethtool-netlink, TC offload, socket memory, KTLS, removals
+
+## 46.1 2021 --- IPv6 IOAM
+
+Initial upstream series:
+
+-   `[PATCH net-next v4 0/5] Support for the IOAM Pre-allocated Trace with IPv6`
+-   https://lwn.net/Articles/857497/
+-   v5: https://lwn.net/Articles/863746/
+
+IOAM (In-situ Operations, Administration, and Maintenance) carries
+telemetry inside packets as they traverse the network.
+
+Conceptually:
+
+``` text
+packet
+  │
+  ├── node A appends telemetry
+  ├── node B appends telemetry
+  ├── node C appends telemetry
+  ▼
+receiver / collector
+```
+
+The Linux implementation includes IPv6 IOAM trace handling,
+namespace/schema configuration, Generic Netlink control, sysctls, and
+selftests.
+
+Linux 5.16 then enhanced IOAM with encapsulation support for in-transit
+packets.
+
+LWN merge-window: https://lwn.net/Articles/874683/
+
+This is different from SRv6: SRv6 primarily encodes
+forwarding/service-path instructions, whereas IOAM carries
+operational/telemetry information. They may coexist in IPv6 networks but
+solve different problems.
+
+------------------------------------------------------------------------
+
+## 46.2 2019--2025 --- ethtool ioctl → Generic Netlink
+
+The ethtool userspace/kernel interface historically used ioctl
+structures.
+
+Problems identified by the netlink series:
+
+-   poor extensibility;
+-   GET-modify-SET races;
+-   limited error reporting;
+-   no multicast notifications;
+-   difficulty dumping state for many devices.
+
+Important in-scope series:
+
+-   2019-07 v6: https://lwn.net/Articles/792611/
+-   2019-12 v8: https://lwn.net/Articles/808028/
+
+New architecture:
+
+``` text
+old:
+
+ethtool
+   │ ioctl
+   ▼
+fixed UAPI structs
+
+
+new:
+
+ethtool / NetworkManager / systemd-networkd / ...
+   │
+Generic Netlink family "ethtool"
+   │
+   ├── GET
+   ├── SET
+   ├── ACT
+   ├── dumps
+   ├── extended ACK
+   └── multicast notifications
+```
+
+Kernel code was split into `net/ethtool/`, with dedicated netlink
+handlers and documentation.
+
+### Continued migration
+
+The conversion was intentionally incremental.
+
+Linux 5.16-era work added transceiver-module control through ethtool
+netlink.
+
+By 2025 RSS configuration was being completed over Netlink:
+
+-   RSS_SET: https://lwn.net/Articles/1029617/
+-   RSS context create/remove: https://lwn.net/Articles/1030503/
+
+The latter series states that, for RSS configuration, all functionality
+available via ioctl had then become available through Netlink.
+
+### Relationship to YNL
+
+The later YNL/specification work changes the implementation again:
+
+``` text
+ethtool Generic Netlink
+       │
+       ▼
+YAML protocol specification
+       │
+       ├── generated UAPI/policy
+       ├── generated tooling
+       └── documentation
+```
+
+Recent ethtool patches modify:
+
+``` text
+Documentation/netlink/specs/ethtool.yaml
+```
+
+rather than treating UAPI definitions and docs as unrelated
+hand-maintained artifacts.
+
+------------------------------------------------------------------------
+
+# 47. TC / hardware-offload evolution
+
+## 47.1 Shared `flow_rule` / `flow_action` representation
+
+A key precursor predates the start date but is essential context:
+drivers were moved away from parsing TC-native action layouts directly
+toward common `flow_rule` / `flow_action` structures.
+
+The architectural result is:
+
+``` text
+TC flower ───────┐
+                 │
+ethtool RX NFC ──┼──► flow_rule / flow_action ──► NIC driver
+                 │
+netfilter ───────┘       (later integration)
+```
+
+This common representation reduces duplicate rule parsers in drivers and
+enables multiple kernel subsystems to share hardware-offload
+infrastructure.
+
+Archive: https://lwn.net/Articles/775046/
+
+------------------------------------------------------------------------
+
+## 47.2 2021 --- standalone TC action hardware offload
+
+Series:
+
+-   `[PATCH v7 net-next 00/12] allow user to offload tc action to net device`
+-   2021-12-17
+-   https://lwn.net/Articles/879034/
+
+Before, hardware actions were primarily offloaded as part of a
+flow/filter.
+
+The new model allows an action instance to have an independent
+lifecycle:
+
+``` text
+TC action instance
+      │
+      ├── flow A references it
+      ├── flow B references it
+      └── flow C references it
+      │
+      ▼
+hardware action object
+```
+
+The motivating example was OVS metering using a shared police action.
+
+The series also adds:
+
+-   `skip_hw` / `skip_sw`;
+-   hardware action statistics;
+-   `in_hw_count`;
+-   reoffload when drivers appear/disappear;
+-   selftests.
+
+------------------------------------------------------------------------
+
+## 47.3 2023 --- partial hardware offload and software continuation
+
+Series:
+
+-   `net/sched: cls_api: Support hardware miss to tc action`
+-   https://lwn.net/Articles/920501/
+
+This handles rules where only part of an action list can execute in
+hardware.
+
+``` text
+TC rule
+
+action A ──► action B ──► action C
+   │ HW         │ HW          │ unsupported
+   └────────────┴───── miss ───┘
+                         │
+                         ▼
+                  continue in software
+                  at specific action
+```
+
+This is important because real TC/OVS pipelines are rarely
+all-or-nothing offloadable.
+
+------------------------------------------------------------------------
+
+# 48. Socket memory and receive-buffer evolution
+
+## 48.1 Linux 5.16 --- `SO_RESERVE_MEM`
+
+LWN 5.16 merge-window:
+
+https://lwn.net/Articles/874683/
+
+`SO_RESERVE_MEM` lets users reserve kernel memory for a socket.
+
+Purpose:
+
+``` text
+normal socket
+    │
+memory pressure
+    │
+allocation may become difficult
+
+
+SO_RESERVE_MEM socket
+    │
+reserved memory
+    │
+network operation can proceed more predictably
+```
+
+The feature is tied to memory cgroups; reserved memory is charged
+against the cgroup quota.
+
+This belongs in the networking change log because it changes
+socket-memory guarantees, rather than simply tuning a sysctl.
+
+------------------------------------------------------------------------
+
+## 48.2 2025 --- TCP receive-side autotuning work
+
+Eric Dumazet's 2025 series:
+
+-   `[PATCH net-next 00/11] tcp: receive side improvements`
+-   https://lwn.net/Articles/1021321/
+
+The cover letter notes that Google had used a 15MB `tcp_rmem[2]` for
+years but that high-speed/small-RTT flows exposed overestimation in TCP
+RX autotuning.
+
+The work addresses receive-side sizing/accounting rather than simply
+"make buffers larger".
+
+This is relevant to the conceptual distinction:
+
+``` text
+net.core.rmem_default / rmem_max
+        │
+        └── generic socket limits/defaults
+
+tcp_rmem
+        │
+        └── TCP autotuning parameters
+
+sk_rcvbuf / rcvq_space
+        │
+        └── per-socket runtime state
+```
+
+These should not be treated as interchangeable knobs.
+
+------------------------------------------------------------------------
+
+## 48.3 Linux 6.18 --- default socket receive buffer raised to 4MB
+
+LWN's 6.18 merge-window explicitly records:
+
+> the default socket receive buffer size has been raised to 4MB
+
+https://lwn.net/Articles/1040203/
+
+This is recorded separately from TCP autotuning because the generic
+socket default and TCP's dynamic receive-window/buffer logic are
+distinct layers.
+
+------------------------------------------------------------------------
+
+# 49. KTLS / kernel-handshake follow-up
+
+Earlier chapters covered the 2022 effort to let kernel socket consumers
+request TLS handshakes.
+
+The generic handshake upcall mechanism reached a mature v8 series in
+2023:
+
+-   `[PATCH v8 0/4] Another crack at a handshake upcall mechanism`
+-   https://lwn.net/Articles/928240/
+
+Purpose:
+
+``` text
+kernel socket consumer
+(NFS / NVMe / etc.)
+        │
+        ▼
+generic handshake request
+        │
+        ▼
+userspace TLS policy/handshake helper
+        │
+        ▼
+KTLS-enabled kernel socket
+```
+
+This avoids requiring each kernel consumer to invent a separate
+userspace upcall protocol.
+
+### NVMe/TCP TLS
+
+After the handshake upcall and `tls_read_sock()` work landed, NVMe/TCP
+could build on the common infrastructure.
+
+-   `[PATCHv7 00/17] nvme: In-kernel TLS support for TCP`
+-   2023-08
+-   https://lwn.net/Articles/941139/
+
+### 2026 continuation
+
+Kernel consumers of `read_sock` still had limitations around TLS control
+records.
+
+2026 series:
+
+-   `Deliver TLS control records to kernel read_sock consumers`
+-   https://lwn.net/Articles/1083795/
+
+This demonstrates that KTLS evolution during the period is not a single
+feature merge but an ongoing effort to make encrypted sockets behave
+like ordinary kernel-consumable transport streams.
+
+------------------------------------------------------------------------
+
+# 50. Protocol retirement as network-stack optimization
+
+## 50.1 DECnet --- Linux 6.1
+
+LWN 6.1 merge-window:
+
+https://lwn.net/Articles/910312/
+
+DECnet protocol support was removed while UAPI definitions were retained
+so existing source code can still compile.
+
+This establishes a pattern later seen with other retired protocols:
+
+``` text
+remove implementation
+       │
+       ├── eliminate maintenance/security surface
+       ├── simplify shared fast-path code
+       └── sometimes retain UAPI for build compatibility
+```
+
+------------------------------------------------------------------------
+
+## 50.2 DCCP --- 2025
+
+Covered earlier.
+
+DCCP removal is particularly useful because TCP/DCCP shared code could
+become TCP-specific after the protocol disappeared.
+
+------------------------------------------------------------------------
+
+## 50.3 UDP-Lite --- Linux 7.1
+
+Removal series:
+
+-   `[PATCH v2 net-next 00/15] udp: Retire UDP-Lite`
+-   2026-03-05
+-   https://lwn.net/Articles/1061588/
+
+LWN 7.1 merge-window confirms removal:
+
+https://lwn.net/Articles/1067250/
+
+The cover letter gives unusually useful performance data.
+
+Without FDO:
+
+``` text
+13.3 Mpps → 14.7 Mpps
+≈ 10% increase
+```
+
+With FDO:
+
+``` text
+20.1 Mpps → 20.7 Mpps
+≈ 3% increase
+```
+
+for the author's `udp_rr` workload with 20,000 flows.
+
+Why can removing an unused protocol improve UDP?
+
+UDP-Lite shared many conditionals and helper paths with normal UDP:
+
+``` text
+UDP RX/TX fast path
+      │
+      ├── UDP?
+      └── UDP-Lite?
+             │
+             └── checksum-coverage special cases
+```
+
+Removing UDP-Lite eliminates branches, separate tables/helpers,
+partial-checksum logic, and code footprint from the common UDP path.
+
+This is a strong example of **negative code as networking performance
+work**.
+
+------------------------------------------------------------------------
+
+# 51. Audit synthesis --- three recurring modernization patterns
+
+The newly audited items reveal three broad patterns.
+
+## 51.1 Fixed UAPI → extensible, generated Netlink
+
+``` text
+ioctl structs
+    │
+    ▼
+Generic Netlink
+    │
+    ▼
+YAML/YNL generated specification
+```
+
+Examples:
+
+-   ethtool;
+-   MPTCP;
+-   nftables;
+-   other netdev APIs.
+
+## 51.2 Software-only pipeline → common representation → partial hardware offload
+
+``` text
+TC-specific representation
+      │
+      ▼
+flow_rule / flow_action
+      │
+      ├── TC
+      ├── ethtool
+      └── netfilter
+      │
+      ▼
+NIC hardware
+      │
+      └── software continuation on miss
+```
+
+## 51.3 Add protocols → later prune unused protocol complexity
+
+``` text
+large monolithic network stack
+      │
+      ├── DECnet removed
+      ├── DCCP removed
+      └── UDP-Lite removed
+             │
+             ▼
+smaller shared fast paths
+```
+
+The UDP-Lite case demonstrates that removal can produce measurable
+packet-rate gains.
+
+------------------------------------------------------------------------
+
+# 52. Remaining audit before canonical inventory
+
+At this point the broad architectural categories are substantially
+covered.
+
+One final sweep remains for:
+
+1.  `devlink` changes that affect netdev architecture rather than
+    individual drivers;
+2.  route/FIB policy changes after nexthop objects;
+3.  IPv6 and TCP sysctl/socket-option additions;
+4.  major GRO/GSO/NAPI/XDP changes not already attached to BIG
+    TCP/page_pool;
+5.  removals/deprecations announced but not yet represented;
+6.  2026 articles through 2026-10-02;
+7.  duplicate and status reconciliation.
+
+After that, generate the canonical inventory:
+
+  --------------------------------------------------------------------------
+  Date     LWN      Category   Kernel   Status   Series   Commits   Tags
+           title                                                    
+  -------- -------- ---------- -------- -------- -------- --------- --------
+
+  --------------------------------------------------------------------------
+
+Status values will be normalized to:
+
+``` text
+merged
+merged-follow-up
+RFC
+under-review
+stalled
+removed
+userspace-milestone
+design-discussion
+```
+
+This table will become the basis for the final completeness check.
