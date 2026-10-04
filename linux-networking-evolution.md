@@ -1544,3 +1544,354 @@ ISM / SMC-D
 7.  AccECN individual patch/commit history
 8.  UDP RX optimization individual commits
 9.  RTNL breakup individual series / enabling progression
+
+------------------------------------------------------------------------
+
+# 19. Commit-level pass 3 --- io_uring ZC TX, BPF struct_ops, MPTCP/BPF, nftables/flowtable
+
+## 19.1 io_uring zero-copy TX
+
+**Subsystem:** io_uring / socket send path / `MSG_ZEROCOPY`
+infrastructure\
+**Mainline generation:** Linux 6.0 era\
+**Primary author:** Pavel Begunkov
+
+### Development timeline
+
+-   2021-11-30: `[RFC 00/12] io_uring zerocopy send`
+    -   https://lwn.net/Articles/877167/
+-   2021-12-21: `[RFC v2 00/19] io_uring zerocopy tx`
+    -   https://lwn.net/Articles/879371/
+-   2021-12-30: LWN feature, *Zero-copy network transmission with
+    io_uring*
+    -   https://lwn.net/Articles/879724/
+-   2022-06-28: RFC v3 / 29 patches
+    -   https://lwn.net/Articles/899296/
+-   2022-07-05: non-RFC `PATCH net-next v3 00/25`
+    -   https://lwn.net/Articles/900083/
+-   2022-09: API simplification: slot/flush model was replaced by
+    per-request completion notifications.
+    -   https://lwn.net/Articles/906803/
+
+### Design
+
+Normal send:
+
+``` text
+userspace buffer
+       │ memcpy
+       ▼
+kernel-owned skb data
+       │
+       ▼
+NIC
+```
+
+Zero-copy send:
+
+``` text
+userspace buffer
+       │ pin/reference
+       ▼
+network stack / NIC DMA
+       │
+       └── completion notification ──► userspace may reuse buffer
+```
+
+The difficult part is therefore not only avoiding `memcpy()`, but
+defining buffer lifetime and completion semantics. The io_uring design
+delivers the "buffer may now be reused" notification through the
+completion queue.
+
+The v3 series identifies two networking-side changes in particular:
+
+1.  passing `ubuf_info` from io_uring into the networking layer through
+    the in-kernel `msghdr`;
+2.  avoiding page-reference overhead for registered buffers where
+    possible.
+
+### Mainline evidence
+
+Linux 6.0 stable history contains fixes for the newly introduced
+io_uring ZC send path, including:
+
+-   `io_uring/net: fail zc send when unsupported by socket`
+-   `net: flag sockets supporting msghdr originated zerocopy`
+
+This places the first mainline generation in the Linux 6.0 timeframe.
+
+### Relationship to later ZC RX
+
+TX and RX are related goals but architecturally different:
+
+``` text
+ZC TX (6.0 era)
+userspace memory ──► network/NIC
+
+ZC RX (6.15)
+network/NIC ──► page_pool memory provider ──► userspace memory
+```
+
+The later RX work depends much more directly on `page_pool`, `netmem`,
+and memory-provider infrastructure shared with Device Memory TCP.
+
+------------------------------------------------------------------------
+
+## 19.2 BPF `struct_ops` and TCP congestion control --- Linux 5.6
+
+**Subsystem:** BPF / TCP congestion control\
+**Primary author:** Martin KaFai Lau
+
+### Development
+
+The BPF STRUCT_OPS series explicitly states that its first use case is
+implementing `struct tcp_congestion_ops` in BPF.
+
+Important revisions:
+
+-   2019-12-20: `[PATCH bpf-next v2 00/11] Introduce BPF STRUCT_OPS`
+    -   https://lwn.net/Articles/807973/
+-   2020-01-08: `[PATCH bpf-next v4 00/11] Introduce BPF STRUCT_OPS`
+    -   https://lwn.net/Articles/809092/
+-   LWN feature: *Kernel operations structures in BPF*
+    -   https://lwn.net/Articles/811631/
+
+### Architecture
+
+``` text
+traditional:
+
+kernel C implementation/module
+          │
+          ▼
+ struct tcp_congestion_ops
+          │
+          ▼
+       TCP stack
+
+
+BPF struct_ops:
+
+BPF program
+     │ verifier + BTF/trampoline infrastructure
+     ▼
+BPF implementation of tcp_congestion_ops
+     │
+     ▼
+TCP stack
+```
+
+This is an important transition in BPF networking: BPF is no longer only
+attached at packet/socket hooks; it can implement selected kernel
+operation tables.
+
+### Why it matters
+
+The cover letter gives the motivation as combining faster algorithm
+iteration with the kernel's existing TCP stack, rather than moving
+congestion control entirely into a userspace TCP implementation.
+
+Later `struct_ops` work extends this model beyond TCP congestion
+control, including network scheduling/qdisc-related experimentation.
+
+------------------------------------------------------------------------
+
+## 19.3 MPTCP + BPF
+
+**Subsystem:** MPTCP / socket selection / BPF
+
+MPTCP entered mainline as a deliberately incremental implementation.
+During the period covered by this document, the important trend is not
+just "more MPTCP features", but the increasing ability to steer MPTCP
+behavior with BPF.
+
+Conceptually:
+
+``` text
+application TCP socket
+        │
+        ▼
+       MPTCP
+   ┌────┴────┐
+ subflow A  subflow B
+   │          │
+ path A     path B
+```
+
+BPF hooks increasingly allow policy to influence socket/protocol
+selection and MPTCP subflow behavior. Linux 6.6 is an important point in
+this lineage, with BPF support around protocol switching/selection and
+MPTCP use cases appearing in the merge-window work.
+
+### Classification rule
+
+MPTCP changes are split into:
+
+1.  protocol implementation milestones;
+2.  path-manager/userspace API;
+3.  BPF integration.
+
+This avoids treating every MPTCP bug fix or protocol extension as a
+separate architecture-level change.
+
+### Commit verification status
+
+The BPF/MPTCP work spans multiple hooks and commits. Exact individual
+hashes are left for a dedicated MPTCP pass rather than assigning one
+commit as "the MPTCP+BPF commit".
+
+------------------------------------------------------------------------
+
+## 19.4 Netfilter flowtable and hardware offload --- Linux 5.3 onward
+
+**Subsystem:** netfilter / nftables / flowtable / NIC offload\
+**Primary contributor in the initial series:** Pablo Neira Ayuso
+
+LWN's 2020 hardware-offload article states that Linux 5.3 received a
+patch set adding support for offloading some netfilter packet filtering
+to hardware. The work also refactored common offload paths shared with
+NIC drivers.
+
+LWN:
+
+-   https://lwn.net/Articles/809333/
+-   *Accelerating netfilter with hardware offload, part 2* --- indexed
+    by LWN Kernel Index
+
+### Architecture
+
+``` text
+without flow offload
+
+packet
+  │
+  ▼
+netfilter hooks / conntrack / nft rules
+  │
+  ▼
+forwarding
+
+
+flowtable fast path
+
+first packets
+  │
+conntrack + nftables policy
+  │
+  ▼
+flow established
+  │
+  ▼
+flowtable fast path
+  │
+  ├── software fast path
+  └── hardware offload (where supported)
+```
+
+Hardware typically supplies parser/classifier/action capabilities. The
+kernel work also had to reduce duplication among previously separate TC,
+ethtool, and netfilter offload paths.
+
+### Userspace milestone
+
+nftables 0.9.9 (2021) exposed a flowtable `offload` flag to enable the
+hardware fast path.
+
+Example from the release announcement:
+
+``` text
+flowtable f {
+    hook ingress priority filter + 1
+    devices = { ... }
+    flags offload
+}
+```
+
+Archive: https://lwn.net/Articles/857369/
+
+------------------------------------------------------------------------
+
+## 19.5 nftables 1.0 --- 2021
+
+**Subsystem:** netfilter / packet filtering / userspace ABI
+
+nftables 1.0.0 was released on 2021-08-19. LWN's retrospective
+emphasizes the long transition from the multiple protocol-specific
+iptables-family engines toward a more generic packet-filtering virtual
+machine and rule representation.
+
+LWN feature: https://lwn.net/Articles/867185/
+
+### Why it belongs in a kernel-networking change log
+
+The version number itself is userspace, but it marks the maturation of
+kernel/userspace nftables interfaces that had accumulated features such
+as:
+
+-   atomic ruleset updates;
+-   common IPv4/IPv6-capable rule representation;
+-   sets/maps/concatenations;
+-   stateful filtering/NAT integration;
+-   flowtable software fast path;
+-   hardware flow offload.
+
+Therefore this entry is tracked as a **userspace/kernel-interface
+milestone**, not as a single kernel commit.
+
+------------------------------------------------------------------------
+
+# 20. Refined networking evolution map
+
+The additional research makes it useful to separate three kinds of "fast
+path":
+
+``` text
+A. Fewer / larger packets
+   GRO/GSO
+      │
+      └── BIG TCP
+
+
+B. Avoid memory copies
+   MSG_ZEROCOPY
+      │
+      ├── io_uring ZC TX
+      │
+      └── netmem/page_pool
+             ├── io_uring ZC RX
+             └── Device Memory TCP
+
+
+C. Avoid repeated stack/policy work
+   nftables/conntrack
+      │
+      └── flowtable
+             ├── software fast path
+             └── hardware offload
+
+   BPF/XDP
+      │
+      ├── socket lookup
+      ├── struct_ops
+      └── netkit
+```
+
+These mechanisms solve different bottlenecks and should not be grouped
+simply under "zero-copy" or "offload".
+
+------------------------------------------------------------------------
+
+# 21. Next commit-level pass
+
+Remaining high-priority series:
+
+1.  MPTCP --- protocol milestones, path manager, exact BPF commits
+2.  nftables flowtable --- exact kernel patch/commit sequence
+3.  conntrack --- scalability/GC/timeout/observability changes
+4.  BIG TCP --- IPv4 and overlay/VXLAN/GENEVE follow-ups
+5.  virtio-net/TAP --- XDP, multiqueue, mergeable buffers, zero-copy
+    evolution
+6.  KubeVirt/netkit/io_uring ZC receive developments
+7.  AccECN --- exact patch and commit history
+8.  UDP receive optimization --- exact mechanism and commits
+9.  RTNL breakup --- exact conversion series and activation progression
