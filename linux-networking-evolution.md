@@ -9449,28 +9449,28 @@ multi-stage integration.
 
 # 90. Updated MPTCP provenance quality
 
-  ------------------------------------------------------------------------
-  MPTCP item                   Status                Quality
-  ---------------------------- --------------------- ---------------------
-  native MPTCP API / Linux 5.6 merged                A/B
+  ----------------------------------------------------------------------
+  MPTCP item                   Status               Quality
+  ---------------------------- -------------------- --------------------
+  native MPTCP API / Linux 5.6 merged               A/B
 
-  initial kselftest            merged                **A**
-  `048d19d444be`                                     
+  initial kselftest            merged               **A**
+  `048d19d444be`                                    
 
-  2020 BPF subflow v3 design   review/design         **A**
-                               provenance            
+  2020 BPF subflow v3 design   review/design        **A**
+                               provenance           
 
-  subflow parent-cgroup        merged separately     **A**
-  `3764b0c5651e3`                                    
+  subflow parent-cgroup        merged separately    **A**
+  `3764b0c5651e3`                                   
 
-  2022 BPF `mptcp_sock` v5     applied to bpf-next   **A landing
-                                                     provenance**
+  2022 BPF `mptcp_sock` v5     applied to bpf-next  **A landing
+                                                    provenance**
 
-  `update_socket_protocol()`   merged                **A**
+  `update_socket_protocol()`   merged               **A**
 
-  later iterator/kfunc work    evolving              pending exact
-                                                     enumeration
-  ------------------------------------------------------------------------
+  later iterator/kfunc work    evolving             pending exact
+                                                    enumeration
+  ----------------------------------------------------------------------
 
 The remaining MPTCP task is now mostly mechanical SHA enumeration rather
 than historical interpretation.
@@ -9797,3 +9797,214 @@ MPTCP/BPF:
 
 These corrections are now the canonical interpretation used by the
 document.
+
+------------------------------------------------------------------------
+
+# 94. Provenance verification pass 8 --- canonical landing confidence
+
+## 94.1 MPTCP/BPF v5 is now fully canonical
+
+The seven-commit 2022 `mptcp_sock` series is no longer merely an
+accepted-series reference. Patchwork-bot returned direct
+`git.kernel.org/bpf/bpf-next/c/<SHA>` objects for every patch:
+
+``` text
+3bc253c2e652  bpf: add bpf_skc_to_mptcp_sock_proto
+d3294cb1e06d  selftests/bpf: Enable CONFIG_IKCONFIG_PROC in config
+8039d353217c  selftests/bpf: add MPTCP test base
+3bc48b56e345  selftests/bpf: test bpf_skc_to_mptcp_sock
+026622346772  selftests/bpf: verify token of struct mptcp_sock
+ccc090f46900  selftests/bpf: verify ca_name of struct mptcp_sock
+4f90d034bba9  selftests/bpf: verify first of struct mptcp_sock
+```
+
+The implementation anchor `3bc253c2e652` is also independently
+referenced by later stable/fix work, including a 5.19 stable fix and
+2026 MPTCP/BPF correctness fixes.
+
+This satisfies all three provenance layers:
+
+``` text
+review/design
+    2020 subflow-BPF series
+        ↓
+landing
+    2022 v5/7 + patchwork applied confirmation
+        ↓
+mainline durability
+    later Fixes: 3bc253c2e652
+```
+
+**Quality: A, high confidence.**
+
+------------------------------------------------------------------------
+
+## 94.2 MPTCP parent-cgroup landing is independently canonical
+
+The separately landed cgroup behavior is:
+
+``` text
+3764b0c5651e
+mptcp: attach subflow socket to parent cgroup
+```
+
+Patchwork-bot for the December 2020 MPTCP net-next series provides the
+canonical `git.kernel.org` object directly.
+
+This confirms the historical split:
+
+``` text
+2020 BPF proposal
+    included parent-cgroup concept
+          │
+          ├── parent-cgroup fix lands in MPTCP net-next
+          │     3764b0c5651e
+          │
+          └── BPF mptcp_sock API is redesigned and lands in 2022
+                3bc253c2e652...
+```
+
+So these should remain separate canonical inventory entries rather than
+be attributed to one BPF series.
+
+------------------------------------------------------------------------
+
+## 94.3 Nexthop final landing revision is confirmed, hashes remain conservative
+
+The accepted nexthop route-integration revision is conclusively:
+
+``` text
+[PATCH v4 net-next 00/20]
+net: Enable nexthop objects with IPv4 and IPv6 routes
+```
+
+David Miller's response on 2019-06-10 is explicit:
+
+``` text
+Series applied, thanks.
+```
+
+The June 8 archive also exposes the v4 subjects, including:
+
+``` text
+11/20 ipv4: Allow routes to use nexthop objects
+12/20 ipv4: Optimization for fib_info lookup with nexthops
+13/20 ipv6: Allow routes to use nexthop objects
+14/20 nexthops: add support for replace
+17/20 selftests: pmtu: Add support for routing via nexthop objects
+19/20 selftests: Add test with multiple prefixes using single nexthop
+20/20 selftests: Add version of router_multipath.sh using nexthop objects
+```
+
+Known exact anchors remain:
+
+``` text
+493ced1a...    ipv4: Allow routes to use nexthop objects
+cab14d1087d9   router_multipath nexthop-object selftest
+```
+
+Search indexing did not expose a trustworthy canonical mapping for every
+one of the twenty commits. They therefore remain **pending rather than
+inferred**.
+
+This is intentional: series acceptance is Quality A, while complete SHA
+enumeration remains Quality B.
+
+------------------------------------------------------------------------
+
+## 94.4 IOAM v5: exact series date and revision changes
+
+The final v5 series was posted:
+
+``` text
+2021-07-20 21:42:55 +0200
+[PATCH net-next v5 0/6]
+Support for the IOAM Pre-allocated Trace with IPv6
+```
+
+v5 explicitly added/refined:
+
+``` text
+sysctl types/min/max/defaults
+wide IOAM-ID sysctls
+stronger header validation
+RCU for schema↔namespace pointers
+per-operation Generic Netlink policies
+selftests
+removal of virtual/anonymous tunnel decapsulation
+```
+
+This explains why the v5 generation, rather than the earlier v4, is the
+correct provenance anchor.
+
+The exact data-plane object remains:
+
+``` text
+9ee11f0fff205b4b3df9750bff5e94f97c71b6a0
+ipv6: ioam: Data plane support for Pre-allocated Trace
+```
+
+and a February 2026 receive-path overflow fix again carries:
+
+``` text
+Fixes: 9ee11f0fff20
+```
+
+Thus the IOAM data-plane provenance is now doubly anchored by:
+
+``` text
+v5 accepted-generation history
+        +
+later mainline Fixes history
+```
+
+The other five v5 objects remain pending exact canonical enumeration.
+
+------------------------------------------------------------------------
+
+# 95. Provenance-confidence convention
+
+The document now uses a stricter interpretation of Quality A:
+
+``` text
+Quality A
+    accepted/pulled series identity
+        +
+    exact canonical SHA
+        +
+    preferably independent later mainline evidence
+    (Fixes:, stable backport, pull log, etc.)
+
+Quality B
+    accepted series/release is certain
+        +
+    only part of the exact SHA set is enumerated
+
+Quality C
+    development series/status is certain
+        +
+    exact landing still incomplete
+
+Quality D
+    RFC/design/proposal; no merge assumed
+```
+
+Under this definition:
+
+  Feature                              Confidence
+  ------------------------------------ -------------------------------------
+  MPTCP/BPF `mptcp_sock` 2022          **A**
+  MPTCP parent-cgroup                  **A**
+  `update_socket_protocol()`           **A**
+  AF_XDP multi-buffer                  **A**
+  Device Memory TCP RX/TX              **A**
+  BPF qdisc                            **A**
+  netkit core / queue leasing          **A**
+  BIG TCP IPv4 / tunnel series         **A**
+  IOAM data-plane                      **A**
+  IOAM complete v5 series              **B**
+  nexthop v4/20 landing                **A for series / B for all hashes**
+  initial MPTCP 5.6 complete SHA set   **B**
+
+The remaining work is therefore concentrated in complete multi-commit
+enumeration, not in determining whether these features actually landed.
