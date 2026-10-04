@@ -3107,36 +3107,110 @@ them.
 
 ### Driver-framework confidence table
 
-  ----------------------------------------------------------------------------------
-  Framework         Design/RFC              Release landing   Exact anchor status
-  ----------------- ----------------------- ----------------- ----------------------
-  switchdev         2014/2015 evolution     3.19 origin; 4.x  multi-commit;
-                                            expansion         expansion commits
-                                                              identified
+  --------------------------------------------------------------------------------
+  Framework         Design/RFC              Release landing Exact anchor status
+  ----------------- ----------------------- --------------- ----------------------
+  switchdev         2014/2015 evolution     3.19 origin;    multi-commit;
+                                            4.x expansion   expansion commits
+                                                            identified
 
-  devlink           2016 series             4.6               release verified;
-                                                              exact origin pending
+  devlink           2016 series             4.6             release verified;
+                                                            exact origin pending
 
-  phylink           2015 RFC                4.13 generation   `9525ae83959b...`
-                                                              exact
+  phylink           2015 RFC                4.13 generation `9525ae83959b...`
+                                                            exact
 
-  DIM/net_dim       pre-2018 work           upstream by       generic-library SHA
-                                            Netdev 0x12 /     pending
-                                            2018              
+  DIM/net_dim       pre-2018 work           upstream by     generic-library SHA
+                                            Netdev 0x12 /   pending
+                                            2018            
 
-  netdevsim         offload test framework  4.16              release verified
+  netdevsim         offload test framework  4.16            release verified
 
-  ethtool-netlink   2018 RFC lineage        5.6 groundwork    release verified;
-                                                              exact core set pending
+  ethtool-netlink   2018 RFC lineage        5.6 groundwork  release verified;
+                                                            exact core set pending
 
-  auxiliary bus     ancillary/virtual-bus   5.11              signed tag/tip
-                    predecessors                              verified; origin SHA
-                                                              pending
+  auxiliary bus     ancillary/virtual-bus   5.11            signed tag/tip
+                    predecessors                            verified; origin SHA
+                                                            pending
 
-  Rust phylib       2023 RFC→v11            6.8               release/final-series
-                                                              verified; exact SHAs
-                                                              pending
-  ----------------------------------------------------------------------------------
+  Rust phylib       2023 RFC→v11            6.8             release/final-series
+                                                            verified; exact SHAs
+                                                            pending
+  --------------------------------------------------------------------------------
+
+## Release-attribution re-audit --- pass 6: Driver Framework exact anchors
+
+### ethtool Generic Netlink --- exact core anchor
+
+The core Generic Netlink interface has an exact mainline anchor:
+
+``` text
+2b4a8990b7df55875745a80a609a1ceaaf51f322
+ethtool: introduce ethtool netlink interface
+Michal Kubecek
+2019-12-27
+```
+
+This commit creates the `ethtool` Generic Netlink family, UAPI header,
+kernel header, `net/ethtool/netlink.c`, and the initial documentation.
+It is therefore an appropriate **core-interface anchor** for the 5.6
+generation.
+
+The feature remains intentionally described as a generation rather than
+a one-commit conversion: individual ethtool commands were migrated
+incrementally after the family itself appeared.
+
+### auxiliary bus --- final series is known, exact origin SHA remains conservative
+
+The final standalone v4 patch states the architecture directly:
+
+``` text
+auxiliary_device
+auxiliary_driver
+probe/remove
+shutdown
+suspend/resume
+string-based matching on the auxiliary bus
+```
+
+It is authored by Dave Ertman with multiple co-developers and was posted
+in December 2020. Together with the driver-core 5.11 signed tag, this is
+enough to establish design and release provenance. The document still
+does not assign an exact origin SHA until that commit object is
+independently recovered.
+
+### Rust PHY --- exact final series shape
+
+The final v11 series contains exactly four patches:
+
+``` text
+1. rust: core abstractions for network PHY drivers
+2. rust: net::phy add module_phy_driver macro
+3. MAINTAINERS: add Rust PHY abstractions for ETHERNET PHY LIBRARY
+4. net: phy: add Rust Asix PHY driver
+```
+
+The first patch adds the phylib abstractions and
+`CONFIG_RUST_PHYLIB_ABSTRACTIONS`; the fourth adds
+`drivers/net/phy/ax88796b_rust.rs`. This provides a clean
+design→final-series boundary even while exact mainline SHAs remain
+pending.
+
+### What remains deliberately unresolved
+
+The following items are **not** assigned guessed hashes:
+
+``` text
+switchdev initial origin commit set
+devlink initial origin commit set
+generic DIM/net_dim initial library commit
+netdevsim initial core commit
+auxiliary-bus feature-origin commit
+Rust PHY four mainline SHAs
+```
+
+For these, release-level or final-series provenance is stronger than an
+unverified hash. They remain explicitly pending.
 
 # Part III --- Long-term feature lineages
 
@@ -5370,33 +5444,55 @@ landing evidence.
 
 ## Pass 5 Driver Framework audit summary
 
+  ---------------------------------------------------------------------
+  Topic                              Canonical result
+  ---------------------------------- ----------------------------------
+  switchdev                          keep 3.19 as origin; treat
+                                     2015/2016 work as framework
+                                     expansion
+
+  devlink                            Linux 4.6 release origin verified
+
+  phylink                            2015 RFC separated from 4.13
+                                     landing; exact `9525ae83959b...`
+
+  DIM                                driver-independent framework
+                                     confirmed by Netdev 0x12; exact
+                                     library SHA pending
+
+  netdevsim                          Linux 4.16 release origin verified
+
+  ethtool-netlink                    Linux 5.6 groundwork verified;
+                                     later commands remain incremental
+
+  auxiliary bus                      Linux 5.11 and signed auxbus tag
+                                     verified; origin SHA still
+                                     conservative
+
+  Rust PHY                           2023 RFC/v11 → Linux 6.8 mainline
+                                     milestone verified
+  ---------------------------------------------------------------------
+
+## Pass 6 Driver Framework exact-anchor summary
+
   -----------------------------------------------------------------------
-  Topic                               Canonical result
+  Framework                           Exact status after pass 6
   ----------------------------------- -----------------------------------
-  switchdev                           keep 3.19 as origin; treat
-                                      2015/2016 work as framework
-                                      expansion
+  phylink                             exact infrastructure anchor
+                                      `9525ae83959b...`
 
-  devlink                             Linux 4.6 release origin verified
+  ethtool-netlink                     exact core-interface anchor
+                                      `2b4a8990b7df...`
 
-  phylink                             2015 RFC separated from 4.13
-                                      landing; exact `9525ae83959b...`
+  auxiliary bus                       final standalone v4 + 5.11 signed
+                                      tag; origin SHA intentionally
+                                      pending
 
-  DIM                                 driver-independent framework
-                                      confirmed by Netdev 0x12; exact
-                                      library SHA pending
+  Rust PHY                            final v11 four-patch shape
+                                      verified; exact mainline SHAs
+                                      pending
 
-  netdevsim                           Linux 4.16 release origin verified
-
-  ethtool-netlink                     Linux 5.6 groundwork verified;
-                                      later commands remain incremental
-
-  auxiliary bus                       Linux 5.11 and signed auxbus tag
-                                      verified; origin SHA still
-                                      conservative
-
-  Rust PHY                            2023 RFC/v11 → Linux 6.8 mainline
-                                      milestone verified
+  switchdev/devlink/DIM/netdevsim     no speculative SHA inserted
   -----------------------------------------------------------------------
 
 # Appendix --- Provenance and research notes
