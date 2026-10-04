@@ -48,6 +48,65 @@ Appendix  LWN / upstream commits / conference provenance /
 
 ------------------------------------------------------------------------
 
+## Editorial conventions
+
+This document uses the following terms consistently:
+
+  -----------------------------------------------------------------------
+  Term                                Meaning
+  ----------------------------------- -----------------------------------
+  **design / RFC**                    proposal or architecture under
+                                      discussion; no merge is implied
+
+  **series**                          a posted patch series;
+                                      `final series` means the latest
+                                      merge-near revision identified by
+                                      this research
+
+  **landing**                         acceptance into the relevant
+                                      subsystem tree or `net-next`; this
+                                      is not automatically a released
+                                      kernel
+
+  **mainline anchor**                 a verified commit in Linus's
+                                      mainline history that anchors part
+                                      of a feature
+
+  **release**                         a feature is present in a released
+                                      mainline kernel version
+
+  **generation**                      a release-era milestone spanning
+                                      multiple commits or incremental
+                                      follow-ups; not necessarily a
+                                      single origin commit
+
+  **development**                     accepted, merged into a development
+                                      tree, or posted for a future cycle,
+                                      but not treated here as a released
+                                      baseline
+  -----------------------------------------------------------------------
+
+A mainline anchor can be a core/origin commit, an integration commit, or
+a protocol-specific enablement commit. The text names the anchor type
+when that distinction matters.
+
+### Provenance ladder
+
+``` text
+design / RFC
+      ↓
+patch series
+      ↓
+subsystem-tree / net-next landing
+      ↓
+mainline commit
+      ↓
+released kernel
+```
+
+The arrows describe the usual path, not a guarantee that every project
+passes through each stage in exactly this form.
+
 # Part I --- Foundations: Linux v3.x → v5.1
 
 ## Linux v3.x --- scalability, virtualization, programmability の誕生
@@ -647,6 +706,31 @@ Linux 6.x–7.x
 This is a dominant-theme model, not a claim that each mechanism
 originated only in the listed major version.
 
+## Transition: foundations → chronology
+
+Part I established the architectural foundations. Part II now fixes
+their release attribution. Later chapters may explain a milestone in
+more depth, but they do not override this table.
+
+## How to read the rest of this document
+
+``` text
+                         Part II
+                  canonical chronology
+                         │
+          ┌──────────────┼──────────────┐
+          ↓              ↓              ↓
+       Part III       Part IV        Part V
+       lineages       drivers     observability
+          └──────────────┼──────────────┘
+                         ↓
+                       Part VI
+                       synthesis
+                         ↓
+                       Part VII
+                      provenance
+```
+
 # Part II --- Canonical release chronology
 
 This is the **single normative release map**. RFC dates, review bases,
@@ -664,169 +748,171 @@ released mainline version
 The table below is the canonical chronology used by all later lineage
 chapters.
 
-  ----------------------------------------------------------------------------
-  Release                 Canonical networking        Provenance status
-                          milestones                  
-  ----------------------- --------------------------- ------------------------
-  3.0                     namespace / `setns()`-era   release generation
-                          foundation                  retained
+  --------------------------------------------------------------------------
+  Release               Canonical networking        Provenance status
+                        milestones                  
+  --------------------- --------------------------- ------------------------
+  3.0                   namespace / `setns()`-era   release generation
+                        foundation                  retained
 
-  3.3                     DQL/BQL mainline            corrected canonical
-                          generation; team;           release
-                          `net_prio`; TCP memcg       
+  3.3                   DQL/BQL mainline            corrected canonical
+                        generation; team;           release
+                        `net_prio`; TCP memcg       
 
-  3.5                     CoDel / fq_codel            exact anchors retained
+  3.5                   CoDel / fq_codel            exact anchors retained
 
-  3.6                     TSQ; TFO client; IPv4       exact/release evidence
-                          route-cache removal         retained
+  3.6                   TSQ; TFO client; IPv4       exact/release evidence
+                        route-cache removal         retained
 
-  3.7                     VXLAN; TFO server; IPv6 NAT release-level verified
+  3.7                   VXLAN; TFO server; IPv6 NAT release verified
 
-  3.9                     TCP/UDP `SO_REUSEPORT`;     exact infrastructure
-                          socket scaling              anchor + release
-                                                      verified
+  3.9                   TCP/UDP `SO_REUSEPORT`;     exact infrastructure
+                        socket scaling              anchor + release
+                                                    verified
 
-  3.13                    nftables                    exact anchor retained
+  3.13                  nftables                    exact anchor retained
 
-  3.14                    TCP autocorking; continuing release milestone
-                          BPF transition              
+  3.14                  TCP autocorking; continuing release-generation
+                        BPF transition              milestone
 
-  3.18                    `bpf()`                     exact anchors retained
-                          syscall/maps/verifier       
-                          generation; DCTCP;          
-                          Geneve/FOU                  
+  3.18                  `bpf()`                     exact anchors retained
+                        syscall/maps/verifier       
+                        generation; DCTCP;          
+                        Geneve/FOU                  
 
-  3.19                    ipvlan; initial switchdev   3.19 origin; later 4.x
-                          generation                  work is expansion
+  3.19                  ipvlan; initial switchdev   3.19 origin; later 4.x
+                        generation                  work is expansion
 
-  4.3                     VRF; LWT; OVS conntrack     release/series verified
+  4.3                   VRF; LWT; OVS conntrack     series + release
+                                                    verified
 
-  4.6                     devlink                     release origin verified
+  4.6                   devlink                     release origin verified
 
-  4.7                     TC BPF direct packet access series/release verified
+  4.7                   TC BPF direct packet access series + release
+                                                    verified
 
-  4.8                     XDP                         initial series/release
-                                                      verified
+  4.8                   XDP                         initial series/release
+                                                    verified
 
-  4.9                     BBR                         exact anchor retained
+  4.9                   BBR                         exact anchor retained
 
-  4.10                    cgroup BPF; BPF LWT; IPv6   series/release verified
-                          Segment Routing             
+  4.10                  cgroup BPF; BPF LWT; IPv6   series + release
+                        Segment Routing             verified
 
-  4.13                    `SOCK_OPS`; kTLS TX;        phylink exact anchor
-                          phylink infrastructure      retained
+  4.13                  `SOCK_OPS`; kTLS TX;        phylink exact anchor
+                        phylink infrastructure      retained
 
-  4.14                    SOCKMAP; TCP `MSG_ZEROCOPY` TCP zero-copy exact
-                                                      enablement anchor
-                                                      retained
+  4.14                  SOCKMAP; TCP `MSG_ZEROCOPY` TCP zero-copy exact
+                                                    enablement anchor
+                                                    retained
 
-  4.16                    netdevsim                   release-level verified
+  4.16                  netdevsim                   release verified
 
-  4.17                    `BPF_PROG_TYPE_SK_MSG`;     final-series generation
-                          sockmap sendmsg/sendfile    verified
-                          path                        
+  4.17                  `BPF_PROG_TYPE_SK_MSG`;     final-series generation
+                        sockmap sendmsg/sendfile    verified
+                        path                        
 
-  4.18                    AF_XDP;                     series/release
-                          `TCP_ZEROCOPY_RECEIVE`;     generation verified
-                          refurbished page_pool/XDP   
-                          memory-return generation;   
-                          cgroup UDP sendmsg hooks    
+  4.18                  AF_XDP;                     series/release
+                        `TCP_ZEROCOPY_RECEIVE`;     generation verified
+                        refurbished page_pool/XDP   
+                        memory-return generation;   
+                        cgroup UDP sendmsg hooks    
 
-  4.19                    `SO_TXTIME` / time-based    exact/release evidence
-                          TX; CAKE                    retained
+  4.19                  `SO_TXTIME` / time-based    exact/release evidence
+                        TX; CAKE                    retained
 
-  4.20                    TCP EDT pacing; BPF flow    release-level verified
-                          dissector; taprio;          
-                          rtnetlink strict checking   
+  4.20                  TCP EDT pacing; BPF flow    release verified
+                        dissector; taprio;          
+                        rtnetlink strict checking   
 
-  5.0                     UDP GRO; UDP `MSG_ZEROCOPY` corrected canonical
-                                                      release
+  5.0                   UDP GRO; UDP `MSG_ZEROCOPY` corrected canonical
+                                                    release
 
-  5.1                     devlink health; BPF         release-level verified
-                          spinlocks/DCE;              
-                          `SO_BINDTOIFINDEX`;         
-                          Y2038-safe timestamps;      
-                          mac80211 airtime fairness;  
-                          io_uring substrate          
+  5.1                   devlink health; BPF         release verified
+                        spinlocks/DCE;              
+                        `SO_BINDTOIFINDEX`;         
+                        Y2038-safe timestamps;      
+                        mac80211 airtime fairness;  
+                        io_uring substrate          
 
-  5.3                     nexthop objects             canonical release;
-                                                      final-revision detail
-                                                      remains provenance item
+  5.3                   nexthop objects             canonical release;
+                                                    final-revision detail
+                                                    remains provenance item
 
-  5.5                     mac80211 Airtime Queue      release generation
-                          Limits (AQL)                
+  5.5                   mac80211 Airtime Queue      release generation
+                        Limits (AQL)                
 
-  5.6                     MPTCP; WireGuard; BPF       ethtool exact core
-                          `struct_ops`/TCP CC;        anchor retained
-                          ethtool Generic Netlink     
-                          groundwork                  
+  5.6                   MPTCP; WireGuard; BPF       ethtool exact core
+                        `struct_ops`/TCP CC;        anchor retained
+                        ethtool Generic Netlink     
+                        groundwork                  
 
-  5.9                     `BPF_PROG_TYPE_SK_LOOKUP` / exact program-type
-                          per-netns socket lookup     anchor retained
+  5.9                   `BPF_PROG_TYPE_SK_LOOKUP` / exact program-type
+                        per-netns socket lookup     anchor retained
 
-  5.11                    auxiliary bus               release +
-                                                      final-series/tag
-                                                      evidence
+  5.11                  auxiliary bus               release +
+                                                    final-series/tag
+                                                    evidence
 
-  5.12                    threaded NAPI               release-level verified
+  5.12                  threaded NAPI               release verified
 
-  5.15                    IPv6 IOAM; MCTP; bridge     release-level verified
-                          per-VLAN multicast          
+  5.15                  IPv6 IOAM; MCTP; bridge     release verified
+                        per-VLAN multicast          
 
-  5.17                    `kfree_skb_reason()` /      release-level verified
-                          structured skb drop-reason  
-                          foundation                  
+  5.17                  `kfree_skb_reason()` /      release verified
+                        structured skb drop-reason  
+                        foundation                  
 
-  5.19                    IPv6 BIG TCP; drop-reason   release-level verified
-                          expansion; MPTCP evolution  
+  5.19                  IPv6 BIG TCP; drop-reason   release verified
+                        expansion; MPTCP evolution  
 
-  6.2                     TCP PLB; XFRM/IPsec packet  XFRM exact anchor
-                          offload                     retained
+  6.2                   TCP PLB; XFRM/IPsec packet  XFRM exact anchor
+                        offload                     retained
 
-  6.3                     IPv4 BIG TCP; YNL           exact BIG TCP commit set
-                                                      retained
+  6.3                   IPv4 BIG TCP; YNL           exact BIG TCP commit set
+                                                    retained
 
-  6.6                     AF_XDP multi-buffer         exact/release evidence
-                                                      retained
+  6.6                   AF_XDP multi-buffer         exact/release evidence
+                                                    retained
 
-  6.7                     netkit; initial TCP-AO      release-level verified
-                          mainline support            
+  6.7                   netkit; initial TCP-AO      release verified
+                        mainline support            
 
-  6.8                     Rust phylib abstractions +  release/final-series +
-                          Rust Asix reference PHY;    documentation milestone
-                          queue/NAPI netdev-genl      
-                          object visibility           
+  6.8                   Rust phylib abstractions +  release/final-series +
+                        Rust Asix reference PHY;    documentation milestone
+                        queue/NAPI netdev-genl      
+                        object visibility           
 
-  6.11                    virtio-net AF_XDP RX        exact anchors retained
-                          zero-copy                   
+  6.11                  virtio-net AF_XDP RX        exact anchors retained
+                        zero-copy                   
 
-  6.12                    Device Memory TCP RX        final-series/exact
-                                                      commit set retained
+  6.12                  Device Memory TCP RX        final-series/exact
+                                                    commit set retained
 
-  6.13                    per-netns RTNL              milestone, **not
-                          infrastructure/migration    completion**
-                          milestone                   
+  6.13                  per-netns RTNL              milestone, **not
+                        infrastructure/migration    completion**
+                        milestone                   
 
-  6.15                    io_uring ZCRX; further RTNL exact merge/series
-                          breakup                     evidence retained
+  6.15                  io_uring ZCRX; further RTNL exact merge/series
+                        breakup                     evidence retained
 
-  6.16                    Device Memory TCP TX; BPF   exact/series evidence
-                          qdisc; DCCP removal         retained
+  6.16                  Device Memory TCP TX; BPF   exact/series evidence
+                        qdisc; DCCP removal         retained
 
-  6.18                    AccECN core; UDP RX         DIBS explicitly separate
-                          evolution; DIBS as a        from page_pool/netmem
-                          separate shared-memory      
-                          lineage                     
+  6.18                  AccECN core; UDP RX         DIBS explicitly separate
+                        evolution; DIBS as a        from page_pool/netmem
+                        separate shared-memory      
+                        lineage                     
 
-  7.0--7.2                released 7.x evolution:     released branch;
-                          AccECN policy/defaults,     subfeature attribution
-                          queue/memory-provider work, continues
-                          protocol/API cleanup        
+  7.0--7.2              released 7.x evolution:     released branch;
+                        AccECN policy/defaults,     subfeature attribution
+                        queue/memory-provider work, continues
+                        protocol/API cleanup        
 
-  7.3-development         BIG TCP tunnel support and  development only; not
-                          other net-next work         treated as a released
-                                                      baseline
-  ----------------------------------------------------------------------------
+  7.3-development       BIG TCP tunnel support and  development only; not
+                        other net-next work         treated as a released
+                                                    baseline
+  --------------------------------------------------------------------------
 
 ## Dominant-theme eras
 
@@ -870,6 +956,12 @@ DRIVER FRAMEWORK
 A feature may belong to more than one axis. `page_pool`, for example, is
 both a memory mechanism and a driver-framework contract; `netdev-genl`
 is both control-plane and observability infrastructure.
+
+## Transition: chronology → lineages
+
+A release table answers *when*. The next chapters answer *how one
+mechanism led to another*. They therefore group milestones by
+architecture rather than repeating the release table.
 
 # Part III --- Long-term feature lineages
 
@@ -1156,6 +1248,12 @@ memory-provider / device-memory integration
 ownership/lifetime の効率化にある。
 
 ------------------------------------------------------------------------
+
+## Transition: feature lineages → driver contracts
+
+The previous chapter followed networking mechanisms end-to-end. Part IV
+changes viewpoint: it asks which responsibilities moved from individual
+drivers into common networking-core frameworks.
 
 # Part IV --- Network Device Driver Framework Evolution
 
@@ -1981,6 +2079,12 @@ As with the rest of this document, review proposals should not be
 promoted to mainline facts until landing is verified.
 
 ------------------------------------------------------------------------
+
+## Transition: mechanisms → observability
+
+Fast paths, memory ownership and offload are useful only if operators
+and developers can understand what the kernel did. Part V follows the
+parallel evolution of visibility, tracing and explanation.
 
 # Part V --- Observability / Explainability
 
@@ -3085,6 +3189,11 @@ Linux networking observability evolution
 
 ------------------------------------------------------------------------
 
+## Transition: evidence → synthesis
+
+The preceding chapters separate chronology and architectural lineages.
+Part VI recombines them into a small number of long-term trends.
+
 # Part VI --- Synthesis: v3.x → 7.x を一つの進化として見る
 
 ## v5.0 と 2026 を比較する
@@ -3161,6 +3270,11 @@ single network model ────→ multi-network / VM-aware networking
 
 ------------------------------------------------------------------------
 
+## Transition: synthesis → provenance
+
+The synthesis is intentionally compact. Part VII records the attribution
+boundaries that remain important for verification or future re-audit.
+
 # Part VII --- Canonical provenance ledger
 
 This section records only unresolved or especially important attribution
@@ -3230,6 +3344,12 @@ D  RFC/design/proposal only
 
 The canonical chronology in Part II takes precedence over all provenance
 notes.
+
+## Reading rule for the appendix
+
+The appendix is an evidence catalog. Dates found there may be RFC dates,
+posting dates, review bases, or conference dates. They must not be read
+as release attribution unless Part II says so.
 
 # Appendix --- Evidence catalog and research notes (non-normative)
 
