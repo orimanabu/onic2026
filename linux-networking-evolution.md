@@ -729,11 +729,11 @@ released mainline version
 | 4.19 | `SO_TXTIME`; CAKE | release + exact anchors |
 | 4.20 | TCP EDT pacing; BPF flow dissector; taprio; rtnetlink strict checking | release |
 | 5.0 | UDP GRO; UDP `MSG_ZEROCOPY` | release |
-| 5.1 | devlink health; BPF spinlocks/DCE; `SO_BINDTOIFINDEX`; Y2038 timestamps; mac80211 airtime-fairness merge-window milestone; io_uring substrate | release |
+| 5.1 | devlink health; BPF spinlocks/DCE; `SO_BINDTOIFINDEX`; Y2038 timestamps; mac80211 airtime-fairness merge-window milestone (5.0/5.1 boundary pending tag audit); io_uring substrate | io_uring release; airtime-fairness exact tag boundary pending |
 | 5.3 | nexthop objects; DIM generalized into common `lib/dim` infrastructure | release; DIM generalization series verified |
 | 5.5 | mac80211 Airtime Queue Limits (AQL) | release-generation |
 | 5.6 | MPTCP; WireGuard; BPF `struct_ops`/TCP CC; ethtool Generic Netlink groundwork | release; exact ethtool core anchor |
-| 5.9 | `BPF_PROG_TYPE_SK_LOOKUP` | release + verified 12-hex introduction anchor (`e9ddbb7707ff`); full SHA pending re-audit |
+| 5.9 | `BPF_PROG_TYPE_SK_LOOKUP` | release + exact introduction anchor (`e9ddbb7707ff5891616240026062b8c1e29864ca`) |
 | 5.11 | auxiliary bus | release + final-series/tag evidence |
 | 5.12 | threaded NAPI | release |
 | 5.15 | IPv6 IOAM core; MCTP; bridge per-VLAN multicast | release |
@@ -836,7 +836,7 @@ IPv6 BIG TCP (5.19)
   ↓
 IPv4 BIG TCP (6.3)
   ↓
-IPv6 BIG TCP without synthetic HBH jumbo header
+IPv6 BIG TCP without synthetic HBH jumbo header (development prerequisite; exact released-version attribution not asserted here)
   ↓
 BIG TCP over VXLAN / GENEVE (7.3-rc/mainline)
 ```
@@ -1051,7 +1051,7 @@ global RTNL
  → RTNL-less FIB rule updates (7.3-rc/mainline)
 ```
 
-7.3向けnetworking pullでは `RTM_NEWRULE` / `RTM_DELRULE` のFIB rule変更が RTNL-lock-less化され、per-netns netdev unregistrationやlock-less GET準備と 同じ「global RTNL依存を減らす」流れとしてmainlineへ入った。
+7.3向けnetworking pullでは `RTM_NEWRULE` / `RTM_DELRULE` のFIB rule変更が RTNL-lock-less化され、further RTNL-dependency reductionやlock-less GET準備と 同じ「global RTNL依存を減らす」流れとしてmainlineへ入った。
 
 ------------------------------------------------------------------------
 
@@ -1711,7 +1711,7 @@ Before assigning every item a precise kernel release/commit, a follow-up provena
 
 ``` text
 switchdev initial core series
-phylink first mainline landing
+
 devlink initial mainline commit set
 VF representor generic model
 DIM / net_dim introduction
@@ -2804,6 +2804,9 @@ The synthesis is intentionally compact. Part VII records the attribution boundar
 
 # Part VII --- Canonical provenance ledger
 
+**Evidence-status addition:** `A-rc` means merged into Linus mainline with authoritative pull/merge evidence, while the final release is still pending; it is distinct from Grade A release evidence.
+
+
 ## Exact mainline anchor inventory retained in this edition
 
 These are representative **anchor commits**, not necessarily every commit in the feature
@@ -2822,7 +2825,7 @@ series.
 | page_pool origin | `ff7d6b27f8944cf4b20740b67e4c9f0ef5bc226f` | `page_pool: refurbish version of page_pool code` |
 | page_pool/XDP integration | `60bbf7eeef10dc647430646d7fe5e3d8d132dbec` | mlx5 page_pool/XDP integration anchor |
 | ethtool Generic Netlink | `2b4a8990b7df55875745a80a609a1ceaaf51f322` | `ethtool: introduce ethtool netlink interface` |
-| SK_LOOKUP | `e9ddbb7707ff...` | `bpf: Introduce SK_LOOKUP program type with a dedicated attach point`; full SHA pending re-audit |
+| SK_LOOKUP | `e9ddbb7707ff5891616240026062b8c1e29864ca` | `bpf: Introduce SK_LOOKUP program type with a dedicated attach point`; full SHA pending re-audit |
 | XFRM packet offload | `d14f28b8c1de668bab863bf5892a49c824cb110d` | `xfrm: add new packet offload flag` |
 | IPv6 BIG TCP / GRO | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | `net: allow gro_max_size to exceed 65536` |
 | IPv6 BIG TCP / GSO | `7c4e983c4f3cf94fcd879730c6caa877e0768a4d` | `net: allow gso_max_size to exceed 65536` |
@@ -2846,10 +2849,12 @@ The appendix is an evidence catalog. Dates found there may be RFC dates, posting
 
 ## Open attribution items and evidence grade
 
+The BIG TCP no-synthetic-HBH work is retained as a development prerequisite in the feature lineage, but this edition does not assign it a released version until tag containment is audited.
+
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   Item                                 Grade                   Current treatment
   ------------------------------------ ----------------------- -------------------------------------------------------------------------------------------------------------------------------------
-  queue leasing                        B                       RX side is merged; TX queue leasing remains PoC/design in the cited 2026 discussion; exact released tag for RX remains to be pinned
+  queue leasing                        B                       RX side is merged; TX queue leasing remains PoC/design in the cited 2026 discussion; Linux 7.1 attribution confirmed by the `net-next-7.1` mainline pull
 
   devmem buffers \> `PAGE_SIZE`        A for 7.3 mainline-rc   explicitly listed in the `net-next-7.3` pull merged to Linus mainline
 
@@ -2938,58 +2943,6 @@ The retained material serves four purposes: source navigation, exact-commit doss
 -   netkit
 -   virtio-net/TAP
 -   KubeVirt-oriented zero-copy work
-
-------------------------------------------------------------------------
-
-## Commit-level research status
-
-この文書では commit hash を「それらしい hash」で埋めず、upstream tree / lore で照合できたものだけを確定情報として追加する。
-
-優先して commit-level history を展開する系列:
-
-1.  BIG TCP
-2.  AF_XDP multi-buffer
-3.  netkit
-4.  Device Memory TCP RX
-5.  Device Memory TCP TX
-6.  io_uring zero-copy TX/RX
-7.  page_pool / netmem / memory-provider; DIBS (separate shared-memory lineage)
-8.  RTNL breakup
-9.  AccECN
-10. UDP receive optimization
-11. BPF `struct_ops`
-12. MPTCP BPF integration
-13. nftables / flowtable / conntrack
-14. virtio-net / VM networking
-
-各系列は最終的に以下の形式にする。
-
-``` text
-Feature:
-Kernel:
-Subsystem:
-Authors:
-
-Motivation:
-Architecture:
-
-Initial RFC:
-Important revisions:
-Final patch series:
-
-Merge commit:
-Key commits:
-
-Changed files:
-Documentation:
-
-LWN:
-Lore:
-git.kernel.org:
-
-Follow-ups:
-Tags:
-```
 
 ------------------------------------------------------------------------
 
@@ -3918,7 +3871,7 @@ mainline traffic-control programmability
 
 ``` text
 Netdev 0x13 (historical provenance)
-P4 compiler backend for TC
+P4 compiler backend for TC (catalog presence pending primary re-check)
         │
         ▼
 Netdev 0x17 (2023)
@@ -3998,7 +3951,6 @@ The Netdev site confirms the relevant editions in the requested period:
 0x1A — 2026
 ```
 
-Future provenance work should add a `Netdev` column to the canonical LWN inventory where a direct conference counterpart exists.
 
 ------------------------------------------------------------------------
 
@@ -4042,7 +3994,7 @@ Future provenance work should add a `Netdev` column to the canonical LWN invento
 
   MPTCP                             0x14 **Using Upstream MPTCP**; 0x19 **MPTCP: present, future...**                                                                        merge-era → post-merge    LWN *Upstreaming multipath TCP*; later BPF/subflow work      5.6 onward                            initial deployment → mature workflow/scaling
 
-  IPv6 IOAM                         0x14 **Implementation of IPv6 IOAM in Linux Kernel**; 0x19 **IOAM Direct Exporting**; 0x1A **Securing IOAM**                             pre/merge → post          IPv6 IOAM patch series                                       5.15 core; 5.16+ f                    ollow-ups implementation → export → security
+  IPv6 IOAM                         0x14 **Implementation of IPv6 IOAM in Linux Kernel**; 0x19 **IOAM Direct Exporting**; 0x1A **Securing IOAM**                             pre/merge → post          IPv6 IOAM patch series                                       5.15 core; 5.16+ follow-ups implementation → export → security
 
   KTLS / kernel handshake           0x14 KTLS offload + handshake performance; 0x17 TLS handshake BoF                                                                        pre/merge                 LWN kernel-TLS handshake articles; `net/handshake`           6.x                                   KTLS record path → generic kernel-consumer handshake
 
