@@ -1,16 +1,16 @@
-# Linux Networking Evolution — Linux v3.0 から 7.x まで
+# Linux Networking Evolution --- Linux v3.0 から 7.x まで
 
-**調査基準日:** 2026-10-02  
+**調査基準日:** 2026-10-02\
 **構成改訂:** 2026-10-03
 
-この文書は、Linux networking の変化を「調査した順」ではなく、
-**kernel networking がどのように進化したかを読む順序**に再構成した版である。
+この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel
+networking がどのように進化したかを読む順序**に再構成した版である。
 
 ## この文書の読み方
 
 本文は次の流れで構成する。
 
-```text
+``` text
 Part I    v3.x → v5.1
           modern Linux networking の基礎形成
 
@@ -35,11 +35,11 @@ Appendix  LWN / upstream commits / conference provenance /
 まず年代順に「何がいつ形成されたか」を読み、その後で同じ技術を
 長期lineageとして横断的に追う。
 
----
+------------------------------------------------------------------------
 
-# Part I — Foundations: Linux v3.x → v5.1
+# Part I --- Foundations: Linux v3.x → v5.1
 
-## 1. Linux v3.x — scalability, virtualization, programmability の誕生
+## 1. Linux v3.x --- scalability, virtualization, programmability の誕生
 
 ``` text
 3.0   setns() / namespace FD
@@ -611,7 +611,7 @@ per-netns RTNL
 
 ------------------------------------------------------------------------
 
-## 2. Linux v4.x — programmable fast path の形成
+## 2. Linux v4.x --- programmable fast path の形成
 
 **調査時点:** 2026-10-02
 
@@ -757,7 +757,7 @@ netkit / queue leasing / per-netns RTNL
 
 ------------------------------------------------------------------------
 
-## 3. Linux v5.0–v5.1 — v4.x innovations が baseline へ収束
+## 3. Linux v5.0--v5.1 --- v4.x innovations が baseline へ収束
 
 ## Linux v5.0 を baseline にする
 
@@ -1146,8 +1146,263 @@ baseline** として扱える。
 
 ------------------------------------------------------------------------
 
+## 4. v3.x / v4.x provenance re-audit --- LWN + upstream commit anchors
 
-# Part II — Expansion: Linux v5.2 → 7.x release chronology
+> **Audit policy:** v5以降と同じく、(1)
+> LWNによるrelease/architecture確認、(2) patch series、 (3) mainline
+> introduction commit、(4)
+> 後続の`Fixes:`参照による独立確認、を分離する。 exact
+> SHAを今回確認できなかった項目は推測せず`pending exact-SHA audit`とする。
+
+### 4.1 Linux v3.x
+
+  -------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Kernel         Feature        LWN / upstream evidence                             Mainline anchor                                      Audit
+  -------------- -------------- --------------------------------------------------- ---------------------------------------------------- ----------------------
+  3.2            Byte Queue     [BQL v3 series](https://lwn.net/Articles/469652/),  exact SHA: pending                                   release/series
+                 Limits         [DQL 1/10](https://lwn.net/Articles/469651/)                                                             verified
+                 (BQL/DQL)                                                                                                               
+
+  3.5            CoDel /        [iproute2 3.5.0:                                    exact SHA: pending                                   release/tooling
+                 fq_codel       codel/fq_codel](https://lwn.net/Articles/509446/)                                                        verified; commit audit
+                                                                                                                                         pending
+
+  3.6            TCP Small      [3.6 merge                                          exact SHA: pending                                   merge verified
+                 Queues         window](https://lwn.net/Articles/507852/)                                                                
+
+  3.6            TCP Fast Open  [3.6 merge                                          exact SHA: pending                                   merge verified
+                 client / IPv4  window](https://lwn.net/Articles/507852/)                                                                
+                 route-cache                                                                                                             
+                 removal                                                                                                                 
+
+  3.7            VXLAN          [3.7 merge                                          `d342894c5d2f8c7df194c793ec4059656e09ca31`           **A**
+                                window](https://lwn.net/Articles/518275/)                                                                
+
+  3.7            TCP Fast Open  [3.7 merge                                          exact SHA: pending                                   merge verified
+                 server / IPv6  window](https://lwn.net/Articles/518275/)                                                                
+                 NAT                                                                                                                     
+
+  3.13           nftables       [3.13 merge                                         exact SHA: pending                                   merge verified
+                                window](https://lwn.net/Articles/573272/)                                                                
+
+  3.14--3.17     BPF core       [split BPF out of                                   `f5bffecda951b59d0d3cdd616d68952abc52bc40` is one    **B** (multi-commit
+                 separation /   networking](https://lwn.net/Articles/600989/), [BPF verified core-separation anchor                      evolution)
+                 eBPF VM        tracing filters](https://lwn.net/Articles/575531/)                                                       
+                 evolution                                                                                                               
+
+  3.18           `bpf()`        [RFC series](https://lwn.net/Articles/603816/), [A  full final-series SHA enumeration: pending           landing/release
+                 syscall / maps reworked BPF API](https://lwn.net/Articles/606089/)                                                      verified, exact set
+                 / verifier                                                                                                              pending
+
+  3.18           DCTCP          [DCTCP v3                                           `e3118e8359bb7c59555aca60c725106e6d78c5ce` (DCTCP    **A**
+                                series](https://lwn.net/Articles/614000/), [3.18    algorithm)                                           
+                                merge window](https://lwn.net/Articles/615825/)                                                          
+
+  3.18           Geneve /       [3.18 merge                                         exact SHA: pending                                   merge verified
+                 Foo-over-UDP   window](https://lwn.net/Articles/615825/)                                                                
+
+  3.19           eBPF socket    [Attaching eBPF programs to                         exact SHA: pending                                   release/architecture
+                 attachment     sockets](https://lwn.net/Articles/625224/), [3.19                                                        verified
+                                merge window](https://lwn.net/Articles/626150/)                                                          
+
+  3.19           ipvlan         [initial ipvlan                                     `2ad7bf363841`                                       **A**
+                                patch](https://lwn.net/Articles/620087/), [3.19     (`ipvlan: Initial check-in of the IPVLAN driver.`)   
+                                merge window](https://lwn.net/Articles/626150/)                                                          
+  -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#### VXLAN independent `Fixes:` confirmation
+
+The original VXLAN commit is not inferred from an old release summary
+only. Later fixes explicitly carry:
+
+``` text
+Fixes: d342894c5d2f ("vxlan: virtual extensible lan")
+```
+
+This independently anchors the original implementation to
+`d342894c5d2f8c7df194c793ec4059656e09ca31`.
+
+#### ipvlan independent `Fixes:` confirmation
+
+Later ipvlan fixes repeatedly reference:
+
+``` text
+Fixes: 2ad7bf363841 ("ipvlan: Initial check-in of the IPVLAN driver.")
+```
+
+Therefore the initial v3.19 ipvlan anchor is considered strong.
+
+#### DCTCP independent `Fixes:` confirmation
+
+The v3.18 DCTCP algorithm commit is:
+
+``` text
+e3118e8359bb7c59555aca60c725106e6d78c5ce
+net: tcp: add DCTCP congestion control algorithm
+```
+
+Later fixes explicitly use `Fixes: e3118e8359bb`, providing independent
+confirmation.
+
+### 4.2 Important correction to the eBPF narrative
+
+The v3.x BPF history should not be written as:
+
+``` text
+3.18: eBPF appeared
+```
+
+A more accurate lineage is:
+
+``` text
+classic BPF
+   ↓
+BPF VM redesign / tracing-oriented extension
+   ↓
+generic BPF core separation
+   ↓
+3.18: bpf() syscall + maps + verifier + userspace loading API
+   ↓
+3.19: attach eBPF programs to sockets
+   ↓
+4.x: TC/XDP/cgroup/LWT/socket programmability
+```
+
+LWN's 2014 articles explicitly show that the VM/API redesign and
+subsystem separation were already underway before the 3.18 userspace API
+landed.
+
+### 4.3 Linux v4.x
+
+  ---------------------------------------------------------------------------------------------------------------------------------------
+  Kernel         Feature        LWN evidence                                  Mainline anchor                              Audit
+  -------------- -------------- --------------------------------------------- -------------------------------------------- --------------
+  4.3            VRF /          [networking                                   exact per-feature SHA: pending               merge verified
+                 lightweight    pull](https://lwn.net/Articles/657074/), [4.3                                              
+                 tunnels / OVS  merge                                                                                      
+                 conntrack      window](https://lwn.net/Articles/656731/)                                                  
+
+  4.6            devlink /      [4.6 merge                                    exact SHA: pending                           merge verified
+                 per-netns TCP  window](https://lwn.net/Articles/680566/)                                                  
+                 knobs                                                                                                     
+
+  4.7            TC BPF direct  LWN/upstream exact mapping: audit pending     exact SHA: pending                           **C until
+                 packet access                                                                                             exact
+                 / BPF tracing                                                                                             mapping**
+                 expansion                                                                                                 
+
+  4.8            XDP initial    release/patch lineage audit still required    exact SHA set: pending                       **B/C**
+                 mainline                                                                                                  
+                 generation                                                                                                
+
+  4.9            BBR / BPF      exact LWN + commit mapping still required     exact SHA: pending                           **C until
+                 NIC-offload                                                                                               audited**
+                 generation                                                                                                
+
+  4.10           cgroup BPF /   exact per-feature audit required              exact SHA: pending                           **C until
+                 BPF LWT / IPv6                                                                                            audited**
+                 Segment                                                                                                   
+                 Routing                                                                                                   
+
+  4.13           BPF `SOCK_OPS` [4.13 merge                                   exact SHA: pending                           merge verified
+                 / kTLS TX      window](https://lwn.net/Articles/727385/)                                                  
+
+  4.14           `SOCKMAP`      kernel docs confirm `BPF_MAP_TYPE_SOCKMAP`    exact SHA: pending                           release
+                                introduced in 4.14                                                                         verified
+
+  4.18           AF_XDP         [initial AF_XDP                               final exact series SHA enumeration: pending  merge verified
+                                series](https://lwn.net/Articles/752546/),                                                 
+                                [4.18 merge                                                                                
+                                window](https://lwn.net/Articles/756898/)                                                  
+
+  4.18           TCP zero-copy  [initial                                      exact SHA: pending                           merge/API
+                 receive        article](https://lwn.net/Articles/752188/),                                                evolution
+                                [reworked                                                                                  verified
+                                API](https://lwn.net/Articles/754681/), [4.18                                              
+                                merge                                                                                      
+                                window](https://lwn.net/Articles/756898/)                                                  
+
+  4.19           time-based     [RFC v3](https://lwn.net/Articles/748744/),   exact final SHA set: pending                 merge verified
+                 packet         [4.19 merge                                                                                
+                 transmission   window](https://lwn.net/Articles/762566/)                                                  
+
+  4.19           CAKE           [CAKE patch                                   `046f6fd5daefac7f5abdafb436b30f63bc7c602b`   **A**
+                                series](https://lwn.net/Articles/752777/),                                                 
+                                [4.19 merge                                                                                
+                                window](https://lwn.net/Articles/762566/)                                                  
+  ---------------------------------------------------------------------------------------------------------------------------------------
+
+#### CAKE independent `Fixes:` confirmation
+
+The original CAKE commit is:
+
+``` text
+046f6fd5daefac7f5abdafb436b30f63bc7c602b
+sched: Add Common Applications Kept Enhanced (cake) qdisc
+```
+
+Later fixes explicitly reference `Fixes: 046f6fd5daef`, making this a
+strong introduction anchor.
+
+### 4.4 Audit status and next exact-SHA pass
+
+This pass deliberately separates three states:
+
+``` text
+A  release + LWN/series + exact mainline SHA + independent later evidence
+B  release/landing is strong, but the feature spans multiple commits or
+   exact final-series enumeration is incomplete
+C  release-level statement is plausible/known, but LWN ↔ final mainline
+   mapping still needs exact verification
+```
+
+After this pass, representative **A-grade** pre-v5 anchors include:
+
+``` text
+Linux 3.7   VXLAN
+  d342894c5d2f8c7df194c793ec4059656e09ca31
+
+Linux 3.18  DCTCP algorithm
+  e3118e8359bb7c59555aca60c725106e6d78c5ce
+
+Linux 3.19  ipvlan
+  2ad7bf363841...
+
+Linux 4.19  CAKE
+  046f6fd5daefac7f5abdafb436b30f63bc7c602b
+```
+
+The next pass should prioritize exact SHA enumeration for:
+
+``` text
+BQL/DQL
+CoDel/fq_codel
+TCP Small Queues
+TCP Fast Open
+IPv4 route-cache removal
+nftables
+bpf() syscall/maps/verifier
+Geneve/Fou
+SO_ATTACH_BPF
+VRF/LWT/OVS conntrack
+devlink
+TC direct-access BPF
+XDP
+BBR
+cgroup/LWT BPF
+SOCK_OPS/kTLS
+SOCKMAP
+AF_XDP
+TCP zero-copy receive
+SO_TXTIME / ETF
+```
+
+This list is intentionally explicit so that no release-level statement
+is silently promoted to exact provenance without verification.
+
+------------------------------------------------------------------------
+
+# Part II --- Expansion: Linux v5.2 → 7.x release chronology
 
 ## 2. 進化を5つの時代で見る
 
@@ -1322,8 +1577,7 @@ subsystem-specific locking
 
 ------------------------------------------------------------------------
 
-
-# Part III — Long-term feature lineages
+# Part III --- Long-term feature lineages
 
 ## 3. Packet aggregation --- GRO/GSO → BIG TCP
 
@@ -1603,8 +1857,7 @@ ownership/lifetime の効率化にある。
 
 ------------------------------------------------------------------------
 
-
-# Part IV — Observability / Explainability
+# Part IV --- Observability / Explainability
 
 ## B. Observability / Explainability evolution
 
@@ -2703,8 +2956,7 @@ Linux networking observability evolution
 
 ------------------------------------------------------------------------
 
-
-# Part V — Synthesis: v3.x → 7.x を一つの進化として見る
+# Part V --- Synthesis: v3.x → 7.x を一つの進化として見る
 
 ## 13. v5.0 と 2026 を比較する
 
@@ -2780,14 +3032,15 @@ single network model ────→ multi-network / VM-aware networking
 
 ------------------------------------------------------------------------
 
-
-# Appendix — Research provenance and audit material
+# Appendix --- Research provenance and audit material
 
 ここから先は本文を支える調査資料である。LWN記事、upstream patch series、
-mainline commit、conference資料、status correction、completeness auditを保持する。
+mainline commit、conference資料、status correction、completeness
+auditを保持する。
 
 本文を読むだけならこのAppendixを順番に読む必要はない。
-特定featureの根拠、commit、conference provenanceを確認するときに参照する。
+特定featureの根拠、commit、conference
+provenanceを確認するときに参照する。
 
 ## Linux Networking Change Log --- LWN / Upstream Cross-Reference
 
@@ -16419,4 +16672,3 @@ LPC 2024 Per Netns RTNL
 
 These chains are now preferred over citing a single LWN page as if it
 represented the entire history of a feature.
-
