@@ -3007,6 +3007,137 @@ This prevents a common historical error: finding one convenient commit
 in a feature series and presenting it as if the entire architecture
 landed atomically.
 
+## Release-attribution re-audit --- pass 5: Driver Framework
+
+### switchdev --- 3.19 origin, 4.x model expansion
+
+Kernel documentation defines switchdev as the in-kernel driver model for
+switch devices that offload the Linux forwarding data plane. The history
+must distinguish the initial 3.19-generation switchdev work from the
+substantial 2015/2016 object/attribute, transaction, bridge/FIB and
+documentation expansion.
+
+The 2015 v3 series introduced generic switchdev get/set attribute
+operations and the prepare/commit model; subsequent commits generalized
+switchdev objects for VLAN/FIB/FDB. These are **expansion anchors**, not
+evidence that switchdev itself first appeared in 4.x.
+
+### devlink --- Linux 4.6
+
+The Linux 4.6 merge-window report explicitly calls devlink a new
+network-control API for parameters not tied to a specific device class.
+This is the canonical release origin. The exact initial commit set
+remains a multi-commit item in the provenance backlog; no guessed SHA is
+inserted.
+
+### phylink --- RFC 2015 → mainline 4.13
+
+Exact infrastructure anchor:
+
+``` text
+9525ae83959b60c6061fe2f2caabdc8f69a48bc6
+phylink: add phylink infrastructure
+```
+
+This resolves a previous chronology ambiguity: 2015 is the RFC/design
+point, while the mainline infrastructure arrives in the Linux 4.13
+generation.
+
+### DIM / net_dim --- common driver algorithm
+
+Netdev 0x12 (2018) describes DIM as a **network-driver-independent
+framework** for dynamic interrupt moderation and states that it was
+already upstream in mlx5 and as the net_dim library. This is strong
+architectural/conference provenance. The exact initial generic library
+SHA is left pending rather than inferred from a later driver
+integration.
+
+### netdevsim --- Linux 4.16
+
+The Linux 4.16 merge-window report explicitly introduces netdevsim as a
+virtual device for testing networking hardware-offload features,
+initially BPF offload. Its architectural importance is testability:
+common driver/offload APIs can be exercised without requiring the
+corresponding NIC or switch ASIC.
+
+### ethtool Generic Netlink --- Linux 5.6 groundwork
+
+The 5.6 merge-window report states that much of the long-running ethtool
+ioctl→Netlink groundwork was merged for 5.6. The matching userspace
+series says that the kernel interface is available since 5.6-rc1. This
+is therefore the canonical start of the ethtool Generic Netlink
+generation, while individual command coverage continues over later
+releases.
+
+### auxiliary bus --- Linux 5.11
+
+The auxiliary-bus history is now release-level verified. The driver-core
+signed tag was prepared specifically for the 5.11-rc1 merge and reaches:
+
+``` text
+0d2bf11a6b3e275a526b8d42d8d4a3a6067cf953
+driver core: auxiliary bus: minor coding style tweaks
+```
+
+That SHA is the tip of the auxiliary-bus support tag, **not** the origin
+commit. The underlying feature commit is Dave Ertman's
+`Add auxiliary bus support`; its exact SHA is kept pending until
+independently verified.
+
+### Rust PHY --- RFC 2023 → Linux 6.8
+
+The lineage is now explicit:
+
+``` text
+2023-09 RFC v1
+   ↓
+2023-12 final/near-final v10/v11
+   ↓
+Linux 6.8
+Rust phylib abstractions
+module_phy_driver macro
+Rust Asix reference PHY driver
+```
+
+LWN's 6.8 merge-window coverage calls this the first user-visible Rust
+code in the kernel. The final v11 series contains four patches and
+creates `rust/kernel/net/phy.rs` plus the Rust Asix driver. Exact
+per-patch mainline SHAs remain pending; the document does not invent
+them.
+
+### Driver-framework confidence table
+
+  ----------------------------------------------------------------------------------
+  Framework         Design/RFC              Release landing   Exact anchor status
+  ----------------- ----------------------- ----------------- ----------------------
+  switchdev         2014/2015 evolution     3.19 origin; 4.x  multi-commit;
+                                            expansion         expansion commits
+                                                              identified
+
+  devlink           2016 series             4.6               release verified;
+                                                              exact origin pending
+
+  phylink           2015 RFC                4.13 generation   `9525ae83959b...`
+                                                              exact
+
+  DIM/net_dim       pre-2018 work           upstream by       generic-library SHA
+                                            Netdev 0x12 /     pending
+                                            2018              
+
+  netdevsim         offload test framework  4.16              release verified
+
+  ethtool-netlink   2018 RFC lineage        5.6 groundwork    release verified;
+                                                              exact core set pending
+
+  auxiliary bus     ancillary/virtual-bus   5.11              signed tag/tip
+                    predecessors                              verified; origin SHA
+                                                              pending
+
+  Rust phylib       2023 RFC→v11            6.8               release/final-series
+                                                              verified; exact SHAs
+                                                              pending
+  ----------------------------------------------------------------------------------
+
 # Part III --- Long-term feature lineages
 
 ## 3. Packet aggregation --- GRO/GSO → BIG TCP
@@ -3366,6 +3497,33 @@ individual drivers into reusable net core infrastructure.
 
 ## 4. Linux 4.x --- hardware becomes a first-class Linux networking object
 
+### phylink provenance correction: RFC in 2015, mainline infrastructure in 4.13
+
+The 2015 26-patch RFC established the architecture for coordinating MAC,
+PHY, PCS/SerDes and hot-pluggable SFP modules. It was **not** yet the
+mainline landing.
+
+The canonical infrastructure anchor is:
+
+``` text
+9525ae83959b60c6061fe2f2caabdc8f69a48bc6
+phylink: add phylink infrastructure
+Russell King
+authored 2017-07-25; committed 2017-08-06
+```
+
+Later stable fixes explicitly cite this SHA in `Fixes:` tags, providing
+independent confirmation of its role. The history is therefore:
+
+``` text
+2015 RFC architecture
+   ↓
+2017 / Linux 4.13 generation
+   phylink infrastructure mainline
+   ↓
+later PCS/SFP/MAC API expansion
+```
+
 ### 4.1 switchdev --- origin in Linux 3.19, expansion through 4.x
 
 The initial switchdev infrastructure belongs to the Linux 3.19
@@ -3426,7 +3584,7 @@ devlink
 
 ### 4.3 phylink and SFP
 
-The 2015 phylink/SFP work addresses a recurring driver problem: MAC,
+The The 2015 phylink/SFP RFC addresses a recurring driver problem: MAC,
 PHY, PCS/SerDes and hot-pluggable SFP combinations could not be modeled
 cleanly by simple PHY attachment.
 
@@ -5183,31 +5341,63 @@ landing evidence.
 
 ## Pass 4 exact-anchor table
 
-  --------------------------------------------------------------------------------------------------
-  Feature           Exact anchor                                 Anchor meaning    Release
-  ----------------- -------------------------------------------- ----------------- -----------------
-  SO_REUSEPORT      `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a`   common            3.9
-                                                                 infrastructure    
+  ------------------------------------------------------------------------------------------
+  Feature         Exact anchor                                 Anchor meaning   Release
+  --------------- -------------------------------------------- ---------------- ------------
+  SO_REUSEPORT    `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a`   common           3.9
+                                                               infrastructure   
 
-  TCP MSG_ZEROCOPY  `f214f915e7db99091f1312c48b30928c1e0c90b7`   TCP protocol      4.14
-                                                                 enablement        
+  TCP             `f214f915e7db99091f1312c48b30928c1e0c90b7`   TCP protocol     4.14
+  MSG_ZEROCOPY                                                 enablement       
 
-  SK_MSG            pending                                      final series/pull 4.17
-                                                                 verified; do not  
-                                                                 misuse selftest   
-                                                                 SHA               
+  SK_MSG          pending                                      final            4.17
+                                                               series/pull      
+                                                               verified; do not 
+                                                               misuse selftest  
+                                                               SHA              
 
-  page_pool/XDP     `60bbf7eeef10dc647430646d7fe5e3d8d132dbec`   mlx5              4.18 generation
-                                                                 page_pool/XDP     
-                                                                 integration       
+  page_pool/XDP   `60bbf7eeef10dc647430646d7fe5e3d8d132dbec`   mlx5             4.18
+                                                               page_pool/XDP    generation
+                                                               integration      
 
-  SK_LOOKUP         `e9ddbb7707ff...`                            program type +    5.9
-                                                                 attach point      
+  SK_LOOKUP       `e9ddbb7707ff...`                            program type +   5.9
+                                                               attach point     
 
-  XFRM packet       `d14f28b8c1de668bab863bf5892a49c824cb110d`   packet-offload    6.2
-  offload                                                        UAPI flag/core    
-                                                                 series anchor     
-  --------------------------------------------------------------------------------------------------
+  XFRM packet     `d14f28b8c1de668bab863bf5892a49c824cb110d`   packet-offload   6.2
+  offload                                                      UAPI flag/core   
+                                                               series anchor    
+  ------------------------------------------------------------------------------------------
+
+## Pass 5 Driver Framework audit summary
+
+  -----------------------------------------------------------------------
+  Topic                               Canonical result
+  ----------------------------------- -----------------------------------
+  switchdev                           keep 3.19 as origin; treat
+                                      2015/2016 work as framework
+                                      expansion
+
+  devlink                             Linux 4.6 release origin verified
+
+  phylink                             2015 RFC separated from 4.13
+                                      landing; exact `9525ae83959b...`
+
+  DIM                                 driver-independent framework
+                                      confirmed by Netdev 0x12; exact
+                                      library SHA pending
+
+  netdevsim                           Linux 4.16 release origin verified
+
+  ethtool-netlink                     Linux 5.6 groundwork verified;
+                                      later commands remain incremental
+
+  auxiliary bus                       Linux 5.11 and signed auxbus tag
+                                      verified; origin SHA still
+                                      conservative
+
+  Rust PHY                            2023 RFC/v11 → Linux 6.8 mainline
+                                      milestone verified
+  -----------------------------------------------------------------------
 
 # Appendix --- Provenance and research notes
 
