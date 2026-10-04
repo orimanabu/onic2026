@@ -2357,3 +2357,606 @@ net/bridge/netfilter/nf_conntrack_bridge.c
 5.  **UDP receive optimization exact commits**
 6.  **RTNL breakup exact series**
 7.  MPTCP exact milestone/commit map
+
+------------------------------------------------------------------------
+
+# 26. Commit-level pass 5 --- BIG TCP evolution, virtio-net/AF_XDP, netkit/KubeVirt
+
+## 26.1 BIG TCP: IPv6 → IPv4 → tunnel/overlay
+
+BIG TCP の発展は次の3段階に分けると理解しやすい。
+
+``` text
+Linux 5.19
+IPv6 BIG TCP
+   │
+   ▼
+Linux 6.3
+IPv4 BIG TCP
+   │
+   ▼
+2026 / Linux 7.3
+BIG TCP through VXLAN / GENEVE
+```
+
+### Linux 5.19 --- initial IPv6 BIG TCP
+
+初期 BIG TCP は IPv6 jumbogram の仕組みを利用し、64KiB を超える
+kernel-internal TCP/GSO packet を扱えるようにした。
+
+この時点では IPv6-specific な仕組み、特に Hop-by-Hop (HBH) header
+を利用する 実装上の制約が残っていた。
+
+### Linux 6.3 --- IPv4 BIG TCP
+
+Xin Long の IPv4 series は v2/v3 で 10 patches。
+
+Important series:
+
+-   `[PATCHv2 net-next 00/10] net: support ipv4 big tcp`
+-   2023-01-23
+-   LWN archive: https://lwn.net/Articles/921060/
+
+v3:
+
+-   2023-01-27
+-   https://lwn.net/Articles/921509/
+
+Linux 6.3 release note は IPv4 BIG TCP support を significant change
+として明記する。
+
+-   https://lwn.net/Articles/929851/
+
+### IPv4 BIG TCP patch structure
+
+系列には以下が含まれる。
+
+``` text
+helpers for IPv4 total length
+       │
+       ├── bridge netfilter
+       ├── OVS conntrack
+       ├── TC
+       ├── netfilter
+       ├── ipvlan
+       └── AF_PACKET
+       │
+       ▼
+IPv4 BIG TCP core support
+       │
+       ▼
+selftest
+```
+
+つまり IPv4 BIG TCP は `net/ipv4` だけの変更ではない。 従来「IPv4 total
+length は16bitに収まる」と仮定していた複数 subsystem を BIG TCP-aware
+にする必要があった。
+
+主要 affected files:
+
+-   `include/linux/ip.h`
+-   `net/core/gro.c`
+-   `net/core/sock.c`
+-   `net/ipv4/af_inet.c`
+-   `net/ipv4/ip_input.c`
+-   `net/ipv4/ip_output.c`
+-   `net/bridge/netfilter/nf_conntrack_bridge.c`
+-   `net/openvswitch/conntrack.c`
+-   `net/sched/act_ct.c`
+-   `net/sched/sch_cake.c`
+-   `tools/testing/selftests/net/big_tcp.sh`
+
+------------------------------------------------------------------------
+
+## 26.2 2026 --- BIG TCP without IPv6 HBH
+
+Alice Mikityanska の 2026 series は IPv6 BIG TCP の設計を IPv4
+に近づけるため、 BIG TCP 用 Hop-by-Hop header を除去する。
+
+Important revision:
+
+-   `[PATCH net-next v3 00/11] BIG TCP without HBH in IPv6`
+-   2026-02-02
+-   https://lwn.net/Articles/1057080/
+
+### Why remove HBH?
+
+従来:
+
+``` text
+IPv6 BIG TCP
+     │
+     └── HBH header carries 32-bit packet length
+```
+
+しかし tunnel を組み合わせると、
+
+``` text
+outer IPv6
+   │ HBH?
+   ▼
+VXLAN/GENEVE
+   │
+inner IPv6
+   │ HBH?
+   ▼
+BIG TCP packet
+```
+
+のように inner/outer の組み合わせごとに HBH stripping/validation
+が必要になる。
+
+さらに NIC driver 側にも BIG TCP HBH handling が必要だった。
+
+新しい方向:
+
+``` text
+IPv6 BIG TCP
+     │
+     └── restore/derive length from skb metadata
+             │
+             └── align with IPv4 BIG TCP
+```
+
+これにより IPv4/IPv6 BIG TCP implementation を揃え、 UDP tunnel support
+を追加しやすくした。
+
+この series では mlx5, mlx4, ice, bnxt_en, gve, mana などから
+BIG-TCP-specific `jumbo_remove` processing を除去する。
+
+------------------------------------------------------------------------
+
+## 26.3 Linux 7.3 --- BIG TCP over VXLAN / GENEVE
+
+2026 年の follow-up series:
+
+-   `[PATCH net-next v9 0/9] BIG TCP for UDP tunnels`
+-   2026-07-10
+-   https://lwn.net/Articles/1082319/
+
+Linux 7.3 merge-window coverage は、
+
+> big TCP packets in UDP tunnels managed with VXLAN and GENEVE
+
+が可能になったことを明記する。
+
+-   https://lwn.net/Articles/1089791/
+
+### Patch architecture
+
+v9 series:
+
+1.  UDP length-field accessor
+2.  UDP tunnel code の BIG TCP gaps を修正
+3.  `udp_gro_receive()` で malformed `len=0` packet を排除
+4.  tcpdump formatting 用に overflow 時の UDP length を0として扱う
+5.  VXLAN `tso_max_size` を拡大
+6.  GENEVE `tso_max_size` を拡大
+7.  selftests
+
+BIG TCP UDP tunnel では oversized internal UDP packet の length field に
+通常の16bit表現をそのまま使えないため、`len=0` handling と validation
+が重要になる。
+
+### Evolution
+
+``` text
+IPv6 BIG TCP (5.19)
+       │
+       ▼
+IPv4 BIG TCP (6.3)
+       │
+       ▼
+remove IPv6 HBH dependency
+       │
+       ▼
+BIG TCP through UDP tunnel
+       │
+       ├── VXLAN
+       └── GENEVE
+             │
+             ▼
+        Linux 7.3
+```
+
+これは Kubernetes/OVN/Cilium など overlay-heavy
+な環境にも直接関係する変更である。
+
+------------------------------------------------------------------------
+
+# 27. virtio-net and AF_XDP zero-copy
+
+## 27.1 Why virtio-net is special
+
+物理 NIC driver の AF_XDP zero-copy は比較的直接的である。
+
+``` text
+NIC RX queue
+    │
+    ▼
+UMEM
+    │
+    ▼
+AF_XDP application
+```
+
+virtio-net では間に virtqueue / virtual device / host backend がある。
+
+``` text
+guest
+ virtio-net
+    │
+ virtqueue
+    │
+ host backend
+    │
+ physical networking
+```
+
+そのため AF_XDP zero-copy 対応には、
+
+-   virtqueue reset
+-   premapped DMA
+-   XDP refactoring
+-   queue ownership/sharing
+-   NAPI wakeup
+-   mergeable receive buffer
+
+などの前提作業が必要になる。
+
+------------------------------------------------------------------------
+
+## 27.2 2023 --- initial large AF_XDP zero-copy series
+
+Xuan Zhuo の初期 series:
+
+-   `[PATCH 00/33] virtio-net: support AF_XDP zero copy`
+-   2023-02-02
+-   https://lwn.net/Articles/921993/
+
+2023-10:
+
+-   `[PATCH net-next v1 00/19] virtio-net: support AF_XDP zero copy`
+-   https://lwn.net/Articles/947912/
+
+この段階から、AF_XDP zero-copy を virtio-net driver に持ち込むための
+大規模 refactor が継続した。
+
+------------------------------------------------------------------------
+
+## 27.3 2024 --- series decomposition
+
+2024 年には series を分割し、preparatory work と TX zero-copy を段階的に
+review する形へ移行した。
+
+Preparation:
+
+-   `[PATCH net-next 0/7] virtnet_net: prepare for af-xdp`
+-   2024-05-08
+-   https://lwn.net/Articles/972853/
+
+v5:
+
+-   `[PATCH net-next v5 00/15] virtio-net: support AF_XDP zero copy`
+-   2024-06-14
+-   https://lwn.net/Articles/978434/
+
+TX-specific series:
+
+-   `[PATCH net-next 00/13] virtio-net: support AF_XDP zero copy (tx)`
+-   2024-08-20
+-   https://lwn.net/Articles/986516/
+
+### Important design constraint
+
+virtio-net は AF_XDP 専用に queue 数を自由に増やせないため、 AF_XDP と
+kernel networking が queue を共有する設計が必要になる。
+
+また TX NAPI が別 CPU 上で動いていた場合の wakeup など、 physical NIC
+driver にはない virtio-specific な問題もある。
+
+------------------------------------------------------------------------
+
+## 27.4 2025 --- zero-copy multi-buffer XDP with mergeable buffers
+
+RFC v2:
+
+-   `[RFC PATCH net-next v2 0/2] virtio-net: support zerocopy multi buffer XDP in mergeable`
+-   2025-05-27
+-   https://lwn.net/Articles/1022732/
+
+従来、virtio-net の zero-copy + mergeable receive-buffer mode では XDP
+packet が single buffer に制限されていた。
+
+新しい series は XDP frags を利用して、
+
+``` text
+large packet / jumbo MTU
+        │
+        ▼
+virtio mergeable buffers
+   ┌────┼────┐
+   ▼    ▼    ▼
+ buf1  buf2  buf3
+   └────┼────┘
+        ▼
+multi-buffer XDP
+```
+
+を zero-copy path でも扱えるようにする。
+
+これは前章の AF_XDP multi-buffer と BIG TCP/jumbo packet evolution
+に対応する VM-side の重要な work とみなせる。
+
+------------------------------------------------------------------------
+
+# 28. netkit queue leasing --- physical queue into a network namespace
+
+## 28.1 Problem
+
+container/VM が network namespace 内にある場合、通常は host physical NIC
+の queue を直接 reconfigure できない。
+
+しかし io_uring zero-copy RX memory provider や AF_XDP zero-copy は、
+physical RX queue に memory provider/UMEM を bind する必要がある。
+
+``` text
+host namespace
+
+physical NIC
+ RXQ0 RXQ1 RXQ2
+      │
+      X  namespace boundary
+      │
+container / VM netns
+```
+
+------------------------------------------------------------------------
+
+## 28.2 Queue leasing
+
+Daniel Borkmann の 2026 netkit series は **queue leasing** を導入する。
+
+Important revision:
+
+-   `[PATCH net-next v8 00/16] netkit: Support for io_uring zero-copy and AF_XDP`
+-   2026-01-29
+-   https://lwn.net/Articles/1056727/
+
+Concept:
+
+``` text
+host namespace
+
+physical NIC
+ RXQ0  RXQ1  RXQ2
+        │
+        │ lease
+        ▼
++--------------------------+
+| container / VM netns     |
+|                          |
+| netkit leased queue      |
+|        │                 |
+|        ├─ io_uring ZC RX |
+|        └─ AF_XDP         |
++--------------------------+
+```
+
+leased queue は physical netdev の real queue に binding される proxy
+として動作する。
+
+userspace は network namespace 内の virtual netdev の:
+
+``` text
+ifindex + queue_id
+```
+
+を指定し、operation は underlying physical queue へ proxy される。
+
+### Tested hardware
+
+series description では少なくとも以下で testing したと記載されている。
+
+-   NVIDIA ConnectX-6 / mlx5
+-   Broadcom BCM957504 / bnxt_en 100G
+
+------------------------------------------------------------------------
+
+# 29. Why this matters to KubeVirt
+
+2026 LSFMM+BPF summit の LWN report は KubeVirt を具体的な use case
+として挙げている。
+
+-   https://lwn.net/Articles/1083418/
+
+KubeVirt では概念的に:
+
+``` text
+Kubernetes Pod / network namespace
+             │
+             ▼
+        QEMU / KubeVirt VM
+             │
+          virtio-net
+             │
+             ▼
+       virtual datapath
+             │
+             ▼
+         host NIC
+```
+
+という namespace isolation と VM networking を同時に必要とする。
+
+従来の高速 VM networking:
+
+``` text
+SR-IOV / device passthrough
+        │
+        └── fast
+             but
+        host/network-namespace policy integration が難しい
+```
+
+netkit + queue leasing:
+
+``` text
+physical NIC queue
+       │
+       ▼
+netkit queue lease
+       │
+       ▼
+network namespace
+       │
+       ├── io_uring zero-copy RX
+       └── AF_XDP
+       │
+       ▼
+VM / KubeVirt
+```
+
+という方向で、network namespace semantics を保ちながら physical queue と
+zero-copy datapath を結びつける。
+
+LWN の 2026 report は netkit が network namespace 内の VM へ zero-copy
+packet reception を提供できる段階まで進んだと報告している。
+
+------------------------------------------------------------------------
+
+# 30. Combined VM/networking evolution
+
+今回までの調査を統合すると、VM/container datapath
+は次のような流れになる。
+
+``` text
+                     traditional virtual networking
+
+physical NIC
+     │
+ host kernel
+     │
+ veth/TAP
+     │
+ QEMU
+     │
+virtio-net guest
+
+
+                  packet processing optimization
+
+physical NIC
+     │
+ XDP / AF_XDP
+     │
+ TAP / virtio-net
+     │
+ guest
+
+
+                    copy reduction
+
+physical NIC
+     │
+ AF_XDP / io_uring ZC
+     │
+     │ namespace boundary problem
+     ▼
+ virtual workload
+
+
+                  netkit queue leasing
+
+physical NIC RX queue
+     │
+     ▼
+ leased queue / proxy
+     │
+     ▼
+ network namespace
+     │
+ io_uring ZC / AF_XDP
+     │
+     ▼
+ VM / KubeVirt
+```
+
+これは、
+
+> 「VM に NIC を passthrough して host stack を bypass する」
+
+以外の高速化ルートとして重要である。
+
+------------------------------------------------------------------------
+
+# 31. Cross-series relationship
+
+``` text
+GRO/GSO
+   │
+   └── BIG TCP
+          │
+          ├── IPv4 BIG TCP
+          │
+          └── VXLAN/GENEVE BIG TCP
+
+
+XDP
+ │
+ └── AF_XDP
+       │
+       └── multi-buffer
+              │
+              └── virtio-net multi-buffer ZC
+
+
+page_pool
+   │
+ netmem / memory provider
+   │
+   ├── Device Memory TCP
+   └── io_uring ZC RX
+             │
+             ▼
+       netkit queue leasing
+             │
+             ▼
+        container / VM netns
+             │
+             ▼
+          KubeVirt
+```
+
+これらは別々の機能に見えるが、
+
+1.  packet aggregation を大きくする
+2.  copy を減らす
+3.  memory ownership を抽象化する
+4.  physical queue を namespace 境界越しに利用可能にする
+
+という連続した設計課題として読むことができる。
+
+------------------------------------------------------------------------
+
+# 32. Verification status and next pass
+
+今回確認できた release-level facts:
+
+-   IPv4 BIG TCP: Linux 6.3
+-   BIG TCP over VXLAN/GENEVE: Linux 7.3
+-   virtio-net AF_XDP zero-copy: 2023--2025 に複数 revision /
+    preparatory series
+-   netkit queue leasing + io_uring ZC/AF_XDP: 2026 series
+-   KubeVirt/network-namespace VM: netkit queue-leasing work の明示的
+    use case
+
+次の pass:
+
+1.  AccECN exact series / commits
+2.  UDP receive optimization exact commits
+3.  RTNL breakup exact series / commits
+4.  MPTCP exact milestone map
+5.  BIG TCP follow-up の exact mainline commits
+6.  virtio-net AF_XDP work の merged-vs-RFC status を release 単位で確定
+7.  netkit queue leasing の individual mainline commits
