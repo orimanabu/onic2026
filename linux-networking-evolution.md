@@ -3913,41 +3913,41 @@ removal**, not just feature addition.
 
 # 40. Completeness audit: classification table
 
-  -------------------------------------------------------------------------
-  Topic                       Year Classification       Why it matters
-  ------------------ ------------- -------------------- -------------------
-  IPv6                        2020 design/API           protocol
-  extension-header                 discussion           extensibility vs
-  processing                                            fast path/offload
+  ------------------------------------------------------------------------
+  Topic                      Year Classification       Why it matters
+  ------------------ ------------ -------------------- -------------------
+  IPv6                       2020 design/API           protocol
+  extension-header                discussion           extensibility vs
+  processing                                           fast path/offload
 
-  Threaded NAPI               2020 merged architecture  moves RX polling
-                                   direction            out of softirq
-                                                        context
+  Threaded NAPI              2020 merged architecture  moves RX polling
+                                  direction            out of softirq
+                                                       context
 
-  bpfilter rethink            2020 failed/stalled       BPF firewall
-                                   design               architecture
-                                                        history
+  bpfilter rethink           2020 failed/stalled       BPF firewall
+                                  design               architecture
+                                                       history
 
-  SO_REUSEPORT                2021 socket semantics     scalable listener
-  failover                                              behavior
+  SO_REUSEPORT               2021 socket semantics     scalable listener
+  failover                                             behavior
 
-  skb drop reasons            2022 observability        structured
-                                                        packet-drop
-                                                        diagnostics
+  skb drop reasons           2022 observability        structured
+                                                       packet-drop
+                                                       diagnostics
 
-  in-kernel TLS               2022 API/architecture     kernel-originated
-  handshake                                             secure transports
+  in-kernel TLS              2022 API/architecture     kernel-originated
+  handshake                                            secure transports
 
-  P4TC                    2023--24 significant          programmable TC
-                                   non-merged proposal  pipeline debate
+  P4TC                   2023--24 significant          programmable TC
+                                  non-merged proposal  pipeline debate
 
-  BPF qdisc                   2025 merged/programming   `struct_ops`
-                                   model                reaches packet
-                                                        scheduling
+  BPF qdisc                  2025 merged/programming   `struct_ops`
+                                  model                reaches packet
+                                                       scheduling
 
-  DCCP removal                2025 removal/cleanup      simplifies shared
-                                                        transport code
-  -------------------------------------------------------------------------
+  DCCP removal               2025 removal/cleanup      simplifies shared
+                                                       transport code
+  ------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -6803,34 +6803,35 @@ Tags
 
 Example:
 
-  ----------------------------------------------------------------------------------------------------------
-  LWN /       Kernel            Status                 Netdev      Session           Phase
-  feature                                                                            
-  ----------- ----------------- ---------------------- ----------- ----------------- -----------------------
-  BIG TCP     5.19              merged                 0x15        BIG TCP           pre-merge
+  ------------------------------------------------------------------------------------------------------
+  LWN /      Kernel            Status                 Netdev   Session           Phase
+  feature                                                                        
+  ---------- ----------------- ---------------------- -------- ----------------- -----------------------
+  BIG TCP    5.19              merged                 0x15     BIG TCP           pre-merge
 
-  Device      6.12              merged                 0x17 / 0x18 Device Memory TCP pre/merge-era
-  Memory TCP                                                       / Devmem+io_uring 
-  RX                                                               BoF               
+  Device     6.12              merged                 0x17 /   Device Memory TCP pre/merge-era
+  Memory TCP                                          0x18     / Devmem+io_uring 
+  RX                                                           BoF               
 
-  io_uring    6.15              merged                 0x17 / 0x18 Zero Copy RX /    pre→post
-  ZCRX                                                 / 0x1A      BoF / Progress    
-                                                                   and Next Steps    
+  io_uring   6.15              merged                 0x17 /   Zero Copy RX /    pre→post
+  ZCRX                                                0x18 /   BoF / Progress    
+                                                      0x1A     and Next Steps    
 
-  BPF qdisc   2025-era          merged                 0x17        eBPF Qdisc        pre-merge
+  BPF qdisc  2025-era          merged                 0x17     eBPF Qdisc        pre-merge
 
-  P4TC        ---               stalled/under-review   0x17        eBPF Into P4TC    pre-merge
-                                lineage                            Datapath          
+  P4TC       ---               stalled/under-review   0x17     eBPF Into P4TC    pre-merge
+                               lineage                         Datapath          
 
-  MPTCP       5.6+              merged/evolving        0x14 / 0x19 Using Upstream    merge→post
-                                                                   MPTCP / present & 
-                                                                   future            
+  MPTCP      5.6+              merged/evolving        0x14 /   Using Upstream    merge→post
+                                                      0x19     MPTCP / present & 
+                                                               future            
 
-  IPv6 IOAM   5.15/5.16+        merged/evolving        0x14 / 0x19 implementation /  pre→post
-                                                       / 0x1A      export / security 
+  IPv6 IOAM  5.15/5.16+        merged/evolving        0x14 /   implementation /  pre→post
+                                                      0x19 /   export / security 
+                                                      0x1A                       
 
-  QUIC        RFC/development   under review           0x1A        Linux QUIC        merge-era/development
-  ----------------------------------------------------------------------------------------------------------
+  QUIC       RFC/development   under review           0x1A     Linux QUIC        merge-era/development
+  ------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -6908,3 +6909,497 @@ IOAM
 
 These have the strongest Netdev↔LWN↔upstream relationships and will
 provide the highest value if fully verified first.
+
+------------------------------------------------------------------------
+
+# 67. Provenance verification pass 1 --- exact upstream anchors
+
+This pass verifies representative/mainline commits for the first five
+high-priority lineages. A **merge commit** and a **feature commit** are
+recorded separately.
+
+## 67.1 BIG TCP
+
+### IPv4 BIG TCP --- Linux 6.3
+
+Final v4 series was accepted into net-next with ten commits.
+
+Key final commits:
+
+``` text
+a13fbf5ed5b4  netfilter: use skb_ip_totlen and iph_totlen
+7eb072be41ba  cipso_ipv4: use iph_set_totlen in skbuff_setattr
+50e6fb5c6efb  ipvlan: use skb_ip_totlen in ipvlan_get_L3_hdr
+8e08bb75b60f  packet: add TP_STATUS_GSO_TCP for tp_status
+9eefedd58ae1  net: add gso_ipv4_max_size and gro_ipv4_max_size per device
+b1a78b9b9886  net: add support for ipv4 big tcp
+```
+
+The last commit is the principal feature anchor:
+
+``` text
+b1a78b9b9886 ("net: add support for ipv4 big tcp")
+```
+
+It must not be described as the *entire* IPv4 BIG TCP implementation; it
+is patch 10/10 of the accepted series.
+
+A later 2026 GRO fix explicitly references `b1a78b9b9886` as the
+introduction point for IPv4 BIG TCP behavior, independently confirming
+this provenance.
+
+### Provenance
+
+``` text
+Netdev 0x15 BIG TCP
+       │
+       ▼
+IPv6 BIG TCP / Linux 5.19
+       │
+       ▼
+[PATCHv4 net-next 00/10]
+IPv4 BIG TCP
+       │
+       ├── 9eefedd58ae1 per-device IPv4 GSO/GRO maximum
+       └── b1a78b9b9886 IPv4 BIG TCP core support
+               │
+               ▼
+Linux 6.3
+```
+
+------------------------------------------------------------------------
+
+## 67.2 Device Memory TCP RX --- Linux 6.12
+
+This lineage requires special care because earlier patchwork-bot
+messages could look as if large early series had been accepted. In
+December 2023, for example, only the first page-pool preparation patch
+was actually taken; Mina Almasry explicitly clarified that the bot was
+overly optimistic.
+
+The definitive core series was:
+
+``` text
+[PATCH net-next v26 00/13] Device Memory TCP
+```
+
+Applied to `netdev/net-next.git` on 2024-09-12.
+
+Verified commits:
+
+``` text
+7c88f86576f3  netdev: add netdev_rx_queue_restart()
+3efd7ab46d0a  net: netdev netlink api to bind dma-buf to a net device
+170aafe35cb9  netdev: support binding dma-buf to netdevice
+28c5c74eeaa0  netdev: netdevice devmem allocator
+8ab79ed50cf1  page_pool: devmem support
+0f9214046893  memory-provider: dmabuf devmem memory provider
+9f6b619edf2e  net: support non paged skb frags
+65249feb6b3d  net: add support for skbs with unreadable frags
+8f0b3cc9a4c1  tcp: RX path for devmem TCP
+678f6e28b5f6  net: add SO_DEVMEM_DONTNEED setsockopt to release RX frags
+09d1db26b5e5  net: add devmem TCP documentation
+85585b4bc8d8  selftests: add ncdevmem, netcat for devmem TCP
+d0caf9876a1c  netdev: add dmabuf introspection
+```
+
+Main feature anchors:
+
+``` text
+8ab79ed50cf1  page_pool devmem support
+0f9214046893  dmabuf memory provider
+8f0b3cc9a4c1  TCP RX path
+678f6e28b5f6  userspace buffer-release API
+```
+
+The Linux 6.12 networking pull describes the result as receiving TCP
+payloads directly into a DMA-BUF/device-memory region while packet
+headers remain in ordinary kernel buffers so the normal TCP stack can
+process them.
+
+### Provenance
+
+``` text
+Netdev 0x16
+Merging the Networking Worlds
+        │
+        ▼
+Netdev 0x17
+Device Memory TCP
+        │
+        ▼
+many RFC / PATCH revisions
+        │
+        ▼
+v26 / 13 patches
+        │
+        ▼
+8f0b3cc9a4c1
+TCP RX path
+        │
+        ▼
+Linux 6.12
+```
+
+------------------------------------------------------------------------
+
+## 67.3 Device Memory TCP TX --- Linux 6.16
+
+The TX direction was merged separately after RX.
+
+Final accepted series:
+
+``` text
+[PATCH net-next v14 0/9] Device memory TCP TX
+```
+
+Verified commits:
+
+``` text
+03e96b8c11d1  netmem: add niov->type attribute
+e9f3d61db5cb  net: add get_netmem/put_netmem support
+8802087d20c0  net: devmem: TCP tx netlink api
+bd61848900bf  net: devmem: Implement TX path
+17af8cc06a5a  net: add devmem TCP TX documentation
+383faec0fd64  net: enable driver support for netmem TX
+c32532670cec  gve: add netmem TX support to GVE DQO-RDA mode
+ae28cb114727  net: check for driver support in netmem TX
+2f1a805f32ba  selftests: ncdevmem: Implement devmem TCP TX
+```
+
+Primary TX feature anchor:
+
+``` text
+bd61848900bf ("net: devmem: Implement TX path")
+```
+
+Again, this commit is not the whole feature; the netlink API, netmem
+lifetime support, driver capability, GVE implementation and selftests
+are separate commits.
+
+------------------------------------------------------------------------
+
+## 67.4 io_uring zero-copy RX --- Linux 6.15
+
+The feature was merged through Jens Axboe's pull:
+
+``` text
+for-6.15/io_uring-rx-zc-20250325
+```
+
+Mainline merge commit:
+
+``` text
+ca0b04ba0b35d48e1473a280c2e8905e7f80e906
+Merge tag 'for-6.15/io_uring-rx-zc-20250325'
+```
+
+The pull explicitly describes:
+
+-   zero-copy bulk receive directly into application memory;
+-   a new io_uring receive request;
+-   a shared refill queue;
+-   a zero-copy page_pool feeding a hardware RX queue;
+-   buffer lifetime controlled by io_uring rather than normal networking
+    refcount rules.
+
+Representative series commits include:
+
+``` text
+io_uring/zcrx: add interface queue and refill queue
+io_uring/zcrx: add io_zcrx_area
+io_uring/zcrx: add io_recvzc request
+io_uring/zcrx: set pp memory provider for an rx queue
+net: add documentation for io_uring zcrx
+```
+
+The final pre-merge tip named in the pull was:
+
+``` text
+89baa22d75278b69d3a30f86c3f47ac3a3a659e9
+io_uring/zcrx: add selftest case for recvzc with read limit
+```
+
+### Important distinction
+
+``` text
+ca0b04ba...
+```
+
+is a **mainline merge commit**, not the single implementation commit.
+The implementation is a multi-commit series beneath that merge.
+
+### Provenance
+
+``` text
+Netdev 0x16 architecture
+       │
+Netdev 0x17 implementation
+       │
+Netdev 0x18 BoF
+       │
+v13 net-next / io_uring series
+       │
+ca0b04ba... mainline merge
+       │
+Linux 6.15
+       │
+Netdev 0x1A post-merge follow-up
+```
+
+------------------------------------------------------------------------
+
+## 67.5 BPF qdisc --- 2025
+
+The accepted BPF pull identifies ten Amery Hung commits implementing the
+initial BPF qdisc support.
+
+Principal feature commit:
+
+``` text
+c8240344956e3f0b4e8f1d40ec3435e47040cacb
+bpf: net_sched: Support implementation of Qdisc_ops in bpf
+```
+
+This allows BPF `struct_ops` programs to implement:
+
+``` text
+Qdisc_ops.enqueue
+Qdisc_ops.dequeue
+Qdisc_ops.init
+Qdisc_ops.reset
+Qdisc_ops.destroy
+```
+
+Additional commits in the accepted series add:
+
+-   qdisc skb kfuncs;
+-   watchdog timer;
+-   bstats update;
+-   root/mq attachment restrictions;
+-   libbpf create/destroy support;
+-   FIFO/FQ selftests.
+
+BPF-side merge tip:
+
+``` text
+fd23ce3eb4a1005bd109977856d12ec0fde7ef75
+Merge branch 'bpf-qdisc'
+```
+
+Merge into net-next:
+
+``` text
+07e32237ed9d3f5815fb900dee9458b5f115a678
+Merge tag 'for-netdev' ...
+```
+
+The code was followed almost immediately by fixes for using BPF qdisc as
+the default qdisc and by making the currently supported `Qdisc_ops`
+callbacks mandatory. This is worth recording because the initial merge
+was functional but the API/validation rules were still settling.
+
+### Provenance
+
+``` text
+BPF struct_ops / TCP CC
+       │
+       ▼
+Netdev 0x17 eBPF Qdisc
+       │
+       ▼
+2025 BPF qdisc series
+       │
+       ├── c8240344956e feature anchor
+       ├── fd23ce3eb4a1 BPF branch merge
+       └── 07e32237ed9d net-next merge
+```
+
+------------------------------------------------------------------------
+
+## 67.6 netkit core --- Linux 6.7
+
+The original netkit device has a clean feature anchor:
+
+``` text
+35dfaad7188cdc043fde31709c796f5a692ba2bd
+netkit, bpf: Add bpf programmable net device
+```
+
+The accepted v4 series consisted of seven commits:
+
+``` text
+35dfaad7188c  netkit, bpf: Add bpf programmable net device
+5c1b994de4be  tools: Sync if_link uapi header
+05c31b4ab205  libbpf: Add link-based API for netkit
+92a85e18ad47  bpftool: Implement link show support for netkit
+bec981a4add6  bpftool: Extend net dump with netkit progs
+51f1892b5289  selftests/bpf: Add netlink helper library
+ace15f91e569  selftests/bpf: Add selftests for netkit
+```
+
+The feature commit explicitly states that BPF runs inside the driver's
+xmit routine so container/Pod egress can be processed earlier and can
+redirect directly to a physical device without traversing the per-CPU
+backlog queue.
+
+------------------------------------------------------------------------
+
+## 67.7 netkit queue leasing --- 2026: merge, revert, rework, re-merge
+
+This history corrects an earlier oversimplification in this document.
+
+### First merge
+
+A v7-era queue-leasing series was merged into net-next in January 2026:
+
+``` text
+77b9c4a438fc66e2ab004c411056b3fb71a54f2c
+Merge branch 'netkit-support-for-io_uring-zero-copy-and-af_xdp'
+```
+
+Representative commits included:
+
+``` text
+a5546e18f77c  net: Add queue-create operation
+31127deddef4  net: Implement netdev_nl_queue_create_doit
+9e2103f36110  net: Add lease info to queue-get response
+ff8889ff9107  net, ethtool: Disallow leased real rxqs to be resized
+...
+920da3634194  netkit: Add xsk support for af_xdp applications
+```
+
+### Immediate revert
+
+The merge was then reverted:
+
+``` text
+8766d61a1d33cb5f15bfdd6ce9832bbe1fc649c2
+Revert "Merge branch 'netkit-support-for-io_uring-zero-copy-and-af_xdp'"
+```
+
+The revert message states:
+
+``` text
+The series will conflict with io_uring work,
+and the code needs more polish.
+```
+
+Therefore the January 2026 merge must **not** be treated as the final
+upstream landing.
+
+### Rework
+
+The series continued through later revisions, including:
+
+``` text
+v8  2026-01-29
+v10 2026-03-27
+```
+
+The design remained queue leasing:
+
+``` text
+container netns
+    │
+netkit virtual queue
+    │ lease/proxy
+    ▼
+physical NIC queue
+    │
+    ├── io_uring memory provider
+    └── AF_XDP
+```
+
+### Final re-merge
+
+A reworked series was merged again in April 2026.
+
+Merge commit:
+
+``` text
+15089225889ba4b29f0263757cd66932fa676cb0
+Merge branch 'netkit-support-for-io_uring-zero-copy-and-af_xdp'
+```
+
+The accepted selftest tip includes:
+
+``` text
+65d657d806848add1e1f0632562d7f47d5d5c188
+selftests/net: Add queue leasing tests with netkit
+```
+
+This tests io_uring zero-copy from a network namespace through netkit
+leased queues backed by a physical netdev.
+
+### Correct status timeline
+
+``` text
+2026-01
+queue leasing merged
+      │
+      ▼
+immediately reverted
+      │
+      ▼
+v8 → v10 → later rework
+      │
+      ▼
+2026-04
+re-merged
+      │
+      ▼
+post-merge fixes / Netdev 0x1A use cases
+```
+
+This is now the canonical history used by this document.
+
+------------------------------------------------------------------------
+
+# 68. Provenance quality levels
+
+To make the final inventory auditable, each commit mapping should carry
+one of these quality levels.
+
+``` text
+A — exact accepted series + exact mainline commit(s) verified
+B — merge commit / pull request verified, individual commits partially enumerated
+C — patch series verified, merge status/release verified, hashes incomplete
+D — design/RFC only; no mainline commit expected
+```
+
+Current status:
+
+  Feature                Quality
+  ---------------------- --------------------------------------
+  IPv4 BIG TCP           A
+  Device Memory TCP RX   A
+  Device Memory TCP TX   A
+  io_uring ZCRX          B
+  BPF qdisc              A
+  netkit core            A
+  netkit queue leasing   A, including revert/re-merge history
+  AccECN                 C
+  RTNL breakup           C
+  MPTCP/BPF              C
+  IOAM                   C
+  nexthop objects        C
+
+------------------------------------------------------------------------
+
+# 69. Next provenance batch
+
+Next verification order:
+
+1.  AccECN;
+2.  per-netns/fine-grained RTNL;
+3.  MPTCP initial merge + BPF protocol switching + subflow iterator;
+4.  nexthop objects and resilient nexthop groups;
+5.  IPv6 IOAM;
+6.  AF_XDP multi-buffer;
+7.  virtio-net AF_XDP zero-copy status;
+8.  BIG TCP IPv6 initial commit series and 2026 tunnel series.
+
+The goal remains to upgrade each row to quality **A** where the upstream
+history permits it, without inventing a single "feature commit" for
+genuinely multi-commit features.
