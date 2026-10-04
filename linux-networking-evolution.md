@@ -3913,41 +3913,41 @@ removal**, not just feature addition.
 
 # 40. Completeness audit: classification table
 
-  ---------------------------------------------------------------------------
-  Topic                         Year Classification       Why it matters
-  ------------------ --------------- -------------------- -------------------
-  IPv6                          2020 design/API           protocol
-  extension-header                   discussion           extensibility vs
-  processing                                              fast path/offload
+  --------------------------------------------------------------------------
+  Topic                        Year Classification       Why it matters
+  ------------------ -------------- -------------------- -------------------
+  IPv6                         2020 design/API           protocol
+  extension-header                  discussion           extensibility vs
+  processing                                             fast path/offload
 
-  Threaded NAPI                 2020 merged architecture  moves RX polling
-                                     direction            out of softirq
-                                                          context
+  Threaded NAPI                2020 merged architecture  moves RX polling
+                                    direction            out of softirq
+                                                         context
 
-  bpfilter rethink              2020 failed/stalled       BPF firewall
-                                     design               architecture
-                                                          history
+  bpfilter rethink             2020 failed/stalled       BPF firewall
+                                    design               architecture
+                                                         history
 
-  SO_REUSEPORT                  2021 socket semantics     scalable listener
-  failover                                                behavior
+  SO_REUSEPORT                 2021 socket semantics     scalable listener
+  failover                                               behavior
 
-  skb drop reasons              2022 observability        structured
-                                                          packet-drop
-                                                          diagnostics
+  skb drop reasons             2022 observability        structured
+                                                         packet-drop
+                                                         diagnostics
 
-  in-kernel TLS                 2022 API/architecture     kernel-originated
-  handshake                                               secure transports
+  in-kernel TLS                2022 API/architecture     kernel-originated
+  handshake                                              secure transports
 
-  P4TC                      2023--24 significant          programmable TC
-                                     non-merged proposal  pipeline debate
+  P4TC                     2023--24 significant          programmable TC
+                                    non-merged proposal  pipeline debate
 
-  BPF qdisc                     2025 merged/programming   `struct_ops`
-                                     model                reaches packet
-                                                          scheduling
+  BPF qdisc                    2025 merged/programming   `struct_ops`
+                                    model                reaches packet
+                                                         scheduling
 
-  DCCP removal                  2025 removal/cleanup      simplifies shared
-                                                          transport code
-  ---------------------------------------------------------------------------
+  DCCP removal                 2025 removal/cleanup      simplifies shared
+                                                         transport code
+  --------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -5648,3 +5648,768 @@ and normalization**:
 This distinction is important: the thematic search is substantially
 complete, while commit-level provenance is intentionally still stricter
 and incomplete where evidence has not yet been verified.
+
+------------------------------------------------------------------------
+
+# 58. Netdev conference cross-reference (2019-05-07--2026-10-02)
+
+Netdev Society の archive を 0x13--0x1A まで確認し、LWN/kernel change
+log と 技術的に対応する講演を cross-reference する。
+
+注意点:
+
+-   Netdev 0x13 は 2019-03-20--22 開催のため、本資料の開始日 2019-05-07
+    より前。 したがって **本期間の正式 inventory
+    からは除外**する。ただし、後の機能の前史として
+    有用な講演（conntrack, XDP/virtio-net, BPF TCP extensibility
+    等）は存在する。
+-   0x14 (2020) 以降は対象期間内。
+-   conference talk は upstream merge を意味しない。`proposal`,
+    `development`, `deployment`, `research` を区別して読む。
+-   Netdev の講演資料は、LWN記事より前に proposal/design
+    を説明しているケースが多く、
+    「機能がどこから来たか」を追う一次資料として有用。
+
+Netdev archive: https://netdevconf.info/
+
+------------------------------------------------------------------------
+
+## 58.1 Netdev 0x14 --- 2020
+
+Conference: https://netdevconf.info/0x14/
+
+既存 change log と特に関連する講演:
+
+  -----------------------------------------------------------------------
+  Netdev 0x14 session     Change-log lineage      Relevance
+  ----------------------- ----------------------- -----------------------
+  The Path To TCP 4K MTU  TCP RX zero-copy →      early receive-side
+  and RX ZeroCopy         io_uring ZCRX / devmem  zero-copy work
+
+  Implementation of IPv6  IPv6 IOAM               direct upstream
+  IOAM in Linux Kernel                            implementation topic
+
+  Using Upstream MPTCP in MPTCP                   follows initial MPTCP
+  Linux Systems                                   mainlining
+
+  TC Connection tracking  conntrack / TC HW       flow offload lineage
+  hardware offload -      offload                 
+  upstream work                                   
+
+  Fast OVS data path with XDP / virtual switching XDP fast-path work
+  XDP                                             
+
+  Issuing SYN cookies in  XDP/BPF TCP             SYN-cookie fast path
+  XDP                                             
+
+  Replacing HTB with EDT  BPF / traffic control   programmable scheduling
+  and BPF                                         lineage
+
+  Hierarchical QoS        TC HW offload           qdisc/offload
+  Hardware Offload (HTB)                          
+
+  kTLS HW offload -       KTLS                    TLS record/offload
+  implementation and                              lineage
+  performance gains                               
+
+  Performance study of    KTLS / handshake        precursor to later
+  kernel TLS handshakes                           kernel-handshake work
+
+  devlink enhancements    devlink/SR-IOV          netdev
+  for sub functions                               device-management API
+  management                                      
+
+  Hardware offload for    container/offload       Kubernetes datapath
+  K8s container                                   
+  networking                                      
+
+  Hardware Acceleration   container/offload       virtual networking
+  of Container Networking                         
+  Interfaces                                      
+  -----------------------------------------------------------------------
+
+Netdev 0x14 is particularly useful because several topics later
+appearing as mature kernel features were already being discussed
+together:
+
+``` text
+TCP zero-copy
+MPTCP
+IOAM
+XDP
+TC/conntrack offload
+KTLS
+container HW offload
+```
+
+------------------------------------------------------------------------
+
+## 58.2 Netdev 0x15 --- 2021
+
+Accepted sessions: https://netdevconf.info/0x15/accepted-sessions.html
+
+### BIG TCP --- Eric Dumazet
+
+One of the strongest cross-references in this audit.
+
+Netdev 0x15 accepted **BIG TCP** in June 2021, before the LWN feature
+article and before the Linux 5.19 merge.
+
+This gives the lineage:
+
+``` text
+Netdev 0x15 (2021)
+BIG TCP talk
+      │
+      ▼
+LWN "Going big with TCP packets" (2022)
+      │
+      ▼
+Linux 5.19
+IPv6 BIG TCP
+      │
+      ▼
+Linux 6.3
+IPv4 BIG TCP
+      │
+      ▼
+Linux 7.3 development
+VXLAN/GENEVE BIG TCP
+```
+
+### Accelerating synproxy with XDP
+
+Session:
+https://netdevconf.info/0x15/loadsessions/Accelerating-synproxy-with-XDP.html
+
+The talk explicitly describes extending BPF helpers so XDP can:
+
+-   query conntrack information;
+-   generate/check SYN cookies without a local listening socket.
+
+This connects:
+
+``` text
+XDP
+  ├── SYN-cookie helpers
+  └── conntrack BPF integration
+```
+
+and is a useful precursor to the later BPF conntrack lifecycle kfunc
+work.
+
+### Resilient nexthop groups
+
+This directly follows the 2019 nexthop-object work and belongs in the
+routing/FIB lineage.
+
+``` text
+nexthop objects
+      │
+      ▼
+nexthop groups
+      │
+      ▼
+resilient groups
+```
+
+### Rethinking Zero-Copy Networking with MAIO
+
+This is relevant as an alternative high-performance networking design in
+the same period that eventually produced stronger kernel-side zero-copy
+efforts around io_uring, page_pool/netmem and Device Memory TCP.
+
+### TC / ACL / BPF
+
+Relevant sessions include:
+
+-   Recent Enhancements to the TC Police Action
+-   Where turbo boosting TC flower control path had led us to
+-   Linux ACL Performance Analysis
+-   Introducing Ptables
+-   XDP General Workshop
+-   Switchdev Offload Workshop
+
+The ACL analysis compares:
+
+-   iptables;
+-   iptables + IPSet;
+-   XDP/eBPF;
+-   TC/eBPF;
+-   TC flower.
+
+Ptables was implemented over eBPF at TC/XDP and provides useful
+historical context for the later bpfilter/BPF-firewall discussions.
+
+------------------------------------------------------------------------
+
+## 58.3 Netdev 0x16 --- 2022
+
+Conference: https://netdevconf.info/0x16/
+
+### Merging the Networking Worlds --- David Ahern, Shrijeet Mukherjee
+
+Session:
+https://netdevconf.info/0x16/sessions/talk/merging-the-networking-worlds.html
+
+This is a particularly important architectural precursor to Device
+Memory TCP and modern io_uring zero-copy receive.
+
+The talk compares:
+
+``` text
+traditional socket API
+    │
+    ├── syscalls
+    ├── memcpy
+    └── page refcount overhead
+
+io_uring
+    │
+    └── fewer syscalls + TX zero-copy
+        but no direct hardware queue ownership
+
+AF_XDP
+    │
+    └── hardware queues + registered userspace memory
+        but bypasses the kernel TCP stack
+
+RDMA
+    │
+    └── direct memory/hardware access
+        but separate networking ecosystem
+```
+
+The proposal attempts to combine:
+
+``` text
+kernel TCP/IP stack
+       +
+pre-registered application memory
+       +
+hardware queues
+       +
+zero-copy RX/TX
+```
+
+This is almost exactly the architectural problem later attacked by:
+
+``` text
+page_pool/netmem
+     │
+Device Memory TCP
+     │
+io_uring ZCRX
+     │
+netkit queue leasing
+```
+
+### Historical significance
+
+For the change log this gives a useful design lineage:
+
+``` text
+Netdev 0x16 (2022)
+"Merging the Networking Worlds"
+          │
+          ▼
+Netdev 0x17 (2023)
+Device Memory TCP
+Zero Copy Receive using io_uring
+          │
+          ▼
+Netdev 0x18 (2024)
+Devmem TCP & io_uring zero copy BoF
+          │
+          ▼
+Linux 6.12
+Device Memory TCP RX
+          │
+          ▼
+Linux 6.15
+io_uring ZC RX
+```
+
+------------------------------------------------------------------------
+
+## 58.4 Netdev 0x17 --- 2023
+
+Sessions: https://netdevconf.info/0x17/pages/sessions.html
+
+This edition has unusually strong overlap with the mainline networking
+developments covered in this document.
+
+### Device Memory TCP
+
+Speakers:
+
+-   Mina Almasry
+-   Willem de Bruijn
+-   Eric Dumazet
+-   Kaiyuan Zhang
+
+This is the direct conference counterpart to the Device Memory TCP
+RFC/mainline lineage.
+
+### Fast ZC Rx Data Plane using io_uring / Zero Copy Receive using io_uring
+
+Session:
+https://netdevconf.info/0x17/sessions/talk/zero-copy-receive-using-io_uring.html
+
+Speakers:
+
+-   David Wei
+-   Pavel Begunkov
+
+The description explicitly frames memory bandwidth as a bottleneck and
+compares the kernel socket copy path with kernel bypass and RDMA.
+
+This is one of the most useful primary sources for the later Linux 6.15
+io_uring ZCRX feature.
+
+### eBPF Qdisc: a generic building block for traffic control
+
+Speakers:
+
+-   Hsin-Wei (Amery) Hung
+-   Cong Wang
+
+This is a direct precursor/context source for the later BPF qdisc /
+`struct_ops` development.
+
+### Integrating eBPF Into The P4TC Datapath
+
+This provides the conference-side history for the P4TC proposal that
+later encountered maintainer resistance and was covered by LWN in 2024.
+
+### Netlink APIs to Expose/Configure Netdev Objects
+
+This belongs alongside:
+
+``` text
+Generic Netlink
+      │
+YNL specifications
+      │
+modern netdev configuration APIs
+```
+
+### Other relevant sessions
+
+-   NIC offloads at Hyperscale: experience, new offloads and validation
+-   SO_TIMESTAMPING: powering fleetwide RPC monitoring
+-   TCP Offload via AF_XDP sockets --- Not your grandmother's TCP
+    Offload!
+-   Using eBPF to inject IPv6 Extension Headers
+-   Multi-core IPsec tunnels
+-   TLS handshake for in-kernel consumers (BoF)
+-   XDP Workshop
+-   TC Workshop
+-   Netfilter Mini Workshop
+
+The TLS handshake BoF is especially useful alongside the
+`net/handshake`/KTLS chapters.
+
+------------------------------------------------------------------------
+
+## 58.5 Netdev 0x18 --- 2024
+
+Schedule: https://netdevconf.info/0x18/pages/schedule.html
+
+### Devmem TCP & io uring zero copy --- BoF
+
+Speakers include Willem de Bruijn et al.
+
+This conference occurred while both Device Memory TCP and io_uring ZC RX
+were moving toward mainline maturity.
+
+The sequence is therefore:
+
+``` text
+2022  architecture proposal
+          │
+2023  implementation talks
+          │
+2024  joint devmem/io_uring BoF
+          │
+2024  Linux 6.12 devmem TCP RX
+          │
+2025  Linux 6.15 io_uring ZC RX
+```
+
+### The Future of AI Networks: Advancing TCP with Device Memory and Collective Communication
+
+This extends Device Memory TCP from a pure networking optimization into
+AI/GPU/collective communication use cases.
+
+### A new lightweight Zero-Copy Notification Mechanism in Linux
+
+Relevant to the broader zero-copy TX/RX completion/lifetime problem.
+
+### Characterizing IOTLB Wall for Multi-100-Gbps Linux-based Networking
+
+Relevant to DMA/IOMMU overhead in high-speed networking and therefore
+complementary to page_pool/netmem/device-memory work.
+
+### Fine-grained TCP Tuning
+
+Relevant to the growing set of per-socket TCP controls and later
+RTO/receive-side tuning changes.
+
+### Workshops/BoFs
+
+-   Extension Headers Workshop
+-   TC Workshop
+-   IPsec Workshop
+
+------------------------------------------------------------------------
+
+## 58.6 Netdev 0x19 --- 2025
+
+Schedule: https://netdevconf.info/0x19/pages/schedule.html
+
+Sessions: https://netdevconf.info/0x19/pages/sessions.html
+
+This edition maps closely to the 2025 chapters in the change log.
+
+### Diagnosing Page Pool Leaks
+
+Directly relevant to:
+
+``` text
+page_pool
+   │
+   ▼
+netmem
+   │
+   ├── devmem TCP
+   └── io_uring ZCRX
+```
+
+It is useful operational material because page_pool recycling/lifetime
+bugs are a key failure mode in modern RX-memory infrastructure.
+
+### MPTCP: present, future, and its development workflow
+
+Directly complements the MPTCP release/patch history.
+
+### SRv6 in Linux Kernel, FRR and eBPF
+
+Directly complements the SRv6 Headend Reduced / PSP / NEXT-C-SID
+evolution.
+
+### Communication via Internal Shared Memory (ISM) - Time to open up
+
+This is especially interesting in light of the later DIBS/shared-memory
+transport work.
+
+The conceptual lineage is not `netmem → DIBS`; instead:
+
+``` text
+ISM / SMC-D / local shared-memory transports
+              │
+              ▼
+DIBS / later shared-memory socket ideas
+```
+
+### mq-cake: Scaling software rate limiting across CPU cores
+
+This is the conference-side precursor/context for CAKE multiqueue work
+that later appears in the Linux 7.0-era change log.
+
+### Linux Kernel Support for IOAM Direct Exporting
+
+Follow-up to the earlier IPv6 IOAM implementation.
+
+### The Battle Of The ZCs: Who is the prettiest of them all?
+
+Useful comparison material for the multiple Linux zero-copy mechanisms
+that this document otherwise follows separately.
+
+### IRQ Suspension: a new, efficient mechanism for packet delivery
+
+Relevant to the NAPI/softirq/busy-poll execution-model evolution.
+
+### The future of SO_TIMESTAMPING
+
+Complements the packet/network timestamp observability lineage.
+
+### State of the union in TCP land --- Eric Dumazet
+
+Useful cross-reference for contemporary TCP performance/API work,
+including the period around AccECN, receive-side optimization, and timer
+tuning.
+
+------------------------------------------------------------------------
+
+## 58.7 Netdev 0x1A --- 2026
+
+Sessions: https://netdevconf.info/0x1A/pages/sessions.html
+
+Netdev 0x1A is inside the requested time window and is especially
+valuable because its materials were available by August 2026.
+
+### io_uring ZCRX: Progress and Next Steps --- Pavel Begunkov
+
+The session covers the post-merge ZCRX problems:
+
+-   refill-queue exhaustion;
+-   buffers that cannot immediately be recycled;
+-   sharing NIC queues between processes;
+-   memory-pressure detection;
+-   API/performance follow-ups.
+
+This is the natural follow-up to Linux 6.15 ZCRX.
+
+### Accelerating Software RDMA (RXE) with Netkit and Devmem
+
+Directly intersects two major late-period themes:
+
+``` text
+netkit
+   +
+Device Memory / devmem
+   +
+software RDMA
+```
+
+and reinforces that netkit is becoming a mechanism for exposing modern
+memory/queue facilities beyond ordinary container networking.
+
+### Kernel shared memory socket transport --- David Wei
+
+Session:
+https://netdevconf.info/0x1A/sessions/talk/kernel-shared-memory-socket-transport.html
+
+Proposal:
+
+``` text
+AF_UNIX SOCK_SEQPACKET
+        +
+io_uring registered buffers
+        +
+shared memory
+        │
+        ▼
+zero-copy sender + receiver IPC
+```
+
+This is a new RFC/proposal lineage and should not be confused with DIBS,
+but it belongs in the same broad "avoid local-host copies" design space.
+
+### Linux QUIC: Bringing a Modern Secure Transport into the Kernel
+
+Direct conference counterpart to the 2024--2026 kernel QUIC RFC series.
+
+### TCP State of the union (2026) --- Eric Dumazet
+
+Session:
+https://netdevconf.info/0x1A/sessions/talk/tcp-state-of-the-union-2026.html
+
+The talk explicitly focuses on recent/upcoming TCP changes and
+performance on modern platforms, making it a useful companion source for
+the late TCP chapters.
+
+### Thrice the charm: an skb extension for BPF metadata
+
+Relevant to the long-running question of how metadata is carried with
+skb/BPF datapaths.
+
+### Securing IOAM in the Linux Kernel
+
+Follow-up to IOAM deployment: telemetry integrity/trust rather than
+merely carrying trace data.
+
+### Network Observability BoF
+
+Complements:
+
+-   `skb_drop_reason`;
+-   SO_TIMESTAMPING;
+-   BPF network timestamp callbacks;
+-   modern tracing/Retis work.
+
+### Other relevant 0x1A sessions
+
+-   AF_XDP copy mode needs more love
+-   XDP Workshop
+-   SRv6 Workshop
+-   What's next for the PSP Security Protocol
+-   Can Homa and TCP Get Along?
+-   Rakaia: Scalable In-Kernel Scheduling for TCP-Based RPCs
+-   Scripting Netfilter with Lua
+-   Could an IPv6-Only Kernel Be a Reality?
+-   Chat with the Maintainers / Netconf Update
+
+------------------------------------------------------------------------
+
+# 59. Netdev ↔ LWN ↔ mainline lineage map
+
+The conference material makes several feature histories much clearer.
+
+## BIG TCP
+
+``` text
+Netdev 0x15 (2021)
+BIG TCP — Eric Dumazet
+        │
+        ▼
+LWN 2022
+Going big with TCP packets
+        │
+        ▼
+Linux 5.19
+IPv6 BIG TCP
+        │
+        ▼
+Linux 6.3
+IPv4 BIG TCP
+        │
+        ▼
+2026
+HBH removal + UDP tunnel work
+        │
+        ▼
+Linux 7.3 development
+VXLAN/GENEVE BIG TCP
+```
+
+## Zero-copy receive / Device Memory TCP
+
+``` text
+Netdev 0x14 (2020)
+TCP RX ZeroCopy discussion
+        │
+        ▼
+Netdev 0x16 (2022)
+Merging the Networking Worlds
+        │
+        ├──────────────┐
+        ▼              ▼
+Netdev 0x17        Netdev 0x17
+Device Memory TCP  io_uring ZC RX
+        │              │
+        └──────┬───────┘
+               ▼
+Netdev 0x18 (2024)
+Devmem TCP & io_uring ZC BoF
+        │
+        ├── Linux 6.12: Device Memory TCP RX
+        └── Linux 6.15: io_uring ZC RX
+               │
+               ▼
+Netdev 0x1A (2026)
+io_uring ZCRX: Progress and Next Steps
+```
+
+## BPF traffic control
+
+``` text
+BPF struct_ops / TCP CC
+        │
+        ▼
+Netdev 0x17 (2023)
+eBPF Qdisc
+        │
+        ▼
+2025 BPF qdisc series
+        │
+        ▼
+mainline traffic-control programmability
+```
+
+## P4TC
+
+``` text
+Netdev 0x13 (pre-window)
+P4 compiler backend for TC
+        │
+        ▼
+Netdev 0x17 (2023)
+eBPF in P4TC datapath
+        │
+        ▼
+LWN 2024
+P4TC hits a brick wall
+```
+
+## Shared-memory networking
+
+``` text
+ISM / SMC-D
+      │
+Netdev 0x19 (2025)
+Communication via ISM
+      │
+      ├── DIBS development
+      │
+      └── Netdev 0x1A (2026)
+          kernel shared-memory socket transport
+```
+
+These are related design spaces, not necessarily direct implementation
+ancestry.
+
+------------------------------------------------------------------------
+
+# 60. Recommended Netdev talks for this change log
+
+For understanding the architectural evolution rather than simply
+collecting conference talks, the highest-value sessions are:
+
+1.  **BIG TCP** --- Netdev 0x15 (2021)
+2.  **Merging the Networking Worlds** --- Netdev 0x16 (2022)
+3.  **Device Memory TCP** --- Netdev 0x17 (2023)
+4.  **Zero Copy Receive using io_uring** --- Netdev 0x17 (2023)
+5.  **eBPF Qdisc: a generic building block for traffic control** ---
+    Netdev 0x17 (2023)
+6.  **Devmem TCP & io uring zero copy** --- Netdev 0x18 (2024)
+7.  **Diagnosing Page Pool Leaks** --- Netdev 0x19 (2025)
+8.  **Communication via Internal Shared Memory (ISM) - Time to open up**
+    --- Netdev 0x19 (2025)
+9.  **State of the union in TCP land** --- Netdev 0x19 (2025)
+10. **io_uring ZCRX: Progress and Next Steps** --- Netdev 0x1A (2026)
+11. **Linux QUIC: Bringing a Modern Secure Transport into the Kernel**
+    --- Netdev 0x1A (2026)
+12. **TCP State of the union (2026)** --- Netdev 0x1A (2026)
+
+These talks are especially useful because they form a bridge between:
+
+``` text
+design motivation
+      ↓
+prototype / RFC
+      ↓
+upstream patch series
+      ↓
+LWN analysis
+      ↓
+mainline kernel
+      ↓
+post-merge operational lessons
+```
+
+which is the central goal of this change log.
+
+------------------------------------------------------------------------
+
+# 61. Netdev coverage note
+
+The Netdev site confirms the relevant editions in the requested period:
+
+``` text
+0x14 — 2020
+0x15 — 2021
+0x16 — 2022
+0x17 — 2023
+0x18 — 2024
+0x19 — 2025
+0x1A — 2026
+```
+
+0x13 took place in March 2019 and is outside the 2019-05-07 start
+boundary, so its sessions are used only as historical context and are
+not counted as in-window conference entries.
+
+Future provenance work should add a `Netdev` column to the canonical LWN
+inventory where a direct conference counterpart exists.
