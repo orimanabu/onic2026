@@ -377,23 +377,21 @@ programmable socket dispatch
 v3.x前半の:
 
 ``` text
-BQL → fq_codel → TSQ
+BQL     fq_codel     TSQ
+ │          │          │
+ └──────┬───┴────┬─────┘
+        ▼        ▼
+ queue residency / latency control
+        │
+        └── complements ──► pacing / time-based TX
 ```
 
-でqueueを短くする仕組みが整った後、TCP packetを**いつ送るか**を制御する
-pacing/FQ方向が発達する。
+これらは一本道の依存関係ではない。BQL は driver TX queue、fq_codel は qdisc、
+TSQ は per-socket backlog を主に制御し、異なるレイヤーで同じ「過剰な滞留を避ける」
+設計課題に取り組む。pacing/FQ はさらに packet を **いつ送るか** を制御する別の軸である。
 
-この流れは後に:
-
-``` text
-TCP pacing
-  ↓
-BBR
-  ↓
-time-based TX
-  ↓
-EDT
-```
+BBR は congestion-control algorithm、EDT は time-based scheduling primitive であり、
+後者を BBR 専用の後継機構とは扱わない。
 
 へつながる。
 
@@ -697,6 +695,11 @@ Grade の定義は次のとおりであり、この文書自体にも保持す�
 
 C/D は現在の canonical milestone table では使用していないが、将来の監査対象を表すため grade scheme として定義を残す。
 
+**Evidence は3軸で監査する。** Grade は主として release attribution の確度を表す。これとは独立に、
+(1) SHA が正しい Git object / subject を指すか、(2) その anchor が主張する機能をどの範囲まで代表するか、
+(3) その変更が対象の final release tag に含まれるか、を確認する。したがって「exact SHA がある」だけで
+feature series 全体や release attribution が自動的に Grade A になるわけではない。
+
 **Part II ↔ Part VII invariant:** Part II の Evidence / status で `exact anchor` または `anchor retained in Part VII` と主張する場合、Part VII の exact-anchor inventory に対応する完全な40桁SHAが存在しなければならない。Part VII にSHAを保持しない milestone は、Part II では `release-generation`、`release`、`series` などの表現に留める。
 
 
@@ -816,8 +819,7 @@ table を繰り返さず architecture ごとに milestone をまとめる。
 
 # Part III --- Long-term feature lineages
 
-Part III では、Part II の milestone が**なぜ一つの lineage
-を形成するのか**を説明する。release ごとの provenance
+Part III では、Part II の milestone が**どの設計課題を共有し、どこで依存・拡張・並行発展するか**を説明する。release ごとの provenance
 は繰り返さない。driver-specific な仕組みは Part IV、tracing/tooling
 の詳細は Part V で扱う。
 
@@ -850,7 +852,9 @@ BIG TCP over VXLAN / GENEVE (7.3-rc/mainline)
 ```
 
 BIG TCP は wire MTU を巨大化する機能ではなく、 **kernel 内部の
-packet-processing unit を大きくする機能**として理解する。
+packet-processing unit を大きくする機能**として理解する。利用可否と効果は protocol path、
+GRO/GSO/offload capability、driver/NIC、tunnel implementation などに依存し、すべての device / path で
+一律に大きな aggregate を利用できることを意味しない。
 
 ------------------------------------------------------------------------
 
@@ -904,7 +908,9 @@ transport側の別lineageとして扱い、この矢印へ直接接続しない�
 ## XDP / AF_XDP
 
 v5.0 時点で XDP/AF_XDP は存在した。その後の本質は周辺 infrastructure
-の成熟。
+の成熟。ここで XDP → AF_XDP → netkit / queue leasing を単純な派生関係とはみなさない。
+XDP は native driver mode、generic/SKB mode、hardware offload で実行位置・性能特性・必要な driver support が異なり、
+AF_XDP や queue leasing は queue ownership / zero-copy という共通課題から並行して発展した面を持つ。
 
 ``` text
 XDP
@@ -1406,7 +1412,7 @@ support ndo_xdp_xmit
 manage RX memory so buffers can move between RX/XDP/TX
 ```
 
-The last point directly motivates page_pool.
+The last point is one of the pressures that increased the value of a common RX-memory recycling infrastructure such as page_pool; page_pool was not created solely for XDP.
 
 ### USENIX research に見る XDP / SmartNIC offload
 
@@ -1821,8 +1827,24 @@ structured networking metadata
         ↓
 drop reason / timestamp / queue-NAPI-page_pool identity
         ↓
-cross-layer packet-journey reconstruction
+correlation across layers
+        ↓
+packet-journey reconstruction (tool/inference goal)
 ```
+
+### Primitive が提供する情報と限界
+
+| Primitive | 主に提供するもの | 境界 / 注意点 |
+|---|---|---|
+| BTF | kernel type / field metadata | runtime event や packet trajectory 自体は記録しない |
+| eBPF tracing | attach point での event / state | coverage、attach point、権限、overhead に依存 |
+| `skb_drop_reason` | 対応箇所での structured drop reason | 全 drop path が必ず reason を付与するわけではない |
+| timestamping | 特定地点での時刻情報 | clock、取得地点、HW/SW timestamp semantics に依存 |
+| netdev-genl | queue / NAPI 等の identity、state、configuration | 可視化できることと自由に ownership/configuration できることは別 |
+| page_pool introspection | pool identity / stats / diagnostics | packet 単位の end-to-end trajectory ではない |
+
+したがって cross-layer packet journey は単一 primitive の機能ではなく、tool が複数の identifier、event、
+timestamp、metadata を相関して **推論する目標**として扱う。
 
 ### BTF と eBPF tracing
 
@@ -1849,7 +1871,8 @@ captureでは見えない queueing / scheduling / offload の時間軸を補い�
 Part IVで説明した queue、NAPI、page_pool のobject化は、control
 planeだけでなくobservabilityにも 効きます。packet memory、polling
 context、queue identityをuserspace-visible objectとして関連付ける
-ことで、zero-copy / memory-provider時代の問題を説明しやすくなります。
+ことで、zero-copy / memory-provider時代の問題を説明しやすくなります。ただし、readable な identity / stats と、
+userspace が queue や NAPI の ownership/configuration を変更できる control-plane capability は区別する。
 
 この軸を Part II の確定 milestone に対応させると、次の流れになる。
 
@@ -1902,8 +1925,9 @@ memory path          NIC→RAM          →      NIC→RAM or device memory
 async I/O             conventional     →      io_uring ZC TX/RX
 ```
 
-最大の変化は、network stack が **「CPU が system RAM 上の skb
-を逐次処理する単一モデル」から離れたこと** にある。
+最大の変化は、従来の **「CPU が system RAM 上の skb を処理するモデル」自体を置き換えたことではなく**、
+そのモデルを現在も広く維持しながら、AF_XDP、device memory、io_uring zero-copy、programmable/offloaded path など
+**複数の処理・memory-ownership model を用途と hardware capability に応じて共存させる方向へ拡張したこと**にある。
 
 ------------------------------------------------------------------------
 
@@ -1966,6 +1990,9 @@ The synthesis is intentionally compact. Part VII records the attribution
 boundaries that remain important for verification or future re-audit.
 
 # Part VII --- 正規 provenance ledger
+
+**Evidence model:** Part VII の SHA は feature series の「代表 anchor」であり、anchor の存在だけで series 全体を証明しない。
+各項目は **SHA identity / feature correspondence / release containment** を別々に監査する。
 
 **Evidence status:** `A-rc` は authoritative な pull/merge evidence により Linus mainline への merge を確認済みだが、final release が未公開の状態を示す。released milestone の Grade A とは区別する。
 
