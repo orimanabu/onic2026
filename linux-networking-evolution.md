@@ -573,98 +573,99 @@ skb/page allocation optimization
 
 # 8. Release matrix
 
-  -----------------------------------------------------------------------
-  Kernel                              Networking topics to track
-  ----------------------------------- -----------------------------------
-  5.2                                 high-speed NIC memory management,
-                                      XDP
+  ---------------------------------------------------------------------
+  Kernel                             Networking topics to track
+  ---------------------------------- ----------------------------------
+  5.2                                high-speed NIC memory management,
+                                     XDP
 
-  5.3                                 socket/cgroup BPF, TCP hooks
+  5.3                                socket/cgroup BPF, TCP hooks
 
-  5.4                                 XDP/TC, SYN-cookie/BPF
+  5.4                                XDP/TC, SYN-cookie/BPF
 
-  5.5                                 virtual/socket/network-device API
+  5.5                                virtual/socket/network-device API
 
-  5.6                                 WireGuard, BPF struct_ops, TCP CC,
-                                      ethtool-netlink
+  5.6                                WireGuard, BPF struct_ops, TCP CC,
+                                     ethtool-netlink
 
-  5.7                                 bareudp, encapsulation/offload
+  5.7                                bareudp, encapsulation/offload
 
-  5.8                                 XDP buffer API, TC/bridge
+  5.8                                XDP buffer API, TC/bridge
 
-  5.9                                 BPF socket lookup/iterator
+  5.9                                BPF socket lookup/iterator
 
-  5.10                                MPTCP, BPF/TCP options
+  5.10                               MPTCP, BPF/TCP options
 
-  5.11                                TCP zero-copy receive
+  5.11                               TCP zero-copy receive
 
-  5.12                                MPTCP/multicast
+  5.12                               MPTCP/multicast
 
-  5.13                                MPTCP/BPF/netdev
+  5.13                               MPTCP/BPF/netdev
 
-  5.14                                routing, SO_REUSEPORT
+  5.14                               routing, SO_REUSEPORT
 
-  5.15                                IPv6 IOAM, bridge multicast
+  5.15                               IPv6 IOAM, bridge multicast
 
-  5.16                                socket memory, IOAM
+  5.16                               socket memory, IOAM
 
-  5.17                                TC hardware offload
+  5.17                               TC hardware offload
 
-  5.18                                BPF/MPTCP/netdev
+  5.18                               BPF/MPTCP/netdev
 
-  **5.19**                            **BIG TCP, skb drop reasons, MPTCP
-                                      API**
+  **5.19**                           **BIG TCP, skb drop reasons, MPTCP
+                                     API**
 
-  6.0                                 BPF/netdev continuation
+  6.0                                BPF/netdev continuation
 
-  6.1                                 netlink/API modernization
+  6.1                                netlink/API modernization
 
-  6.2                                 BPF/netdev
+  6.2                                BPF/netdev
 
-  6.3                                 netlink specification / Ethernet
+  6.3                                netlink specification / Ethernet
 
-  6.4                                 XDP/BPF
+  6.4                                XDP/BPF
 
-  6.5                                 socket/process API
+  6.5                                socket/process API
 
-  **6.6**                             **AF_XDP multi-buffer, BPF defrag,
-                                      MPTCP BPF**
+  **6.6**                            **AF_XDP multi-buffer, BPF defrag,
+                                     MPTCP BPF**
 
-  **6.7**                             **netkit, io_uring networking**
+  **6.7**                            **netkit, io_uring networking**
 
-  6.8                                 network-core cache/performance work
+  6.8                                network-core cache/performance
+                                     work
 
-  6.9                                 RTNL reduction, BPF token
+  6.9                                RTNL reduction, BPF token
 
-  6.10                                io_uring zero-copy send
-                                      improvements
+  6.10                               io_uring zero-copy send
+                                     improvements
 
-  6.11                                TCP/network tuning
+  6.11                               TCP/network tuning
 
-  **6.12**                            **Device Memory TCP RX**
+  **6.12**                           **Device Memory TCP RX**
 
-  6.13                                RTNL scalability / traffic shaping
+  6.13                               RTNL scalability / traffic shaping
 
-  6.14                                TCP/UDP/IPsec changes
+  6.14                               TCP/UDP/IPsec changes
 
-  **6.15**                            **io_uring ZC RX, RTNL breakup,
-                                      TCP_RTO_MAX_MS, BPF timestamps**
+  **6.15**                           **io_uring ZC RX, RTNL breakup,
+                                     TCP_RTO_MAX_MS, BPF timestamps**
 
-  6.16                                device-memory / DMA / networking
-                                      continuation
+  6.16                               device-memory / DMA / networking
+                                     continuation
 
-  6.17                                TCP loss-detection cleanup
+  6.17                               TCP loss-detection cleanup
 
-  **6.18**                            **AccECN, UDP RX optimization,
-                                      DIBS, rmem default 4MB**
+  **6.18**                           **AccECN, UDP RX optimization,
+                                     DIBS, rmem default 4MB**
 
-  6.19+                               continued TCP/netdev/BPF
-                                      scalability work
+  6.19+                              continued TCP/netdev/BPF
+                                     scalability work
 
-  7.x                                 BIG TCP/overlay,
-                                      netkit/device-memory/BPF
-                                      continuation
-  -----------------------------------------------------------------------
+  7.x                                BIG TCP/overlay,
+                                     netkit/device-memory/BPF
+                                     continuation
+  ---------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -836,3 +837,338 @@ merge-window coverage に現れる architecture-level change は含める。
 
 commit-level の項目は upstream で確認できたものから順次追加し、LWN
 の記述だけから hash を逆算・推測しない。
+
+------------------------------------------------------------------------
+
+# 13. Commit-level history --- verified entries
+
+この章では、upstream patch archive / git history で commit ID
+まで確認できた系列を記録する。 短縮 hash
+だけが一次資料に掲載されている場合は短縮形をそのまま記載し、推測で full
+hash に展開しない。
+
+## 13.1 BIG TCP --- Linux 5.19
+
+**Feature:** BIG TCP (initial IPv6 support)\
+**Kernel:** Linux 5.19\
+**Subsystem:** `net/core`, IPv6, TCP, GRO/GSO\
+**Primary motivation:** 64KiB を超える kernel-internal GRO/GSO aggregate
+を利用し、高速 TCP datapath の per-packet overhead を削減する。
+
+### Mainline evidence
+
+5.19 の networking pull request は、IPv6 Jumbogram extension header
+を利用して 64KiB より大きな TCPv6 GSO super-segment
+をサポートする機能を明示的に `BIG TCP` として記載している。
+
+-   Networking pull request:
+    https://lists.openwall.net/netdev/2022/05/24/216
+-   LWN feature: https://lwn.net/Articles/884104/
+-   LWN 5.19 merge-window coverage: https://lwn.net/Articles/896140/
+
+### Verified commits
+
+後続の upstream/stable fix history から、少なくとも以下の initial BIG
+TCP commits を 確実に逆参照できる。
+
+-   `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12`
+    -   Linux 5.19 で導入された BIG TCP/GRO 系列の commit。
+    -   後の GRO validation fix がこの commit を introduction point
+        として明示している。
+-   `7c4e983c4f3cf94fcd879730c6caa877e0768a4d`
+    -   Linux 5.19 の BIG TCP 関連 commit。
+    -   `skb_copy_ubufs()` と BIG TCP の interaction に対する後続 fix が
+        introduction point として参照している。
+
+> BIG TCP は複数 commit からなる系列である。この2つだけを「BIG TCP の全
+> commit」と 解釈してはいけない。series 全体の exact commit list
+> は引き続き upstream tree と patch archive を照合する。
+
+### Later evolution
+
+-   IPv4 BIG TCP
+-   GRO validation / HBH handling の再設計
+-   AF_XDP multi-buffer との整合
+-   overlay/tunnel datapath への拡張
+
+------------------------------------------------------------------------
+
+## 13.2 AF_XDP multi-buffer --- Linux 6.6
+
+**Feature:** AF_XDP multi-buffer RX/TX\
+**Kernel:** Linux 6.6\
+**Subsystem:** `net/xdp`, AF_XDP, Intel `ice` / `i40e` initial driver
+support\
+**Patch series:** `[PATCH v7 bpf-next 00/24] xsk: multi-buffer support`
+
+### Development
+
+v7 series は 24 patches から構成され、core AF_XDP support、zero-copy、
+driver support、documentation/selftests をまとめて導入した。
+
+Patch series:
+
+-   https://lists.openwall.net/netdev/2023/07/19/282
+
+### Verified core commits
+
+  ----------------------------------------------------------------------------------------------------
+  Commit                                       Role
+  -------------------------------------------- -------------------------------------------------------
+  `804627751b42`                               `xsk: add support for AF_XDP multi-buffer on Rx path`
+
+  `b7f72a30e9ac`                               Tx multi-buffer 用 wrappers/helpers
+
+  `1b725b0c8163`                               core/driver が EOP bit を確認する infrastructure
+
+  `cf24f5a5feeaae34c1a34d1e04f8ac697290427a`   `xsk: add support for AF_XDP multi-buffer on Tx path`
+
+  `07428da9e25a`                               Tx path で zero-length descriptors を破棄
+
+  `13ce2daa259a`                               ZC maximum fragments 用 netlink attribute
+  ----------------------------------------------------------------------------------------------------
+
+Acceptance record:
+
+-   https://lists.openwall.net/netdev/2023/07/19/358
+
+### Architecture
+
+``` text
+従来 AF_XDP:
+
+one packet
+   │
+   └── one XDP descriptor / buffer
+
+
+multi-buffer:
+
+one packet
+   │
+   ├── descriptor #1
+   ├── descriptor #2
+   ├── ...
+   └── descriptor #N (EOP)
+```
+
+これにより jumbo frame や大きな packet representation を AF_XDP
+で扱いやすくなる。
+
+### Important files
+
+-   `net/xdp/xsk.c`
+-   `net/xdp/xsk_buff_pool.c`
+-   `net/xdp/xsk_queue.h`
+-   `include/net/xsk_buff_pool.h`
+-   `Documentation/networking/af_xdp.rst`
+-   `Documentation/netlink/specs/netdev.yaml`
+
+### Follow-up / maintenance evidence
+
+2026 年の修正でも `Fixes: cf24f5a5feea` が使われており、TX multi-buffer
+introduction point を独立に確認できる。
+
+------------------------------------------------------------------------
+
+## 13.3 netkit --- Linux 6.7
+
+**Feature:** BPF-programmable `netkit` virtual network device\
+**Kernel:** Linux 6.7\
+**Author:** Daniel Borkmann\
+**Subsystem:** BPF / virtual networking / container datapath
+
+### Development
+
+merge 直前の series:
+
+-   `[PATCH bpf-next v4 1/7] netkit, bpf: Add bpf programmable net device`
+-   Date: 2023-10-24
+-   Patch: https://lists.openwall.net/netdev/2023/10/24/365
+
+### Verified mainline commit
+
+`35dfaad7188cdc043fde31709c796f5a692ba2bd`
+
+Subject:
+
+``` text
+netkit, bpf: Add bpf programmable net device
+```
+
+この commit の説明では、BPF program を driver の `xmit` routine
+内で実行し、 Pod/container egress で BPF processing を packet source
+に近づけること、 さらに物理 device へ直接 redirect する場合に per-CPU
+backlog queue を経由しない ことが目的として説明されている。
+
+### Datapath implication
+
+``` text
+veth-centric:
+
+Pod
+ │
+veth
+ │
+host backlog / host-side processing
+ │
+BPF/TC
+ │
+NIC
+
+
+netkit:
+
+Pod
+ │
+netkit xmit
+ │
+BPF
+ │
+direct redirect
+ │
+NIC
+```
+
+### References
+
+-   LWN: https://lwn.net/Articles/949960/
+-   v4 patch: https://lists.openwall.net/netdev/2023/10/24/365
+-   commit mirror:
+    https://git.zx2c4.com/linux-rng/commit/?id=35dfaad7188cdc043fde31709c796f5a692ba2bd
+
+### Follow-ups
+
+2026 年には netkit queue leasing と io_uring zero-copy RX の integration
+が進み、 network namespace 内の guest/VM datapath
+にまで対象が広がっている。
+
+------------------------------------------------------------------------
+
+## 13.4 Device Memory TCP RX --- Linux 6.12
+
+**Feature:** Device Memory TCP receive\
+**Kernel:** Linux 6.12\
+**Authors:** Mina Almasry, Willem de Bruijn et al.\
+**Subsystem:** TCP / netdev / DMA-BUF / page-pool / device memory
+
+### Mainline state
+
+Linux kernel documentation は Device Memory TCP を、TCP socket
+で受信した data を DMA-BUF-backed device memory
+へ直接配置する機能として説明している。
+
+-   Kernel documentation:
+    https://kernel.org/doc/html/latest/networking/devmem.html
+-   LWN 6.12 merge window: https://lwn.net/Articles/990750/
+
+### Architecture
+
+``` text
+traditional device-to-device transfer
+
+device A
+   │
+   ▼
+host memory
+   │ network
+   ▼
+host memory
+   │
+   ▼
+device B
+
+
+Device Memory TCP RX
+
+NIC
+ │ DMA
+ ▼
+DMA-BUF / device memory
+ │
+ ▼
+accelerator / GPU / SSD-side consumer
+```
+
+### Source areas
+
+Current upstream tree contains Device Memory TCP infrastructure
+including:
+
+-   `net/core/devmem.h`
+-   networking device-memory support
+-   page-pool/netmem integration
+-   TCP receive-side APIs
+-   `Documentation/networking/devmem.rst`
+
+### Commit verification status
+
+6.12 への feature merge 自体と source/documentation は確認済み。 ただし
+RX series は多数の preparatory commits に分割されているため、
+**individual commit list はまだ「series 全体として確定」していない**。
+単一 commit を Device Memory TCP RX の introduction commit
+と誤って表記しない。
+
+------------------------------------------------------------------------
+
+## 13.5 Device Memory TCP TX --- Linux 6.16
+
+**Feature:** Device Memory TCP transmit\
+**Kernel:** Linux 6.16\
+**Subsystem:** TCP / DMA-BUF / device-memory / zero-copy TX
+
+RX support は 6.12 に入ったが、TX support は review を分離して後続
+series となった。 2025-05 時点で TX patch set は net-next に queue
+され、6.16 cycle 向けとなった。
+
+### Significance
+
+``` text
+RX (6.12)
+network → NIC → device memory
+
+TX (6.16)
+device memory → NIC → network
+```
+
+これにより Device Memory TCP は device memory を network endpoint の
+data buffer として双方向に利用する方向へ進んだ。
+
+### Verification status
+
+-   RX が 6.12、TX が 6.16 という release separation は確認済み。
+-   TX series は多数 revision を経ている。
+-   exact mainline commit list は次の commit-level pass で確定する。
+
+------------------------------------------------------------------------
+
+# 14. Verification rules used in this document
+
+commit-level 情報は次の優先順位で検証する。
+
+1.  `git.kernel.org` / upstream kernel git
+2.  `lore.kernel.org` または同内容の netdev mailing-list archive
+3.  kernel.org documentation
+4.  LWN merge-window / feature article
+5.  stable-tree `Fixes:` history（introduction commit の相互検証）
+
+特に `Fixes:` tag は、後続 bug fix から introduction commit
+を逆引きするために有用だが、 それだけで patch series 全体を代表する
+commit とみなさない。
+
+------------------------------------------------------------------------
+
+# 15. Next commit-level passes
+
+次に同じ方法で以下を追加する。
+
+1.  `page_pool` → `netmem` → DIBS
+2.  io_uring zero-copy TX → zero-copy RX
+3.  RTNL breakup / per-netns locking
+4.  AccECN
+5.  UDP receive-path optimization
+6.  BPF `struct_ops` / TCP congestion control
+7.  MPTCP + BPF
+8.  nftables / flowtable / conntrack
+9.  virtio-net / TAP / VM networking
+10. BIG TCP IPv4 / tunnel follow-ups
