@@ -7,7 +7,7 @@ title: Linux Networking Evolution
 > **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras, Parts III–V the lineages / driver-framework / observability story. Part VI is the only normative release chronology, Part VII the provenance ledger, and Appendix material is supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02  
-**構成改訂:** 2026-10-04（r20）
+**構成改訂:** 2026-10-04（r21）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
@@ -18,6 +18,94 @@ title: Linux Networking Evolution
 本編は **thesis → architecture map → era → lineage → driver framework / observability → conclusion** の順で読む。release 番号を調べる場合は Part VI、 commit-level provenance を再監査する場合は Part VII へ直接進んでよい。
 
 Part I–V の version 表記は説明上の参照であり、release attribution を独立に定義しない。 その正本は Part VI、exact anchor の台帳は Part VII である。詳細な evidence 用語と canonicalization rule は Part VI 冒頭で定義する。
+
+### 図の記法
+
+- `→` / `↓` — 時系列または shared design problem に沿う **lineage continuation**。直接依存を意味しない。
+- `⇒` — 本文で明示した **direct extension / integration**。
+- `∥` — 同時期の **parallel evolution**。
+- `↔` — 相互作用するが親子関係ではない。
+
+------------------------------------------------------------------------
+
+# Part I — Executive thesis: Linux networking は何が変わったのか
+
+Linux networking の15年間の変化は、単純な「高速化」でも、従来の `skb` path の置き換えでもない。 従来の **CPU が system RAM 上の skb を処理するモデルを現在も広く維持しながら**、 AF_XDP、device memory、io_uring zero-copy、programmable/offloaded path など、 複数の execution / memory-ownership model を workload と hardware capability に応じて **共存させられる architecture へ拡張した**ことが大きな変化である。
+
+その変化は6つの軸で並行して進んだ。
+
+``` text
+PERFORMANCE       queueing / pacing / aggregation / zero-copy
+PROGRAMMABILITY   BPF / XDP / socket / protocol / qdisc extension points
+MEMORY            page_pool / netmem / memory providers / device memory
+CONTROL PLANE     Netlink object model / YNL / RTNL scope reduction
+OBSERVABILITY     typed tracing / drop reason / queue-NAPI-memory identity
+DRIVER FRAMEWORK  switchdev / devlink / phylink / DIM / common driver contracts
+```
+
+これらのさらに上位にある横断的な傾向を、本書では **explicit resource / control contracts** と捉える。 すなわち driver-private、implicit、global だった仕組みを、kernel 共通の object、API、accounting、 assignment、lifetime、synchronization contract として明示する方向である。
+
+### 本書で固定する語彙
+
+- **上位 thesis:** explicit resource / control contracts
+- **contract の具体形:** object / accounting / API / assignment / lifetime / synchronization
+- **重要な subtheme:** ownership（特に queue / packet memory）
+- **帰結:** reusable / programmable / observable な resource control
+
+`ownership` はこの流れの重要な一部だが、すべてを ownership だけで説明しない。たとえば BQL は 主に byte accounting / backpressure、per-netns RTNL は synchronization scope の問題である。 一方 page_pool / AF_XDP / memory providers / queue leasing では、buffer や queue を誰が管理・割り当てるかという ownership が中心問題になる。
+
+## Architecture evolution map
+
+``` text
+                    private / implicit / global
+                              │
+          ┌───────────────────┼────────────────────┐
+          │                   │                    │
+      queue state         packet execution      memory lifetime
+      BQL / pacing        BPF / XDP / TC        page_pool / netmem
+          │                   │                    │
+          ├──────────────┬────┴──────────────┬─────┤
+          │              │                   │     │
+     device control   queue/NAPI objects   memory providers
+   switchdev/devlink     netdev-genl       AF_XDP / devmem
+          │              │                   │
+          └──────────────┼───────────────────┘
+                         ▼
+              explicit common contracts
+                         │
+          object · accounting · API · lifetime · assignment · synchronization
+          （各 contract が提供する capability は API ごとに異なる）
+```
+
+この図の矢印は個々の機能の直接的な派生関係を表さない。異なる subsystem が、 **暗黙的な状態を明示的な contract にする**という共通方向へ進んだことを示す。
+
+## Snapshot: v3.0 / v5.0 / 2026
+
+本書の起点は v3.0 である。v5.0 は第2の起点ではなく、XDP/AF_XDP、switchdev/devlink、 page_pool など programmable/offload/memory infrastructure がすでに成立した **中間観測点**として置く。
+
+| 観点             | v3.0 前後                         | v5.0 前後                 | 2026                                           |
+|:-----------------|:----------------------------------|:--------------------------|:-----------------------------------------------|
+| PERFORMANCE      | driver-local tuning が大きい      | BQL/TSQ/fq/pacing が定着  | multi-layer control + cake_mq / scalable TX    |
+| PROGRAMMABILITY  | classic BPF 中心                  | XDP/AF_XDP・TC BPF        | struct_ops / TCX / BPF qdisc / netkit          |
+| MEMORY           | page-centric driver-local recycle | page_pool が利用可能      | netmem / memory providers / device memory      |
+| DRIVER FRAMEWORK | net_device 中心                   | switchdev/devlink/phylink | queue/NAPI objects・YNL-described APIs         |
+| CONTROL PLANE    | global RTNL 依存が大きい          | global RTNL が依然中心    | per-netns / fine-grained / RTNL-less paths     |
+| OBSERVABILITY    | logs/counters/tracing の個別利用  | BPF/BTF ecosystem が拡大  | typed drop reason + queue/NAPI/memory identity |
+
+## 6軸・contract・cross-cutting domain の対応
+
+6軸は **architecture analysis の主軸**であり、全 milestone の排他的 taxonomy ではない。 TRANSPORT、VIRTUAL / OVERLAY、SECURITY は Axis と独立した **cross-cutting domain** である。 Domain は単に「その protocol のコードを通る」という意味ではなく、protocol semantics / path management / authentication / virtual-overlay behavior 自体が milestone の主題である場合に付与する。 したがって BIG TCP や Device Memory TCP は TCP path に存在しても、それだけを理由に TRANSPORT とはしない。
+
+| Architecture axis | 15年間の変化                                                                               | 主な contract form                   | 本文の主な扱い                                                |
+|-------------------|:-------------------------------------------------------------------------------------------|:-------------------------------------|:--------------------------------------------------------------|
+| PERFORMANCE       | implicit queueing → explicit accounting / multi-layer scheduling / larger processing units | accounting / API                     | Part III「Queueing / latency / pacing」「Packet aggregation」 |
+| PROGRAMMABILITY   | fixed path → verified extension points → reusable programmable infrastructure              | API / object                         | Part III「BPF」「XDP / AF_XDP」                               |
+| MEMORY            | driver-local page handling → common lifetime / provider / assignment model                 | lifetime / assignment / object       | Part III「Packet memory」「io_uring networking」              |
+| CONTROL PLANE     | embedded/global state → reusable objects / schema / narrower lock scope                    | object / API / synchronization       | Part III「Routing / Netlink / RTNL」「netfilter」             |
+| OBSERVABILITY     | opaque outcome → typed reason / identity / correlation                                     | contract を検証する evidence layer   | Part V                                                        |
+| DRIVER FRAMEWORK  | driver-local convention → reusable kernel framework / device-wide object                   | object / API / accounting / lifetime | Part IV                                                       |
+
+**Cross-cutting domain:** TRANSPORT は Part III「TCP / UDP / transport」、 VIRTUAL / OVERLAY は Part III「Virtual networking」、SECURITY は本書の主対象ではなく、 kTLS / WireGuard / TCP-AO / XFRM offload のように他の lineage と交差する場合だけ補助ラベルとして扱う。
 
 ### thesis を検証する代表例
 
@@ -87,9 +175,9 @@ Part III では release 順ではなく、同じ設計課題が長期間にど�
 
 v3.x は release-by-release に読むより、後の Linux networking を支える4つの foundation が 並行して形成された時期として読む方が、本書の architecture-first な構成に合う。 個々の release attribution の正本は Part VI に置き、ここでは設計上の意味だけを追う。
 
-### Queue / scalability foundation
-
 ここでいう4 foundation は新しい分類体系ではなく、Era 1 の milestone を6軸から読み直すための編集上の束ね方である。
+
+### Queue / scalability foundation
 
 v3.x では「どこに、どれだけ packet / byte を滞留させるか」を複数レイヤーで制御する仕組みが整った。
 
@@ -145,7 +233,7 @@ socket attachment
 
 ここで成立したのは、後の TC BPF、XDP、cgroup/LWT hooks、SOCKMAP/SOCK_OPS、 AF_XDP、SK_LOOKUP、struct_ops、netkit、BPF qdisc へ展開できる **verified in-kernel programmability の基礎 contract** である。
 
-以後の BPF history は一本の attachment-point lineage ではない。TC direct packet access、 devmap/cpumap、SK_MSG、flow dissector、`struct_ops`、SK_LOOKUP、TCX などは packet/datapath、 socket/message、protocol algorithm、attachment/lifetime という別々の面を拡張した。 packet/datapath、 socket/lookup、protocol algorithms、virtual-device/queue control が独立・並行して拡大する。 詳細は後述の BPF / XDP lineage で扱う。
+以後の BPF history は一本の attachment-point lineage ではない。packet/datapath、 socket/lookup、protocol algorithms、virtual-device/queue control が独立・並行して拡大する。 詳細は後述の BPF / XDP lineage で扱う。
 
 ### Server / transport foundation
 
@@ -204,8 +292,6 @@ IPv6 BIG TCP without synthetic HBH jumbo header (Linux 7.0)
   ↓
 BIG TCP over VXLAN / GENEVE (7.3-rc/mainline)
 ```
-
-PPPoE GRO/GSO のような encapsulation-specific aggregation も、同じ PERFORMANCE 軸で per-packet cost を減らすが、BIG TCP の派生機能ではない。
 
 BIG TCP は wire MTU を巨大化する機能ではなく、 **kernel 内部の packet-processing unit を大きくする機能**として理解する。利用可否と効果は protocol path、 GRO/GSO/offload capability、driver/NIC、tunnel implementation などに依存し、すべての device / path で 一律に大きな aggregate を利用できることを意味しない。
 
@@ -272,9 +358,48 @@ large RX buffers や `>PAGE_SIZE` devmem buffer の拡張は、この model が 
 
 DIBS は shared-memory communication 側の別 lineage であり、この packet-memory contract の 直接の predecessor/successor ではない。本書の canonical packet-networking story には昇格させない。
 
+## XDP / AF_XDP
+
+v5.0 時点で XDP/AF_XDP は存在した。その後の本質は周辺 infrastructure の成熟。ここで XDP → AF_XDP → netkit / queue leasing を単純な派生関係とはみなさない。 XDP は native driver mode、generic/SKB mode、hardware offload で実行位置・性能特性・必要な driver support が異なり、 AF_XDP や queue leasing は queue ownership / zero-copy という共通課題から並行して発展した面を持つ。
+
+``` text
+XDP
+├─ redirect
+├─ page_pool
+├─ link/lifecycle
+└─ AF_XDP
+    ├─ zero-copy
+    ├─ multi-buffer (6.6)
+    ├─ virtio-net ZC
+    └─ queue ownership / netkit integration
+```
+
+v6.6 AF_XDP multi-buffer は:
+
+``` text
+one packet = one buffer
+```
+
+から:
+
+``` text
+one packet
+├─ buffer 1
+├─ buffer 2
+└─ buffer N (EOP)
+```
+
+への重要な変更である。
+
+------------------------------------------------------------------------
+
+XDP multi-buffer / frags は、single contiguous buffer を暗黙の前提にしていた XDP packet model を multi-buffer packet へ拡張した。6.6 の AF_XDP multi-buffer は同じ multi-buffer problem を userspace zero-copy path へ接続するが、native/generic/offload XDP mode の差を消すものではない。
+
 ## BPF — packet filter から stack extension へ
 
 BPF の発展は一本道ではなく、attachment point と適用範囲が複数方向へ増えたものとして捉える。
+
+TC direct packet access、devmap/cpumap、SK_MSG、flow dissector、`struct_ops`、SK_LOOKUP、TCX は、 packet/datapath、socket/message、protocol algorithm、attachment/lifetime という異なる面を拡張した。 一本の attachment-point lineage としてではなく、verified programmability の適用範囲が広がったものとして読む。
 
 ``` text
                      BPF core / verifier / maps
@@ -295,95 +420,7 @@ BPF の発展は一本道ではなく、attachment point と適用範囲が複�
 
 ------------------------------------------------------------------------
 
-### USENIX research から見える「kernel bypass → in-kernel extensibility」の流れ
-
-USENIX の研究を併せて読むと、Linux networking の programmability が解こうとしてきた問題を別の角度から確認できる。
-
-``` text
-mTCP (NSDI 2014): user-level TCP / kernel overhead avoidance
-        ↓
-XDP/eBPF: early in-kernel programmable hook
-        ↓
-Electrode (NSDI 2023) / DINT (NSDI 2024):
-  kernel の protection / isolation を維持し frequent path を eBPF 化
-        ↓
-eTran (NSDI 2025):
-  transport 自体を eBPF で extensible にする
-```
-
-mTCP は Linux kernel TCP processing の CPU cost に対して user-level TCP stack を採った。一方 Electrode と DINT は、kernel bypass の security / isolation / maintainability 上の trade-off を避けながら、XDP/eBPF により frequent path を kernel 内で処理する。eTran はさらに TCP/DCTCP や Homa のような transport design を eBPF ベースの extensible kernel transport として扱う。この研究史は、**kernel を単に迂回するのではなく、kernel の ownership / protection model を保ったまま fast path や protocol behavior を programmable にする**という方向を補強する。
-
-これらは upstream Linux release milestone ではないため Part VI には追加せず、architecture の動機を説明する research evidence として扱う。
-
-## Virtual networking — datapath と queue assignment の並行進化
-
-v5.0 前後の典型的な virtual datapath は次のような形だった。
-
-``` text
-container → veth → host stack → NIC
-
-guest virtio-net → QEMU/vhost/TAP → bridge/OVS → NIC
-```
-
-その後は一つの後継系列ではなく、複数の branch が並行して発展した。
-
-``` text
-VM datapath:
-  virtio-net ∥ vhost ∥ vDPA ∥ SR-IOV/VFIO
-                    ↔
-              AF_XDP zero-copy
-
-container datapath:
-  veth ∥ netkit / BPF-native path
-
-queue / zero-copy assignment:
-  AF_XDP / io_uring ↔ RX HW queue leasing
-```
-
-`∥` は parallel evolution、`↔` は相互作用する別 lineage を表す。netkit は veth の単純な後継ではなく、 RX HW queue leasing も netkit から派生した機能ではない。queue lease は virtual-device queue と physical-device queue の対応を明示し、AF_XDP や memory-provider 型の queue-bound API を container/virtual-device 側から利用可能にする **assignment mechanism** として位置付ける。
-
-v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、v7.1 RX HW queue leasing に共通して見える方向性は、 full kernel bypass そのものではなく、**kernel の control / protection model を維持しながら data movement と datapath overhead を減らす選択肢を増やしたこと**である。
-
-------------------------------------------------------------------------
-
-## TCP / UDP / transport
-
-この節は **transport protocol 自体の semantics / feedback / path management** に絞る。 TCP 上で使われるという理由だけで、memory、aggregation、programmability の milestone を ここへ再収容しない。
-
-### Transport protocol evolution
-
-| Theme                         | Representative milestones  | この節で追う意味                           |
-|-------------------------------|----------------------------|--------------------------------------------|
-| connection establishment      | TFO client / server        | handshake latency / early data             |
-| congestion control / feedback | DCTCP · BBR · PLB · AccECN | congestion signal と sender behavior       |
-| multipath                     | MPTCP                      | 複数 path / subflow の transport semantics |
-| authentication                | TCP-AO                     | TCP connection authentication              |
-
-これらも一本の派生系列ではない。
-
-``` text
-connection establishment:       TFO
-congestion control / feedback:  DCTCP ∥ BBR ∥ PLB ∥ AccECN
-multipath:                       MPTCP
-authentication:                  TCP-AO
-```
-
-MPTCP は initial upstream から multi-subflow、userspace path manager、Generic Netlink、BPF integration へ発展し、7.2 の PM limit expansion は operational scale を広げたが、BBR や BIG TCP の後継ではない。
-
-### 他の architecture lineage へ置く TCP 関連機能
-
-- **BIG TCP** — `Packet aggregation` を参照。
-- **Device Memory TCP** — `Packet memory` を参照。
-- **BPF congestion control / struct_ops** — `BPF` を参照。
-- **`TCP_ZEROCOPY_RECEIVE` / io_uring ZCRX** — zero-copy / memory-delivery mechanism として `io_uring networking` および `Packet memory` を参照。
-
-### UDP
-
-UDP でも `MSG_ZEROCOPY` と GRO/GSO は copy cost と per-packet processing を減らす重要な PERFORMANCE milestone だが、protocol semantics の変更ではない。前者は socket zero-copy、 後者は aggregation の lineage として位置付ける。
-
-UDP は GRO/GSO、tunnel/encapsulation、high packet-rate RX、receive-buffer scaling の 基盤として発展してきた。ここでは UDP 固有の protocol lineage と、PERFORMANCE / VIRTUAL-OVERLAY 側で扱う packet aggregation・tunnel acceleration を混同しない。
-
-------------------------------------------------------------------------
+# 
 
 ## Routing / Netlink / RTNL
 
@@ -433,8 +470,6 @@ global RTNL
 
 ------------------------------------------------------------------------
 
-------------------------------------------------------------------------
-
 ## netfilter / nftables / conntrack
 
 ``` text
@@ -456,6 +491,8 @@ conntrack では performance だけでなく lifetime/GC、per-netns scalability
 ## io_uring networking
 
 6.0 の SEND_ZC / multishot receive と 6.15 の ZCRX を同じ lineage で扱い、TCP 節には重複記載しない。
+
+TCP `MSG_ZEROCOPY` は send-side copy avoidance の先行 milestone であり、後の io_uring `SEND_ZC` と 同一 API ではないが、userspace↔kernel の data movement cost を減らす PERFORMANCE lineage の 重要な前段として扱う。
 
 ``` text
 sendmsg / recvmsg
@@ -889,7 +926,7 @@ common C driver contracts
 
 重要なのは C implementation を Rust に置換したことではなく、driver framework が持つ lifetime、ownership、state transition、resource cleanup の contract を `unsafe` boundary の内側へ 閉じ込め、safe code から利用できる API として表現できることである。
 
-real NIC driver には PHY だけでなく PCI/platform probing、DMA、MMIO、IRQ、device removal など kernel-wide driver-core abstraction も必要である。したがって Rust networking の成熟は networking subsystem 単独では完結しない。ただしその conference/review の詳細年表は本文の主題ではないため、 Appendix の research/conference provenance に集約する。
+real NIC driver には PHY だけでなく PCI/platform probing、DMA、MMIO、IRQ、device removal など kernel-wide driver-core abstraction も必要である。したがって Rust networking の成熟は networking subsystem 単独では完結しない。ただし conference/review の詳細年表は本文の主題ではない。Appendix には architecture を補助する代表例だけを置く。
 
 ## Conference に見る lineage
 
@@ -911,7 +948,7 @@ Netdev is the strongest conference source for driver-framework implementation:
 
 ### Kernel Recipes
 
-Kernel Recipes は zero-copy networking と Rust/C driver abstraction の architecture context を補う。 個々の講演年表と provenance は Appendix に集約する。
+Kernel Recipes は zero-copy networking と Rust/C driver abstraction の architecture context を補う。 代表的な講演 provenance は Appendix に置く。網羅的な Rust networking conference history は本書の対象外とする。
 
 ## Part IV から Part V へ — common contracts から operability へ
 
@@ -920,8 +957,6 @@ fast path、memory ownership、offload は、operator/developer が kernel の�
 # Part V — Observability / Explainability
 
 Part V は **kernel 側の observability primitive の進化**に限定します。Observability は独立した軸であると同時に、programmable / offloaded / zero-copy path が増えて複雑化した networking を **operationally explainable にする evidence layer** と位置付けます。 Retis / pwru はこれらを利用する case study であり、kernel release chronology そのものではないため Appendix に移します。
-
-7.1 の dedicated qdisc-drop tracepoint は、qdisc 内の drop context を generic tracing から 直接観測しやすくした例であり、structured drop reason と補完関係にある。
 
 ## Kernel observability primitive
 
@@ -970,7 +1005,7 @@ Linux 5.17 の `kfree_skb_reason()` / `skb_drop_reason` 世代は、「packet �
 
 Part IVで説明した queue、NAPI、page_pool のobject化は、control planeだけでなくobservabilityにも 効きます。packet memory、polling context、queue identityをuserspace-visible objectとして関連付ける ことで、zero-copy / memory-provider時代の問題を説明しやすくなります。ただし、readable な identity / stats と、 userspace が queue や NAPI の ownership/configuration を変更できる control-plane capability は区別する。
 
-この軸を Part VI の代表 milestone を observability 観点から投影させると、代表的な observability milestone の**時系列**は次のようになる。これは機能間の依存関係を示す図ではない。
+この軸を Part VI の確定 milestone に対応させると、代表的な observability milestone の**時系列**は次のようになる。これは機能間の依存関係を示す図ではない。
 
 ``` text
 5.17  kfree_skb_reason / structured drop-reason foundation
@@ -1018,11 +1053,11 @@ Retis と pwru は上記primitiveを利用する代表例ですが、本書で�
 
 ## 採用基準
 
-Part VI は release note の網羅表ではない。 単発の機能追加、局所的な数値上限変更、 後続 lineage を変えない個別 protocol/offload enhancement は原則として採用しない。 採用するのは、本文で追う長期 lineage の origin / integration / enablement、または architecture 上の operational range を大きく変える milestone である。6軸の長期 lineage、または TRANSPORT / VIRTUAL-OVERLAY / SECURITY の cross-cutting domain で後続 architecture を理解するために 必要な origin / integration / enablement milestone を採用する。
+Part VI は release note の網羅表ではない。採用するのは、本文で追う6軸の長期 lineage、 または TRANSPORT / VIRTUAL-OVERLAY / SECURITY の cross-cutting domain を理解するために必要な **origin / integration / enablement milestone** と、architecture 上の operational range を大きく変える milestone である。
 
-**Axis と Domain は独立である。** Axis は architecture 上の主問題、Domain は機能が属する protocol/use-case 領域を示す。Axis があることは `explicit contracts` thesis で説明可能であることを 意味しない。たとえば BIG TCP は PERFORMANCE 軸だが、contract 化ではなく processing-unit expansion として説明する。
+単発の機能追加、局所的な数値上限変更、後続 lineage を変えない個別 protocol/offload enhancement は 原則として採用しない。「Axis を付けられる」だけでは採用理由にならず、Part I–V の story で役割を 説明できることを要求する。
 
-本文にも Axis/Domain にも役割を持たない項目は canonical table から外す。この規則により `net_prio` と `TCP memcg` は canonical milestone として採用しない。
+**Axis と Domain は独立である。** Axis は architecture 上の主問題を示す。Domain は単なる実装場所ではなく、 protocol semantics / path management / authentication / virtual-overlay behavior 自体が主題となる場合に付与する。 Axis があることは `explicit contracts` thesis で説明可能であることを意味しない。たとえば BIG TCP は PERFORMANCE 軸だが、contract 化ではなく processing-unit expansion として説明する。
 
 ## Evidence model
 
@@ -1050,15 +1085,12 @@ Evidence class は次の語彙だけを用いる。
 
 ## Canonical milestone table
 
-以下の Era 表記は **release 時期を読みやすくする表示ラベル**であり、release 番号から機械的に 決めた分類列ではない。Part II の era は主問題による重なりを許す architecture model である。
-
-### 3.0–3.18
+### 3.0–3.18（Era 1 期）
 
 | Release | Milestone                                       | Axis                           | Domain            | Evidence class |
 |:--------|:------------------------------------------------|:-------------------------------|:------------------|----------------|
 | 3.0     | namespace FD / setns()                          | CONTROL PLANE                  | —                 | TAG            |
 | 3.3     | DQL/BQL                                         | PERFORMANCE / DRIVER FRAMEWORK | —                 | TAG+ANCHOR     |
-| 3.3     | team                                            | —                              | VIRTUAL / OVERLAY | TAG            |
 | 3.5     | CoDel                                           | PERFORMANCE                    | —                 | TAG+ANCHOR     |
 | 3.5     | fq_codel                                        | PERFORMANCE                    | —                 | TAG            |
 | 3.6     | TSQ                                             | PERFORMANCE                    | —                 | TAG            |
@@ -1066,19 +1098,16 @@ Evidence class は次の語彙だけを用いる。
 | 3.6     | IPv4 route-cache removal                        | CONTROL PLANE                  | —                 | TAG            |
 | 3.7     | VXLAN                                           | —                              | VIRTUAL / OVERLAY | TAG            |
 | 3.7     | TFO server                                      | —                              | TRANSPORT         | TAG            |
-| 3.7     | IPv6 NAT                                        | CONTROL PLANE                  | —                 | TAG            |
 | 3.9     | TCP/UDP SO_REUSEPORT                            | PERFORMANCE                    | —                 | TAG+ANCHOR     |
 | 3.11    | SO_BUSY_POLL                                    | PERFORMANCE                    | —                 | TAG            |
 | 3.12    | sch_fq / TCP pacing / TSO autosizing generation | PERFORMANCE                    | —                 | TAG            |
 | 3.13    | nftables                                        | CONTROL PLANE                  | —                 | TAG+ANCHOR     |
-| 3.14    | TCP autocorking                                 | PERFORMANCE                    | —                 | GENERATION     |
 | 3.15    | internal BPF ISA rework                         | PROGRAMMABILITY                | —                 | TAG            |
 | 3.18    | bpf() / maps / verifier generation              | PROGRAMMABILITY                | —                 | TAG            |
 | 3.18    | DCTCP                                           | —                              | TRANSPORT         | TAG            |
 | 3.18    | Geneve                                          | —                              | VIRTUAL / OVERLAY | TAG            |
-| 3.18    | FOU                                             | —                              | VIRTUAL / OVERLAY | TAG            |
 
-### 3.19–4.20
+### 3.19–4.20（Era 2 期）
 
 | Release | Milestone                            | Axis                     | Domain               | Evidence class |
 |:--------|:-------------------------------------|:-------------------------|:---------------------|----------------|
@@ -1087,16 +1116,12 @@ Evidence class は次の語彙だけを用いる。
 | 3.19    | SO_ATTACH_BPF                        | PROGRAMMABILITY          | —                    | TAG            |
 | 4.1     | cls_bpf / act_bpf eBPF support       | PROGRAMMABILITY          | —                    | GENERATION     |
 | 4.1     | kprobe BPF milestone                 | OBSERVABILITY            | —                    | GENERATION     |
-| 4.3     | VRF                                  | —                        | VIRTUAL / OVERLAY    | SERIES+TAG     |
-| 4.3     | LWT                                  | —                        | VIRTUAL / OVERLAY    | SERIES+TAG     |
-| 4.3     | OVS conntrack                        | —                        | VIRTUAL / OVERLAY    | SERIES+TAG     |
 | 4.6     | devlink                              | DRIVER FRAMEWORK         | —                    | TAG+ANCHOR     |
 | 4.7     | TC BPF direct packet access          | PROGRAMMABILITY          | —                    | TAG            |
 | 4.8     | XDP                                  | PROGRAMMABILITY          | —                    | SERIES+TAG     |
 | 4.9     | BBR                                  | —                        | TRANSPORT            | TAG+ANCHOR     |
 | 4.10    | cgroup BPF                           | PROGRAMMABILITY          | —                    | SERIES+TAG     |
 | 4.10    | BPF LWT                              | PROGRAMMABILITY          | —                    | SERIES+TAG     |
-| 4.10    | IPv6 Segment Routing                 | —                        | VIRTUAL / OVERLAY    | SERIES+TAG     |
 | 4.13    | SOCK_OPS                             | PROGRAMMABILITY          | TRANSPORT            | TAG            |
 | 4.13    | kTLS TX                              | —                        | SECURITY / TRANSPORT | TAG            |
 | 4.14    | phylink                              | DRIVER FRAMEWORK         | —                    | TAG+ANCHOR     |
@@ -1117,15 +1142,13 @@ Evidence class は次の語彙だけを用いる。
 | 4.20    | taprio                               | PERFORMANCE              | —                    | TAG            |
 | 4.20    | BPF flow dissector                   | PROGRAMMABILITY          | —                    | TAG            |
 
-### 5.0–6.1
+### 5.0–6.1（Era 3 期）
 
 | Release | Milestone                              | Axis             | Domain               | Evidence class |
 |:--------|:---------------------------------------|:-----------------|:---------------------|----------------|
 | 5.0     | UDP GRO                                | PERFORMANCE      | —                    | TAG            |
 | 5.0     | UDP MSG_ZEROCOPY                       | PERFORMANCE      | —                    | TAG            |
 | 5.1     | devlink health                         | DRIVER FRAMEWORK | —                    | TAG            |
-| 5.1     | BPF spinlocks                          | PROGRAMMABILITY  | —                    | TAG            |
-| 5.1     | BPF dead-code elimination (DCE)        | PROGRAMMABILITY  | —                    | TAG            |
 | 5.1     | mac80211 airtime accounting/scheduling | PERFORMANCE      | —                    | TAG            |
 | 5.3     | nexthop objects                        | CONTROL PLANE    | —                    | TAG            |
 | 5.3     | DIM generalized into lib/dim           | DRIVER FRAMEWORK | —                    | GENERATION     |
@@ -1144,7 +1167,7 @@ Evidence class は次の語彙だけを用いる。
 | 6.0     | io_uring SEND_ZC                       | PERFORMANCE      | —                    | TAG            |
 | 6.0     | io_uring multishot receive             | PERFORMANCE      | —                    | TAG            |
 
-### 6.2–7.3-rc
+### 6.2–7.3-rc（Era 4 期）
 
 | Release | Milestone                                             | Axis                             | Domain               | Evidence class |
 |:--------|:------------------------------------------------------|:---------------------------------|:---------------------|----------------|
@@ -1243,7 +1266,7 @@ Net DIMについては、algorithm自体は4.16以前からmlx5e内に存在し�
 
 ## Open provenance items
 
-Part VI の `GENERATION` / `SERIES` 全行を複製する表ではない。Part VI にまだ独立 milestone を 立てられていない architecture-critical item、または exact-anchor inventory と canonical row の対応に 追加監査が必要な item だけを置く。各 `GENERATION` / `SERIES` 行の evidence status 自体は Part VI が正本である。
+Part VI の Evidence class を再定義する表ではない。architecture story 上重要だが、 canonical 1行へ正規化する origin / integration / enablement boundary が未解決の項目だけを置く。
 
 | Item                         | Unresolved boundary                                                                             |
 |:-----------------------------|:------------------------------------------------------------------------------------------------|
@@ -1312,14 +1335,9 @@ Conference talk は設計意図や当時のproblem statementを補足する資�
 | OVS/OVN Conf: Retis                     | Part V case-study note      |
 | LPC / FOSDEM: pwru and tracing          | Part V case-study note      |
 
-### Restored conference references
+### Rust conference-scope note
 
-- **Netdev 0x13 — devlink health reporting and recovery system:** https://netdevconf.info/wiki/doku.php?id=0x13:reports:d2t3t07-devlink-health-reporting-and-recovery-system
-- **Kernel Recipes 2024 — Efficient zero-copy networking using io_uring:** https://kernel-recipes.org/en/2024/schedule/efficient-zero-copy-networking-using-io_uring/
-- **Kernel Recipes 2024 — live blog (io_uring zero-copy / netmem / queue API context):** https://kernel-recipes.org/en/2024/2024/09/23/live-blog-day-1-afternoon/
-- **Kernel Recipes 2024 — Interfacing Kernel C APIs from Rust:** https://kernel-recipes.org/en/2024/schedule/interfacing-kernel-c-apis-from-rust/
-
-これらは design/context provenance であり、Part VI の release attribution には使用しない。
+Kernel Recipes 2025 / 2026 や関連 LWN 記事を含む Rust driver-development の完全な講演年表は、 canonical networking chronology の根拠ではないため本版では再構成しない。必要な場合は別途 conference provenance audit として扱う。
 
 ## Retis / pwru case-study index
 
@@ -1346,15 +1364,11 @@ released tag
 
 # Changelog / Errata（非正規）
 
-- **r20:** Packet memory と Queueing を thesis の中核 lineage として拡充。netmem / memory providers / AQL / taprio / cake_mq / large-buffer devmem を本文へ統合。
+- **r21:** r20 の編集事故で欠落した Part I 前半と Part III `XDP / AF_XDP` を r19 から復元し、r20 の Queueing / Packet memory 改善だけを選択的に再適用。
 
-- **r20:** Part VI の除外基準を復活させ、本文の長期 lineage を変えない局所 milestone を整理。
+- **r21:** Part VI の採用基準を一本化し、長期 architecture story に役割を持たない10 milestone を canonical table から除外。TCP MSG_ZEROCOPY と XDP frags は本文 lineage に明示して維持。
 
-- **r20:** Part I の検証表に previous state と Era 3 例を追加し、Snapshot 行名を6軸へ統一。
-
-- **r20:** 宙に浮いていた Netdev 0x13 / Kernel Recipes 2024 provenance を Appendix に復元。
-
-- **r20:** Part IV projection と Part V observability projection を Part VI の分類に合わせて再整理。
+- **r21:** Domain 定義、Era-label 残骸、Programmability foundation の重複、Part V qdisc-drop 配置、Appendix の編集履歴見出しを整理。
 
 - **r19:** TCP/UDP 節を transport semantics に限定し、BIG TCP / Device Memory TCP / BPF CC / zero-copy を各 architecture lineage へ戻した。
 
