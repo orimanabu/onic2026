@@ -1,5 +1,10 @@
 # Linux Networking Evolution --- Linux v3.0 から 7.x まで
 
+> **Clean canonical edition.** Part II is the only normative release
+> chronology. Parts III--V explain long-term lineages; Part VII records
+> unresolved provenance. Appendix material is supporting evidence, not
+> an alternate release map.
+
 **調査基準日:** 2026-10-02\
 **構成改訂:** 2026-10-03
 
@@ -5679,237 +5684,83 @@ single network model ────→ multi-network / VM-aware networking
 
 ------------------------------------------------------------------------
 
-# Part VII --- Release-attribution re-audit log
+# Part VII --- Canonical provenance ledger
 
-This part records only corrections that materially changed the canonical
-chronology.
+This section records only unresolved or especially important attribution
+boundaries. The detailed research diary from the re-audit passes is
+intentionally omitted from the clean edition.
 
-  ----------------------------------------------------------------------
-  Topic                 Earlier problem       Re-audited result
-  --------------------- --------------------- --------------------------
-  BQL                   development base      distinguish 3.2-rebased
-                        treated as release    series from 3.3 mainline
-                                              generation
+  -----------------------------------------------------------------------
+  Topic                               Canonical status
+  ----------------------------------- -----------------------------------
+  BQL/DQL                             Linux 3.3 mainline generation; DQL
+                                      exact anchor retained
 
-  4.20                  release omitted       restore 4.20 and move
-                                              EDT/BPF flow
-                                              dissector/taprio/strict
-                                              rtnetlink there
+  SO_REUSEPORT                        Linux 3.9; infrastructure exact
+                                      anchor retained
 
-  TCP zero-copy RX      5.11 could read as    origin is 4.18; 5.11 is
-                        origin                follow-up
+  switchdev                           3.19 origin; later 4.x work treated
+                                      as expansion
 
-  `skb_drop_reason`     origin shown as 5.19  foundation is 5.17; later
-                        in some summaries     releases expand coverage
+  devlink                             Linux 4.6 release origin; exact
+                                      initial commit set still pending
 
-  BPF sendmsg           SK_MSG and cgroup     split 4.17 SK_MSG from
-                        sendmsg conflated     4.18 cgroup UDP sendmsg
-                                              hooks
+  phylink                             2015 RFC → Linux 4.13
+                                      infrastructure; exact anchor
+                                      retained
 
-  page_pool             origin left pending / refurbished page_pool is
-                        implied later         in the 4.18 XDP
-                                              memory-return generation
+  MSG_ZEROCOPY                        TCP foundation 4.14; UDP extension
+                                      5.0
 
-  threaded NAPI         thematic section only add to canonical 5.12
-                                              chronology
+  SK_MSG                              4.17 generation; final series
+                                      verified, core SHA still pending
 
-  TCP-AO                only later 7.x work   initial support is
-                        emphasized            canonical 6.7 milestone
+  page_pool                           4.18 refurbished/XDP-memory-return
+                                      generation; do not claim all
+                                      page_pool ideas originated there
 
-  per-netns RTNL        6.13 could read as    6.13 is
-                        completion            infrastructure/migration
-                                              milestone
-  ----------------------------------------------------------------------
+  ethtool Generic Netlink             5.6 generation; exact
+                                      core-interface anchor retained
 
-The full v3.0→latest sweep continues to use the same rule: no remembered
-release number is promoted without release-level or exact upstream
-landing evidence.
+  SK_LOOKUP                           5.9; exact program-type anchor
+                                      retained
 
-## Pass 2 resolved items
+  auxiliary bus                       5.11; final series/tag verified,
+                                      exact feature-origin SHA pending
 
-  ---------------------------------------------------------------------
-  Topic                              Result
-  ---------------------------------- ----------------------------------
-  3.7 TFO server / IPv6 NAT / VXLAN  release-level verified
+  XFRM packet offload                 6.2; exact `XFRM_OFFLOAD_PACKET`
+                                      anchor retained
 
-  4.6 devlink                        release-level verified
+  Rust PHY                            2023 RFC/final v11 → Linux 6.8;
+                                      per-patch mainline SHA set pending
 
-  4.13 SOCK_OPS / kTLS               release-level verified
+  queue/NAPI objects                  6.8 documentation-level milestone;
+                                      later write/configuration APIs must
+                                      not be backdated
 
-  5.1 airtime fairness               restored after direct LWN release
-                                     verification
+  7.x development                     released 7.2 separated from
+                                      7.3-development/net-next work
+  -----------------------------------------------------------------------
 
-  5.5 AQL                            release-level verified
-
-  5.3 nexthop objects                release generation verified
-
-  5.9 SK_LOOKUP                      patch-series/release-generation
-                                     verified
-
-  5.15 IOAM / MCTP / per-VLAN        release-level verified
-  multicast                          
-
-  6.2 TCP PLB / IPsec packet offload release/series generation verified
-  ---------------------------------------------------------------------
-
-## Pass 3 resolved items
-
-  ---------------------------------------------------------------------
-  Topic                              Result
-  ---------------------------------- ----------------------------------
-  3.9 `SO_REUSEPORT`                 explicit 3.9 merge-cycle
-                                     confirmation; review-base
-                                     ambiguity removed
-
-  4.14 `MSG_ZEROCOPY`                TX foundation separated from TCP
-                                     receive zero-copy
-
-  4.17 `SK_MSG`                      sendmsg/sendfile ULP final-series
-                                     boundary identified
-
-  4.18 page_pool                     wording narrowed to refurbished
-                                     page_pool in XDP memory-return
-                                     generation
-
-  5.9 `SK_LOOKUP`                    program type, attach model and
-                                     receive-side semantics identified
-
-  6.2 IPsec packet offload           XFRM driver contract and
-                                     crypto-vs-packet distinction
-                                     integrated
-  ---------------------------------------------------------------------
-
-## Pass 4 exact-anchor table
-
-  ------------------------------------------------------------------------------------------
-  Feature         Exact anchor                                 Anchor meaning   Release
-  --------------- -------------------------------------------- ---------------- ------------
-  SO_REUSEPORT    `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a`   common           3.9
-                                                               infrastructure   
-
-  TCP             `f214f915e7db99091f1312c48b30928c1e0c90b7`   TCP protocol     4.14
-  MSG_ZEROCOPY                                                 enablement       
-
-  SK_MSG          pending                                      final            4.17
-                                                               series/pull      
-                                                               verified; do not 
-                                                               misuse selftest  
-                                                               SHA              
-
-  page_pool/XDP   `60bbf7eeef10dc647430646d7fe5e3d8d132dbec`   mlx5             4.18
-                                                               page_pool/XDP    generation
-                                                               integration      
-
-  SK_LOOKUP       `e9ddbb7707ff...`                            program type +   5.9
-                                                               attach point     
-
-  XFRM packet     `d14f28b8c1de668bab863bf5892a49c824cb110d`   packet-offload   6.2
-  offload                                                      UAPI flag/core   
-                                                               series anchor    
-  ------------------------------------------------------------------------------------------
-
-## Pass 5 Driver Framework audit summary
-
-  ---------------------------------------------------------------------
-  Topic                              Canonical result
-  ---------------------------------- ----------------------------------
-  switchdev                          keep 3.19 as origin; treat
-                                     2015/2016 work as framework
-                                     expansion
-
-  devlink                            Linux 4.6 release origin verified
-
-  phylink                            2015 RFC separated from 4.13
-                                     landing; exact `9525ae83959b...`
-
-  DIM                                driver-independent framework
-                                     confirmed by Netdev 0x12; exact
-                                     library SHA pending
-
-  netdevsim                          Linux 4.16 release origin verified
-
-  ethtool-netlink                    Linux 5.6 groundwork verified;
-                                     later commands remain incremental
-
-  auxiliary bus                      Linux 5.11 and signed auxbus tag
-                                     verified; origin SHA still
-                                     conservative
-
-  Rust PHY                           2023 RFC/v11 → Linux 6.8 mainline
-                                     milestone verified
-  ---------------------------------------------------------------------
-
-## Pass 6 Driver Framework exact-anchor summary
-
-  ---------------------------------------------------------------------
-  Framework                          Exact status after pass 6
-  ---------------------------------- ----------------------------------
-  phylink                            exact infrastructure anchor
-                                     `9525ae83959b...`
-
-  ethtool-netlink                    exact core-interface anchor
-                                     `2b4a8990b7df...`
-
-  auxiliary bus                      final standalone v4 + 5.11 signed
-                                     tag; origin SHA intentionally
-                                     pending
-
-  Rust PHY                           final v11 four-patch shape
-                                     verified; exact mainline SHAs
-                                     pending
-
-  switchdev/devlink/DIM/netdevsim    no speculative SHA inserted
-  ---------------------------------------------------------------------
-
-## Pass 7 integration result
-
-The Driver Framework axis is now derived from the same canonical
-chronology as the rest of the document. Its long-term lineage is:
+## Evidence grades
 
 ``` text
-BQL
- → switchdev / devlink
- → XDP / phylink
- → netdevsim / page_pool / DIM
- → ethtool-netlink / devlink health
- → auxiliary bus
- → queue + NAPI + page_pool objects
- → memory-provider attachment
- → Rust-safe driver abstractions
+A  exact mainline SHA and/or tag containment + release evidence
+B  final/accepted series + release evidence
+C  development status or architecture verified; exact landing incomplete
+D  RFC/design/proposal only
 ```
 
-The document explicitly separates the Linux 6.8 queue/NAPI **object
-visibility milestone** from later queue creation, leasing and
-memory-provider configuration so that current APIs are not backdated.
-
-## Pass 8 --- 7.x status summary
-
-  -----------------------------------------------------------------------
-  Topic                               Status after re-audit
-  ----------------------------------- -----------------------------------
-  queue leasing                       development lineage verified;
-                                      released-version attribution kept
-                                      conservative
-
-  \>4K / large RX provider buffers    architecture and benchmark series
-                                      verified; exact released version
-                                      pending
-
-  IPv6 BIG TCP without HBH            v3 series verified; separate
-                                      prerequisite lineage
-
-  BIG TCP over VXLAN/GENEVE           final v9 2026-07-10; recorded as
-                                      7.3-development
-
-  TLS + sockmap cleanup               cleanup direction verified; exact
-                                      mainline origin/release still
-                                      pending
-
-  FIB-rule per-netns mutex            remains pending exact
-                                      landing/benchmark evidence
-  -----------------------------------------------------------------------
+The canonical chronology in Part II takes precedence over all provenance
+notes.
 
 # Appendix --- Provenance and research notes
+
+This appendix preserves source discovery and supporting material. It is
+**not** a second release chronology. If a historical note here conflicts
+with Part II, Part II is normative. Research notes may describe RFC
+dates, review bases or net-next state that differ from the eventual
+released kernel version.
 
 > **Non-normative.** Release assignments are defined only by Part II.
 > This appendix preserves source trails, review-series history and
