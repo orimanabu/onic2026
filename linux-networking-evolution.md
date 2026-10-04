@@ -709,186 +709,71 @@ Grade の定義は次のとおりであり、この文書自体にも保持す�
 
 C/D は現在の canonical milestone table では使用していないが、将来の監査対象を表すため grade scheme として定義を残す。
 
-dataset に保持します。
+**Part II ↔ Part VII invariant:** Part II の Evidence / status で `exact anchor` または `anchor retained in Part VII` と主張する場合、Part VII の exact-anchor inventory に対応する完全な40桁SHAが存在しなければならない。Part VII にSHAを保持しない milestone は、Part II では `release-generation`、`release`、`series` などの表現に留める。
 
-  ----------------------------------------------------------------------------------------------------------------
-  Release           正規 milestone                    Grade             Evidence / status
-  ----------------- --------------------------------- ----------------- ------------------------------------------
-  3.0               namespace / setns() era           B                 release-generation
-                    foundation                                          
 
-  3.3               DQL/BQL; team; net_prio; TCP      A                 release; exact DQL anchor
-                    memcg                                               
-
-  3.5               CoDel / fq_codel                  A                 release + exact anchors
-
-  3.6               TSQ; TFO client; IPv4 route-cache A                 release + exact anchors
-                    removal                                             
-
-  3.7               VXLAN; TFO server; IPv6 NAT       A                 release verified
-
-  3.9               TCP/UDP SO_REUSEPORT; conntrack   A                 release; SO_REUSEPORT infrastructure
-                    labels; VM sockets                                  anchor
-
-  3.11              SO_BUSY_POLL / low-latency busy   A                 Linux man-pages explicitly says since 3.11
-                    polling                                             
-
-  3.12              sch_fq; sk_pacing_rate-driven     A                 qdisc-based pacing; TCP-internal fallback
-                    pacing; TSO autosizing generation                   later
-
-  3.13              nftables                          A                 release + verified core anchor
-                                                                        96518518cc41
-
-  3.14              TCP autocorking                   B                 release-generation
-
-  3.15              internal BPF ISA rework toward    A                 final series + release-generation
-                    eBPF/native-JIT-friendly format                     
-
-  3.18              bpf() syscall/maps/verifier       A                 release + exact anchors
-                    generation; DCTCP; Geneve/FOU                       
-
-  3.19              ipvlan; switchdev origin;         A                 release-generation
-                    SO_ATTACH_BPF                                       
-
-  4.1               cls_bpf / act_bpf eBPF support;   B                 early TC/tracing eBPF milestone
-                    kprobe BPF                                          
-
-  4.3               VRF; LWT; OVS conntrack           A                 series + release
-
-  4.6               devlink                           B                 release origin; exact origin set pending
-
-  4.7               TC BPF direct packet access       A                 later TC fast-path programmability
-                                                                        milestone
-
-  4.8               XDP                               A                 initial series + release
-
-  4.9               BBR                               A                 release + exact anchor
-
-  4.10              cgroup BPF; BPF LWT; IPv6 Segment A                 series + release
-                    Routing                                             
-
-  4.13              SOCK_OPS; kTLS TX; TCP-internal   A                 release
-                    pacing/fallback generation                          
-
-  4.14              phylink; SOCKMAP; TCP             A                 release; exact phylink / TCP `MSG_ZEROCOPY` send-side anchors;
-                    MSG_ZEROCOPY; XDP devmap                            devmap documented since 4.14
-
-  4.15              XDP cpumap                        A                 kernel docs explicitly document cpumap
-                                                                        since 4.15
-
-  4.16              netdevsim; Net DIM generation;    A                 flowtable documented since 4.16; DIM exact
-                    nftables software flowtable                         SHA pending
-
-  4.17              BPF_PROG_TYPE_SK_MSG; sockmap     B                 final-series generation
-                    sendmsg/sendfile                                    
-
-  4.18              AF_XDP; TCP_ZEROCOPY_RECEIVE;     A                 series + release
-                    refurbished page_pool/XDP memory                    
-                    return; cgroup UDP sendmsg hooks                    
-
-  4.19              SO_TXTIME; CAKE                   A                 release + exact anchors
-
-  4.20              TCP EDT pacing; BPF flow          A                 release
-                    dissector; taprio; rtnetlink                        
-                    strict checking                                     
-
-  5.0               UDP GRO; UDP MSG_ZEROCOPY         A                 release
-
-  5.1               devlink health; BPF               A                 release; airtime commit contained in
-                    spinlocks/DCE; SO_BINDTOIFINDEX;                    v5.1-rc1
-                    Y2038 timestamps; io_uring                          
-                    substrate; mac80211 airtime                         
-                    accounting/scheduling to TXQs                       
-
-  5.3               nexthop objects; DIM generalized  A                 release; nexthop exact core anchor
-                    into common lib/dim                                 
-
-  5.5               mac80211 Airtime Queue Limits     B                 release-generation
-                    (AQL)                                               
-
-  5.6               MPTCP; WireGuard; BPF             A                 release; exact ethtool anchor
-                    struct_ops/TCP CC; ethtool                          
-                    Generic Netlink                                     
-
-  5.9               BPF_PROG_TYPE_SK_LOOKUP           A                 exact anchor
-                                                                        e9ddbb7707ff5891616240026062b8c1e29864ca
-
-  5.11              auxiliary bus                     B                 release + final-series/tag evidence;
-                                                                        feature-origin SHA pending
-
-  5.12              threaded NAPI                     A                 release
-
-  5.15              IPv6 IOAM core; MCTP; bridge      A                 release
-                    per-VLAN multicast                                  
-
-  5.17              kfree_skb_reason / structured     A                 release
-                    drop-reason foundation                              
-
-  5.18              XDP multi-buffer / frags          B                 prerequisite for later AF_XDP multi-buffer
-                    generation                                          
-
-  5.19              IPv6 BIG TCP; drop-reason         A                 release; exact BIG TCP anchors
-                    expansion                                           
-
-  6.0               io_uring IORING_OP_SEND_ZC;       A                 release-generation
-                    multishot receive                                   
-
-  6.2               TCP PLB; XFRM/IPsec packet        A                 release; exact XFRM anchor
-                    offload                                             
-
-  6.3               YNL/YAML Netlink tooling;          A                 YNL origin contained in v6.3-rc1; IPv4 BIG TCP release
-                    IPv4 BIG TCP                                        attribution confirmed; detailed BIG TCP commit set is
-                                                                        not reproduced in Part VII
-  6.6               AF_XDP multi-buffer; TCX /        A                 release; TCX/bpf_mprog present in v6.6
-                    bpf_mprog multi-program                             sources
-                    attachment                                          
-
-  6.7               netkit; initial TCP-AO            A                 release
-
-  6.8               Rust phylib + Rust Asix reference B                 release/final-series + docs
-                    PHY; queue/NAPI netdev-genl                         
-                    visibility                                          
-
-  6.11              virtio-net AF_XDP RX zero-copy    A                 release + exact anchors
-
-  6.12              Device Memory TCP RX              B                 final series verified; implementation SHA
-                                                                        list not reproduced
-
-  6.13              per-netns RTNL                    B                 milestone, not completion
-                    infrastructure/migration                            
-                    milestone                                           
-
-  6.15              io_uring ZCRX; further RTNL       A                 exact merge/series evidence
-                    breakup                                             
-
-  6.16              Device Memory TCP TX; BPF qdisc;  A                 final series verified; key BPF-qdisc
-                    DCCP removal                                        anchors retained
-
-  6.18              AccECN core; UDP RX evolution;    B                 release-generation
-                    DIBS separate shared-memory                         
-                    lineage                                             
-
-  7.0               cake_mq / multi-queue-aware       A                 net-next-7.0 / v7.0 release generation
-                    sch_cake; IPv6 BIG TCP without                      
-                    synthetic HBH jumbo header                          
-
-  7.1               RX HW queue leasing               A                 revised RX queue-leasing merge is
-                                                                        contained in v7.1-rc1; TX remains unmerged
-
-  7.2               MPTCP PM limits: subflows 8→64;   A                 three limit-expansion commits are
-                    accepted ADD_ADDR 8→64; endpoints                   contained in v7.2-rc1
-                    8→255                                               
-  ----------------------------------------------------------------------------------------------------------------
-
+| Release | 正規 milestone | Grade | Evidence / status |
+|---|---|---|---|
+| 3.0 | namespace / setns() era foundation | B | release-generation |
+| 3.3 | DQL/BQL; team; net_prio; TCP memcg | A | release; exact DQL anchor |
+| 3.5 | CoDel / fq_codel | A | release; exact anchors retained in Part VII |
+| 3.6 | TSQ; TFO client; IPv4 route-cache removal | A | release-generation; detailed anchors not reproduced in Part VII |
+| 3.7 | VXLAN; TFO server; IPv6 NAT | A | release verified |
+| 3.9 | TCP/UDP SO_REUSEPORT; conntrack labels; VM sockets | A | release; SO_REUSEPORT infrastructure anchor retained |
+| 3.11 | SO_BUSY_POLL / low-latency busy polling | A | release documented |
+| 3.12 | sch_fq; sk_pacing_rate-driven pacing; TSO autosizing generation | A | qdisc-based pacing; TCP-internal fallback later |
+| 3.13 | nftables | A | release; exact core anchor retained in Part VII |
+| 3.14 | TCP autocorking | B | release-generation |
+| 3.15 | internal BPF ISA rework toward eBPF/native-JIT-friendly format | A | release-generation |
+| 3.18 | bpf() syscall/maps/verifier generation; DCTCP; Geneve/FOU | A | release-generation; selected anchors only |
+| 3.19 | ipvlan; switchdev origin; SO_ATTACH_BPF | A | release-generation |
+| 4.1 | cls_bpf / act_bpf eBPF support; kprobe BPF | B | early TC/tracing eBPF milestone |
+| 4.3 | VRF; LWT; OVS conntrack | A | series + release |
+| 4.6 | devlink | B | release origin; exact origin set pending |
+| 4.7 | TC BPF direct packet access | A | release milestone |
+| 4.8 | XDP | A | initial series + release |
+| 4.9 | BBR | A | release; exact anchor retained |
+| 4.10 | cgroup BPF; BPF LWT; IPv6 Segment Routing | A | series + release |
+| 4.13 | SOCK_OPS; kTLS TX; TCP-internal pacing/fallback generation | A | release |
+| 4.14 | phylink; SOCKMAP; TCP MSG_ZEROCOPY; XDP devmap | A | release; exact phylink / TCP MSG_ZEROCOPY anchors retained; devmap documented since 4.14 |
+| 4.15 | XDP cpumap | A | release documented |
+| 4.16 | netdevsim; Net DIM generation; nftables software flowtable | A | release; DIM exact SHA pending |
+| 4.17 | BPF_PROG_TYPE_SK_MSG; sockmap sendmsg/sendfile | B | final-series generation |
+| 4.18 | AF_XDP; TCP_ZEROCOPY_RECEIVE; refurbished page_pool/XDP memory return; cgroup UDP sendmsg hooks | A | series + release; page_pool anchor retained |
+| 4.19 | SO_TXTIME; CAKE | A | release-generation; detailed anchors not reproduced in Part VII |
+| 4.20 | TCP EDT pacing; BPF flow dissector; taprio; rtnetlink strict checking | A | release |
+| 5.0 | UDP GRO; UDP MSG_ZEROCOPY | A | release |
+| 5.1 | devlink health; BPF spinlocks/DCE; SO_BINDTOIFINDEX; Y2038 timestamps; io_uring substrate; mac80211 airtime accounting/scheduling to TXQs | A | release; airtime commit contained in v5.1-rc1 |
+| 5.3 | nexthop objects; DIM generalized into common lib/dim | A | release-generation; nexthop core anchor not reproduced in Part VII |
+| 5.5 | mac80211 Airtime Queue Limits (AQL) | B | release-generation |
+| 5.6 | MPTCP; WireGuard; BPF struct_ops/TCP CC; ethtool Generic Netlink | A | release; exact ethtool anchor retained |
+| 5.9 | BPF_PROG_TYPE_SK_LOOKUP | A | exact anchor retained in Part VII |
+| 5.11 | auxiliary bus | B | release + final-series/tag evidence; feature-origin SHA pending |
+| 5.12 | threaded NAPI | A | release |
+| 5.15 | IPv6 IOAM core; MCTP; bridge per-VLAN multicast | A | release |
+| 5.17 | kfree_skb_reason / structured drop-reason foundation | A | release |
+| 5.18 | XDP multi-buffer / frags generation | B | prerequisite for later AF_XDP multi-buffer |
+| 5.19 | IPv6 BIG TCP; drop-reason expansion | A | release; exact BIG TCP anchors retained |
+| 6.0 | io_uring IORING_OP_SEND_ZC; multishot receive | A | release-generation |
+| 6.2 | TCP PLB; XFRM/IPsec packet offload | A | release; exact XFRM anchor retained |
+| 6.3 | YNL/YAML Netlink tooling; IPv4 BIG TCP | A | YNL origin contained in v6.3-rc1; IPv4 BIG TCP release attribution confirmed |
+| 6.6 | AF_XDP multi-buffer; TCX / bpf_mprog multi-program attachment | A | release |
+| 6.7 | netkit; initial TCP-AO | A | release; netkit anchor retained |
+| 6.8 | Rust phylib + Rust Asix reference PHY; queue/NAPI netdev-genl visibility | B | release/final-series + docs |
+| 6.11 | virtio-net AF_XDP RX zero-copy | A | release-generation; detailed anchors not reproduced in Part VII |
+| 6.12 | Device Memory TCP RX | B | final series verified; implementation SHA list not reproduced |
+| 6.13 | per-netns RTNL infrastructure/migration milestone | B | milestone, not completion |
+| 6.15 | io_uring ZCRX; further RTNL breakup | A | merge/series evidence |
+| 6.16 | Device Memory TCP TX; BPF qdisc; DCCP removal | A | final series verified; key BPF-qdisc anchors retained |
+| 6.18 | AccECN core; UDP RX evolution; DIBS separate shared-memory lineage | B | release-generation |
+| 7.0 | cake_mq / multi-queue-aware sch_cake; IPv6 BIG TCP without synthetic HBH jumbo header | A | net-next-7.0 / v7.0 release generation |
+| 7.1 | RX HW queue leasing | A | revised RX merge contained in v7.1-rc1; TX remains unmerged |
+| 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255 | A | three limit-expansion commits contained in v7.2-rc1 |
 | 7.3-rc / mainline | BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE | A-rc | net-next-7.3 merged 2026-08-20; final 7.3 pending |
 
 **7.3 status note:** 調査基準日時点では final 7.3 は未リリースのため `A-rc` とする。正式リリースを確認した時点で `A` へ更新する。
 
-**MPTCP endpoint-limit note:** the effective endpoint maximum is
-**255**, not 256: the endpoint ID is an 8-bit value and ID 0 is
-reserved. \| 7.3-rc / mainline \| BIG TCP over VXLAN/GENEVE; RTNL-less
-FIB-rule updates; devmem buffers \> PAGE_SIZE \| A-rc \| net-next-7.3
-merged 2026-08-20; final 7.3 pending \|
+**MPTCP endpoint-limit note:** endpoint の実効上限は **255** である。endpoint ID は8-bitで、ID 0が予約されているためである。
 
 ## 各世代を支配したテーマ
 
@@ -2089,14 +1974,11 @@ boundaries that remain important for verification or future re-audit.
 
 # Part VII --- 正規 provenance ledger
 
-**Evidence-status addition:** `A-rc` means merged into Linus mainline
-with authoritative pull/merge evidence, while the final release is still
-pending; it is distinct from Grade A release evidence.
+**Evidence status:** `A-rc` は authoritative な pull/merge evidence により Linus mainline への merge を確認済みだが、final release が未公開の状態を示す。released milestone の Grade A とは区別する。
 
-## Exact mainline anchor inventory retained in this edition
+## 本版で保持する exact mainline anchor inventory
 
-These are representative **anchor commits**, not necessarily every
-commit in the feature series.
+ここに示すのは代表的な **anchor commit** であり、feature series の全commitを列挙するものではない。
 
   ---------------------------------------------------------------------------------------------------------------------------------------------
   Feature                 Mainline anchor                              Subject / role
@@ -2144,38 +2026,24 @@ Grade の正本は Part II と canonical dataset です。Part VII は
 commit-level anchor と、 まだ解消していない attribution boundary
 のみを記録します。
 
-## Reading rule for the appendix
+## Appendix の読み方
 
-The appendix is an evidence catalog. Dates found there may be RFC dates,
-posting dates, review bases, or conference dates. They must not be read
-as release attribution unless Part II says so.
+Appendix は evidence catalog である。そこに現れる日付は RFC date、posting date、review base、conference date の場合があり、Part II に明記されない限り release attribution として読まない。
 
 ## Open attribution items and evidence grade
 
-The BIG TCP no-synthetic-HBH change is attributed to Linux 7.0; it is a
-prerequisite in the later tunnel-BIG-TCP lineage.
+以下は Part II の Grade を再定義する表ではなく、未解決の attribution boundary を記録する補助表である。Grade を記載する場合は Part II と完全に一致させる。
 
-  -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  Item                   Grade         Current treatment
-  ---------------------- ------------- ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  queue leasing          A             RX side is merged; TX queue leasing remains PoC/design in the cited 2026 discussion; Linux 7.1 attribution confirmed; revised merge is contained in v7.1-rc1
+| Item | Canonical Grade | Current treatment |
+|---|---|---|
+| RX HW queue leasing | A | revised RX implementation is contained in v7.1-rc1; TX queue leasing remains unmerged |
+| devmem buffers > `PAGE_SIZE` | A-rc | explicitly listed in the `net-next-7.3` pull merged to Linus mainline; final 7.3 pending |
+| MPTCP PM limit expansion | A | v7.2-rc1 containment confirmed; endpoint maximum is 255 because ID 0 is reserved |
+| DIM / `net_dim` | B | Linux 4.16 Net DIM generation; Linux 5.3 common `lib/dim` generalization; exact SHAs pending |
+| `cake_mq` | A | `net-next-7.0` pull explicitly lists multi-queue-aware `sch_cake`; canonical generation Linux 7.0 |
 
-**Queue-leasing release boundary:** initial merge `77b9c4a438fc...` と revert `8766d61a1d33...` はともに v7.0 merge window 内の development history で相殺され、v7.0 release には含まれない。revised RX implementation `15089225889b...` は v7.1-rc1 に含まれる。TX queue leasing は未 merge である。
+**Queue-leasing release boundary:** initial merge `77b9c4a438fc...` と revert `8766d61a1d33...` はともに v7.0 merge window 内で相殺され、v7.0 release には含まれない。revised RX implementation `15089225889b...` は v7.1-rc1 に含まれる。TX queue leasing は未 merge である。
 
-  boundary:\*\* the      \`77b9c4a4    is contained in v7.1-rc1. TX queue leasing remains unmerged.
-
-  devmem buffers \>      A for 7.3     explicitly listed in the `net-next-7.3` pull merged to Linus mainline
-  `PAGE_SIZE`            mainline-rc   
-
-  MPTCP max subflows 8 → A             v7.2-rc1 containment confirmed for the three limit-expansion commits
-  64                                   
-
-  DIM / `net_dim`        B             Linux 4.16 Net DIM generation; Linux 5.3 common `lib/dim` generalization; exact SHAs pending
-
-  `cake_mq`              A             `net-next-7.0` pull explicitly lists multi-queue-aware `sch_cake`; canonical generation Linux 7.0
-
-  merge/revert/remerge                 
-  -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Appendix --- Source index（非正規）
 
 Appendix は chronology や lineage を再定義しません。正本は以下です。
