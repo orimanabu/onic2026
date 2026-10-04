@@ -1810,46 +1810,46 @@ This upgrades confidence in the anchor itself to **A** while retaining
 
 ### 6.8 Updated exact-anchor table
 
-  -------------------------------------------------------------------------------------------------------
-  Kernel    Feature         Exact mainline anchor                        Scope                 Quality
-  --------- --------------- -------------------------------------------- --------------------- ----------
-  3.2       DQL/BQL         `75957ba36c05b979701e9ec64b37819adc12f830`   DQL core              A
-            foundation                                                                         
+  ------------------------------------------------------------------------------------------------------
+  Kernel   Feature         Exact mainline anchor                        Scope                 Quality
+  -------- --------------- -------------------------------------------- --------------------- ----------
+  3.2      DQL/BQL         `75957ba36c05b979701e9ec64b37819adc12f830`   DQL core              A
+           foundation                                                                         
 
-  3.5       CoDel           `76e3cc126bb223013a6b9a0e2a51238d1ef2e409`   qdisc/core algorithm  A
+  3.5      CoDel           `76e3cc126bb223013a6b9a0e2a51238d1ef2e409`   qdisc/core algorithm  A
 
-  3.5       fq_codel        `4b549a2ef4bef9965d97cbd992ba67930cd3e0fe`   fq_codel qdisc        A
+  3.5      fq_codel        `4b549a2ef4bef9965d97cbd992ba67930cd3e0fe`   fq_codel qdisc        A
 
-  3.6       TCP Small       `46d3ceabd8d98ed0ad10f20c595ca784e34786c5`   TSQ introduction      A
-            Queues                                                                             
+  3.6      TCP Small       `46d3ceabd8d98ed0ad10f20c595ca784e34786c5`   TSQ introduction      A
+           Queues                                                                             
 
-  3.6       TCP Fast Open   `cf60af03ca4e71134206809ea892e49b92a88896`   MSG_FASTOPEN client   A
-            client                                                       API anchor            
+  3.6      TCP Fast Open   `cf60af03ca4e71134206809ea892e49b92a88896`   MSG_FASTOPEN client   A
+           client                                                       API anchor            
 
-  3.7       VXLAN           `d342894c5d2f8c7df194c793ec4059656e09ca31`   initial VXLAN         A
+  3.7      VXLAN           `d342894c5d2f8c7df194c793ec4059656e09ca31`   initial VXLAN         A
 
-  3.13      nftables        `96518518...`                                core introduction     A-anchor
+  3.13     nftables        `96518518...`                                core introduction     A-anchor
 
-  3.13      nftables sets   `20a69341f2d00cd042e81c82289fba8a13c05a25`   netlink set API       A
+  3.13     nftables sets   `20a69341f2d00cd042e81c82289fba8a13c05a25`   netlink set API       A
 
-  3.18      bpf() + maps    `99c55f7d47c0dc6fc64729f37bf435abf43f4c60`   syscall/maps          A
+  3.18     bpf() + maps    `99c55f7d47c0dc6fc64729f37bf435abf43f4c60`   syscall/maps          A
 
-  3.18      BPF program     `09756af46893c18839062976c3252e93a1beeba7`   program load          A
-            load/verifier                                                                      
-            API                                                                                
+  3.18     BPF program     `09756af46893c18839062976c3252e93a1beeba7`   program load          A
+           load/verifier                                                                      
+           API                                                                                
 
-  3.18      DCTCP           `e3118e8359bb7c59555aca60c725106e6d78c5ce`   CC algorithm          A
+  3.18     DCTCP           `e3118e8359bb7c59555aca60c725106e6d78c5ce`   CC algorithm          A
 
-  3.19      ipvlan          `2ad7bf363841...`                            initial driver        A
+  3.19     ipvlan          `2ad7bf363841...`                            initial driver        A
 
-  4.9       BBR             `0f8782ea14974ce992618b55f0c041ef43ed0b78`   BBR algorithm         A
+  4.9      BBR             `0f8782ea14974ce992618b55f0c041ef43ed0b78`   BBR algorithm         A
 
-  4.18      AF_XDP          `c0c77d8fb787cfe0c3fca689c2a30d1dad4eaba7`   foundational          A
-                                                                         UMEM/address-family   
-                                                                         anchor                
+  4.18     AF_XDP          `c0c77d8fb787cfe0c3fca689c2a30d1dad4eaba7`   foundational          A
+                                                                        UMEM/address-family   
+                                                                        anchor                
 
-  4.19      CAKE            `046f6fd5daefac7f5abdafb436b30f63bc7c602b`   qdisc introduction    A
-  -------------------------------------------------------------------------------------------------------
+  4.19     CAKE            `046f6fd5daefac7f5abdafb436b30f63bc7c602b`   qdisc introduction    A
+  ------------------------------------------------------------------------------------------------------
 
 ### 6.9 What remains intentionally unresolved
 
@@ -2174,56 +2174,251 @@ than a release-note-only history.
 
 ### 7.11 Pass-4 status
 
-  ------------------------------------------------------------------------
-  Feature                                    Release Provenance after pass
-                                                     4
-  --------------------- ---------------------------- ---------------------
-  VRF                                            4.3 release/merge strong;
-                                                     exact full SHA audit
-                                                     optional
+  ---------------------------------------------------------------------
+  Feature                                  Release Provenance after
+                                                   pass 4
+  -------------------- --------------------------- --------------------
+  VRF                                          4.3 release/merge
+                                                   strong; exact full
+                                                   SHA audit optional
 
-  Lightweight tunnels                            4.3 22-patch series +
-                                                     merge verified
+  Lightweight tunnels                          4.3 22-patch series +
+                                                   merge verified
 
-  OVS conntrack                                  4.3 multi-revision
-                                                     series + merge
-                                                     verified
+  OVS conntrack                                4.3 multi-revision
+                                                   series + merge
+                                                   verified
 
-  TC direct packet                               4.7 semantics/release
-  access                                             verified
+  TC direct packet                             4.7 semantics/release
+  access                                           verified
 
-  XDP                                            4.8 late v8 series
-                                                     boundary verified
+  XDP                                          4.8 late v8 series
+                                                   boundary verified
 
-  cgroup BPF                                    4.10 attachment-family
-                                                     model clarified;
-                                                     exact socket anchor
-                                                     added
+  cgroup BPF                                  4.10 attachment-family
+                                                   model clarified;
+                                                   exact socket anchor
+                                                   added
 
-  BPF LWT                                       4.10 series boundary
-                                                     verified
+  BPF LWT                                     4.10 series boundary
+                                                   verified
 
-  SOCK_OPS                                      4.13 final-series
-                                                     provenance
+  SOCK_OPS                                    4.13 final-series
+                                                   provenance
 
-  SOCKMAP                                       4.14 kernel-doc release
-                                                     provenance
+  SOCKMAP                                     4.14 kernel-doc release
+                                                   provenance
 
-  AF_XDP                                        4.18 address-family series
-                                                     separated from ZC
-                                                     series
+  AF_XDP                                      4.18 address-family
+                                                   series separated
+                                                   from ZC series
 
-  TCP ZC RX                                     4.18 initial API →
-                                                     reworked landed API
-                                                     verified
+  TCP ZC RX                                   4.18 initial API →
+                                                   reworked landed API
+                                                   verified
 
-  SO_TXTIME                                     4.19 RFC/final-series
-                                                     architecture verified
-  ------------------------------------------------------------------------
+  SO_TXTIME                                   4.19 RFC/final-series
+                                                   architecture
+                                                   verified
+  ---------------------------------------------------------------------
 
 At this point the remaining exact-SHA work is mainly archival
 completeness rather than a material uncertainty about the historical
 evolution.
+
+------------------------------------------------------------------------
+
+## 8. Cross-document factual corrections after release-map audit
+
+This section records corrections that are also applied to the
+interpretation used by the release map and synthesis sections. Where an
+older research-pass appendix still quotes an earlier shorthand, this
+section is authoritative.
+
+### 8.1 `skb_drop_reason`: Linux 5.17, not 5.19
+
+The initial structured drop-reason infrastructure (`kfree_skb_reason()`
+and the `skb_drop_reason` model) belongs to **Linux 5.17**. Linux
+5.18/5.19 and later releases expanded coverage and subsystem-specific
+reasons.
+
+Therefore:
+
+``` text
+5.17  structured skb drop-reason foundation
+5.18+ broader call-site/subsystem coverage
+5.19  BIG TCP and other networking work — not the origin of skb_drop_reason
+```
+
+### 8.2 There is no Linux 4.20
+
+Linux versioning jumps from **4.19 to 5.0**. Consequently EDT pacing,
+BPF flow dissector, taprio and strict rtnetlink checking must not be
+moved into a fictitious 4.20 release. The existing Linux 5.0 baseline
+remains the correct release-generation bucket for those features. UDP
+GRO and UDP `MSG_ZEROCOPY` are also part of the 5.0 networking
+generation.
+
+### 8.3 BQL remains a Linux 3.2-generation feature
+
+The DQL/BQL work was rebased for the 3.2 cycle. It must not be moved to
+3.3 merely because team, net_prio and TCP memory-cgroup work are
+associated with the following release.
+
+### 8.4 BPF sendmsg hook remains Linux 4.17
+
+The 4.17 merge-window material explicitly records BPF filtering/hooks
+for `sendmsg()` / `sendfile()`-related socket paths. Do not move this
+item to 4.18.
+
+### 8.5 TCP autocorking: add Linux 3.14 milestone
+
+TCP autocorking is a Linux **3.14** networking milestone and should be
+represented in the 3.x transport/scalability lineage.
+
+### 8.6 per-netns RTNL: Linux 6.13 is a milestone, not completion
+
+Linux 6.13 introduced important per-network-namespace RTNL
+infrastructure and conversions. It did **not** mean that the global RTNL
+lock had been completely replaced.
+
+Use:
+
+``` text
+global RTNL
+ → unlocked/finer-grained paths
+ → per-netns RTNL infrastructure (6.13 milestone)
+ → subsystem-by-subsystem conversion
+ → continuing lock decomposition
+```
+
+### 8.7 BPF qdisc and DCCP removal: Linux 6.16
+
+Both are now release-resolved:
+
+``` text
+6.16
+ ├─ BPF struct_ops qdisc
+ └─ DCCP removal
+```
+
+The older "2025 merge-window" wording should be read as development
+chronology; the release assignment is Linux 6.16.
+
+### 8.8 TCP-AO: initial mainline support is Linux 6.7
+
+TCP Authentication Option support first entered mainline in **Linux
+6.7**. The later 7.2 work is a separate cryptographic
+implementation/integration step and must not be presented as the origin
+of TCP-AO.
+
+``` text
+6.7  initial TCP-AO mainline support
+7.2  later libcrypto-oriented evolution
+```
+
+### 8.9 Linux 5.12: threaded NAPI belongs in the release timeline
+
+Threaded NAPI was merged for Linux 5.12 and should appear not only in
+the thematic body but also in the chronological timeline.
+
+### 8.10 AccECN: distinguish protocol landing from default policy
+
+AccECN arrived incrementally before 7.0. Linux 7.0 changes the default
+policy to `tcp_ecn=5`.
+
+That means:
+
+``` text
+incoming connections:
+  AccECN enabled by default
+
+outgoing connections:
+  ECN/AccECN initiation remains disabled by default
+```
+
+Therefore "AccECN default enabled in 7.0" is too broad without this
+qualification.
+
+### 8.11 Linux 6.2: add TCP PLB and IPsec packet offload
+
+The 6.2 networking chronology should include:
+
+``` text
+TCP PLB
+IPsec packet-offload generation
+```
+
+These belong in the performance/offload lineage and should not be hidden
+under a generic "BPF/netdev/API continuation" label.
+
+### 8.12 Revised era model: eras describe dominant themes, not hard beginnings
+
+The earlier four-era model is retained only as a dominant-theme model.
+Architectural lineages overlap release boundaries.
+
+In particular:
+
+``` text
+Linux 4.x
+  programmable fast-path formation
+  + early zero-copy / packet-memory foundations
+
+Linux 5.x
+  programmability expansion
+  + packet-memory infrastructure maturation
+
+Linux 6.x–7.x
+  memory-provider and queue-ownership architecture
+  becomes a first-class design axis
+```
+
+AF_XDP and TCP zero-copy RX already appear in 4.18, so the
+memory/zero-copy lineage must not be described as starting only in 6.x.
+
+### 8.13 Evolution includes retreat and removal
+
+BPF/network programmability is not a monotonic "more hooks forever"
+story.
+
+The historical model must include:
+
+``` text
+experimentation
+ → review
+ → adoption / integration
+ → operational feedback
+ → retention, redesign, or removal
+```
+
+Examples worth tracking include unsuccessful or abandoned directions
+such as bpfilter, P4TC proposals that did not become the dominant
+upstream TC model, and later removal of problematic integrations such as
+TLS+sockmap. Protocol removal (for example DCCP) is the same kind of
+architectural pruning on a different axis.
+
+This changes the synthesis from "Linux networking continuously
+accumulated features" to "Linux networking repeatedly explored,
+selected, redesigned, and removed mechanisms while moving architectural
+boundaries."
+
+### 8.14 Items deliberately left pending exact release/commit audit
+
+The following claims are useful leads but are not promoted to
+authoritative release-map facts in this revision until exact landing
+evidence is attached:
+
+``` text
+page_pool exact initial release
+netkit queue leasing exact release assignment
+IPv6 BIG TCP HBH-removal exact release assignment
+large (>4K) memory-provider RX buffers exact release assignment
+TLS + sockmap removal exact 7.2 landing
+FIB-rule per-netns mutex exact 7.3 landing/benchmark provenance
+```
+
+This is deliberate: a plausible or remembered release number is not
+sufficient for the provenance standard used by this document.
 
 ------------------------------------------------------------------------
 
@@ -2350,7 +2545,7 @@ subsystem-specific locking
   5.16--5.18                         socket memory, IOAM, TC offload,
                                      BPF/netdev
 
-  **5.19**                           **BIG TCP, skb_drop_reason, MPTCP
+  **5.19**                           **BIG TCP, MPTCP
                                      userspace/fallback**
 
   6.0--6.2                           BPF/netdev/API continuation
@@ -2371,7 +2566,8 @@ subsystem-specific locking
 
   **6.12**                           **Device Memory TCP RX**
 
-  **6.13**                           **per-netns RTNL, traffic-shaping
+  **6.13**                           **per-netns RTNL infrastructure /
+                                     migration begins, traffic-shaping
                                      API**
 
   6.14                               RxRPC/UDP/TCP/IPsec
@@ -4481,8 +4677,7 @@ skb/page allocation optimization
 
   5.18                               BPF/MPTCP/netdev
 
-  **5.19**                           **BIG TCP, skb drop reasons, MPTCP
-                                     API**
+  **5.19**                           **BIG TCP, MPTCP API**
 
   6.0                                BPF/netdev continuation
 
