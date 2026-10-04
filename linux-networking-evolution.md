@@ -2441,143 +2441,227 @@ sufficient for the provenance standard used by this document.
 
 # Part II --- Canonical release chronology
 
-This is the **single normative release map** for this document. The
-appendix is provenance material, not a second release table. When a
-research note conflicts with this table, this table takes precedence
-after verification.
+This is the **single normative release map**. Appendix material records
+provenance and research history but does not define release attribution.
 
-Two dates are kept conceptually separate:
+The audit separates three different facts:
 
 ``` text
-development/review generation ≠ mainline release
+RFC / review date
+        ≠
+net-next / subsystem-tree landing
+        ≠
+released mainline version
 ```
 
-This distinction is essential for cases such as BQL.
+`Verified` below means that the release assignment has been
+cross-checked against a release/merge-window source or an equivalent
+upstream landing anchor. `Inherited` means the assignment is retained
+from the earlier exact-provenance passes and remains subject to the
+continuing full sweep.
 
-  ---------------------------------------------------------------------
-  Release                            Canonical networking milestones
-  ---------------------------------- ----------------------------------
-  3.0                                namespace/setns-era foundation
+  --------------------------------------------------------------------------
+  Release                 Canonical networking      Audit
+                          milestones                
+  ----------------------- ------------------------- ------------------------
+  3.0                     namespace/setns-era       inherited
+                          foundation                
 
-  3.3                                BQL/DQL mainline generation; team;
-                                     net_prio; TCP memcg
+  3.3                     BQL/DQL mainline          **corrected**
+                          generation; team;         
+                          net_prio; TCP memcg       
 
-  3.5                                CoDel / fq_codel
+  3.5                     CoDel / fq_codel          verified earlier
 
-  3.6                                TSQ; TFO client; IPv4 route-cache
-                                     removal
+  3.6                     TSQ; TFO client; IPv4     verified earlier
+                          route-cache removal       
 
-  3.7                                VXLAN; TFO server; IPv6 NAT
+  3.7                     VXLAN; TFO server; IPv6   inherited
+                          NAT                       
 
-  3.9                                SO_REUSEPORT and socket-scaling
-                                     work
+  3.9                     SO_REUSEPORT and          inherited
+                          socket-scaling work       
 
-  3.13                               nftables
+  3.13                    nftables                  verified earlier
 
-  3.14                               TCP autocorking; continuing BPF
-                                     transition
+  3.14                    TCP autocorking;          **corrected**
+                          continuing BPF transition 
 
-  3.18                               bpf() syscall/maps/verifier
-                                     generation; DCTCP; Geneve/FOU
+  3.18                    bpf()                     verified earlier
+                          syscall/maps/verifier     
+                          generation; DCTCP;        
+                          Geneve/FOU                
 
-  3.19                               ipvlan; initial switchdev
-                                     generation
+  3.19                    ipvlan; initial switchdev **corrected**
+                          generation                
 
-  4.3                                VRF; LWT; OVS conntrack
+  4.3                     VRF; LWT; OVS conntrack   verified earlier
 
-  4.6                                devlink
+  4.6                     devlink                   inherited
 
-  4.7                                TC BPF direct packet access
+  4.7                     TC BPF direct packet      verified earlier
+                          access                    
 
-  4.8                                XDP
+  4.8                     XDP                       verified earlier
 
-  4.9                                BBR
+  4.9                     BBR                       verified
 
-  4.10                               cgroup BPF; BPF LWT; IPv6 Segment
-                                     Routing
+  4.10                    cgroup BPF; BPF LWT; IPv6 verified earlier
+                          Segment Routing           
 
-  4.13                               SOCK_OPS; kTLS TX generation
+  4.13                    SOCK_OPS; kTLS TX         inherited
+                          generation                
 
-  4.14                               SOCKMAP; TCP MSG_ZEROCOPY
-                                     generation
+  4.14                    SOCKMAP; TCP              **verified/corrected**
+                          `MSG_ZEROCOPY`            
 
-  4.17                               SK_MSG/sockmap sendmsg/sendfile
-                                     path; mac80211 airtime-fairness
-                                     generation
+  4.17                    `SK_MSG`/sockmap sendmsg  **split/corrected**
+                          path; mac80211            
+                          airtime-fairness          
+                          generation                
 
-  4.18                               AF_XDP; TCP_ZEROCOPY_RECEIVE;
-                                     page_pool initial generation;
-                                     cgroup UDP sendmsg hooks
+  4.18                    AF_XDP;                   **verified/corrected**
+                          `TCP_ZEROCOPY_RECEIVE`;   
+                          page_pool refurbished/XDP 
+                          memory-model generation;  
+                          cgroup UDP sendmsg hooks  
 
-  4.19                               SO_TXTIME/time-based TX; CAKE
+  4.19                    SO_TXTIME/time-based TX;  verified earlier
+                          CAKE                      
 
-  4.20                               TCP EDT pacing; BPF flow
-                                     dissector; taprio; rtnetlink
-                                     strict checking
+  4.20                    TCP EDT pacing; BPF flow  **verified/corrected**
+                          dissector; taprio;        
+                          rtnetlink strict checking 
 
-  5.0                                UDP GRO; UDP MSG_ZEROCOPY
+  5.0                     UDP GRO; UDP              corrected
+                          `MSG_ZEROCOPY`            
 
-  5.1                                devlink health; BPF spinlocks/DCE;
-                                     SO_BINDTOIFINDEX; Y2038
-                                     timestamps; io_uring
+  5.1                     devlink health; BPF       inherited
+                          spinlocks/DCE;            
+                          SO_BINDTOIFINDEX; Y2038   
+                          timestamps; io_uring      
 
-  5.3                                nexthop objects
+  5.3                     nexthop objects           **corrected**
 
-  5.5                                Wi-Fi AQL generation
+  5.5                     Wi-Fi AQL generation      corrected
 
-  5.6                                MPTCP; WireGuard; BPF
-                                     struct_ops/TCP CC; ethtool-netlink
+  5.6                     MPTCP; WireGuard; BPF     verified earlier
+                          struct_ops/TCP CC;        
+                          ethtool-netlink           
 
-  5.9                                SK_LOOKUP
+  5.9                     SK_LOOKUP                 inherited
 
-  5.12                               threaded NAPI
+  5.12                    threaded NAPI             **verified**
 
-  5.15                               IPv6 IOAM; MCTP; bridge per-VLAN
-                                     multicast
+  5.15                    IPv6 IOAM; MCTP; bridge   inherited/partly
+                          per-VLAN multicast        verified
 
-  5.17                               kfree_skb_reason()/structured skb
-                                     drop-reason foundation
+  5.17                    `kfree_skb_reason()` /    **verified**
+                          structured skb            
+                          drop-reason foundation    
 
-  5.19                               IPv6 BIG TCP; later drop-reason
-                                     expansion; MPTCP evolution
+  5.19                    IPv6 BIG TCP; later       verified earlier
+                          drop-reason expansion;    
+                          MPTCP evolution           
 
-  6.2                                TCP PLB; IPsec packet-offload
-                                     generation
+  6.2                     TCP PLB; IPsec            **series/release
+                          packet-offload generation generation verified**
 
-  6.3                                IPv4 BIG TCP; YNL generation
+  6.3                     IPv4 BIG TCP; YNL         verified earlier
+                          generation                
 
-  6.6                                AF_XDP multi-buffer
+  6.6                     AF_XDP multi-buffer       verified earlier
 
-  6.7                                netkit; initial TCP-AO mainline
-                                     support
+  6.7                     netkit; initial TCP-AO    **verified**
+                          mainline support          
 
-  6.11                               virtio-net AF_XDP RX zero-copy
+  6.11                    virtio-net AF_XDP RX      verified earlier
+                          zero-copy                 
 
-  6.12                               Device Memory TCP RX
+  6.12                    Device Memory TCP RX      verified earlier
 
-  6.13                               per-netns RTNL infrastructure and
-                                     migration milestone --- not
-                                     completion
+  6.13                    per-netns RTNL            **corrected**
+                          infrastructure and        
+                          migration milestone ---   
+                          not completion            
 
-  6.15                               io_uring ZCRX; further RTNL
-                                     breakup
+  6.15                    io_uring ZCRX; further    verified earlier
+                          RTNL breakup              
 
-  6.16                               Device Memory TCP TX; BPF qdisc;
-                                     DCCP removal
+  6.16                    Device Memory TCP TX; BPF verified earlier
+                          qdisc; DCCP removal       
 
-  6.18                               AccECN core; UDP RX work; DIBS
-                                     (separate shared-memory lineage)
+  6.18                    AccECN core; UDP RX work; verified earlier
+                          DIBS --- separate         
+                          shared-memory lineage     
 
-  7.0+                               later AccECN/default-policy,
-                                     queue/memory/offload and protocol
-                                     evolution; exact 7.x assignments
-                                     remain subject to the latest
-                                     provenance audit
-  ---------------------------------------------------------------------
+  7.x                     later                     continuing audit
+                          AccECN/default-policy,    
+                          queue/memory/offload and  
+                          protocol evolution        
+  --------------------------------------------------------------------------
+
+## Corrected boundary notes
+
+### BQL: development generation vs release generation
+
+The late 2011 BQL v3 series explicitly says that it was rebased to Linux
+3.2. That is a **development-tree base**, not sufficient evidence to
+label BQL a released 3.2 feature. The canonical chronology therefore
+records the BQL mainline generation at 3.3 while the provenance appendix
+retains the 3.2-rebase history.
+
+### Linux 4.20 is a real release
+
+Linux 4.20 was released in December 2018. Its merge-window networking
+highlights include:
+
+``` text
+TCP earliest-departure-time pacing
+BPF programmable flow dissector
+taprio
+rtnetlink strict checking
+```
+
+These must not be assigned to 5.0 merely because the next development
+cycle was renamed 5.0.
+
+### Two different BPF "sendmsg" lineages
+
+Do not collapse these into one feature:
+
+``` text
+4.17 generation
+  SOCKMAP / SK_MSG
+  message data-path processing
+
+4.18 generation
+  cgroup UDP sendmsg hooks
+  BPF_CGROUP_UDP4_SENDMSG / BPF_CGROUP_UDP6_SENDMSG
+  socket address / policy control
+```
+
+### Zero-copy chronology
+
+``` text
+4.14  MSG_ZEROCOPY transmit foundation
+4.18  TCP_ZEROCOPY_RECEIVE
+5.0   UDP MSG_ZEROCOPY release generation
+5.11  later TCP zero-copy receive API/implementation expansion
+```
+
+Thus 5.11 must not be described as the introduction of TCP zero-copy
+receive.
+
+### page_pool chronology
+
+The XDP redirect memory-return series in the 4.18 development cycle
+introduced the refurbished page_pool as the first allocator type for the
+new XDP memory-return model and explicitly identified AF_XDP zero-copy
+as an integration target. Later page_pool work is maturation/redesign,
+not the origin of the lineage.
 
 ## Canonical architecture model --- six axes
-
-The document now uses **one six-axis model** throughout:
 
 ``` text
 PERFORMANCE
@@ -2588,17 +2672,13 @@ OBSERVABILITY
 DRIVER FRAMEWORK
 ```
 
-Earlier axis-count wording has been superseded by this canonical
-six-axis model.
-
 ## Era model
 
-Era labels describe the **dominant architectural theme**, not the first
-appearance of every technology:
+Era labels describe dominant themes, not hard technology boundaries:
 
 ``` text
 3.x       scalability + virtualization + programmability foundations
-4.x       programmable fast-path formation + early zero-copy/memory foundations
+4.x       programmable fast path + early zero-copy / packet-memory foundations
 5.x       expansion + operationalization + memory-infrastructure maturation
 6.x–7.x   memory providers + queue ownership + finer-grained control/locking
 ```
@@ -4656,6 +4736,52 @@ single network model ────→ multi-network / VM-aware networking
 
 ------------------------------------------------------------------------
 
+# Part VII --- Release-attribution re-audit log
+
+This part records only corrections that materially changed the canonical
+chronology.
+
+  --------------------------------------------------------------------------
+  Topic                   Earlier problem         Re-audited result
+  ----------------------- ----------------------- --------------------------
+  BQL                     development base        distinguish 3.2-rebased
+                          treated as release      series from 3.3 mainline
+                                                  generation
+
+  4.20                    release omitted         restore 4.20 and move
+                                                  EDT/BPF flow
+                                                  dissector/taprio/strict
+                                                  rtnetlink there
+
+  TCP zero-copy RX        5.11 could read as      origin is 4.18; 5.11 is
+                          origin                  follow-up
+
+  `skb_drop_reason`       origin shown as 5.19 in foundation is 5.17; later
+                          some summaries          releases expand coverage
+
+  BPF sendmsg             SK_MSG and cgroup       split 4.17 SK_MSG from
+                          sendmsg conflated       4.18 cgroup UDP sendmsg
+                                                  hooks
+
+  page_pool               origin left pending /   refurbished page_pool is
+                          implied later           in the 4.18 XDP
+                                                  memory-return generation
+
+  threaded NAPI           thematic section only   add to canonical 5.12
+                                                  chronology
+
+  TCP-AO                  only later 7.x work     initial support is
+                          emphasized              canonical 6.7 milestone
+
+  per-netns RTNL          6.13 could read as      6.13 is
+                          completion              infrastructure/migration
+                                                  milestone
+  --------------------------------------------------------------------------
+
+The full v3.0→latest sweep continues to use the same rule: no remembered
+release number is promoted without release-level or exact upstream
+landing evidence.
+
 # Appendix --- Provenance and research notes
 
 > **Non-normative.** Release assignments are defined only by Part II.
@@ -4828,7 +4954,7 @@ processing の接点も増加した。
 
 ## 3. 2021--2022: zero-copy と BIG TCP
 
-### Linux 5.11 --- TCP zero-copy receive
+### Linux 5.11 --- TCP zero-copy receive follow-up/expansion (origin is 4.18)
 
 **Tags:** `TCP`, `zero-copy`, `performance`
 
@@ -8361,7 +8487,7 @@ selection, together with BPF `SK_REUSEPORT` and socket-lookup hooks.
 
 ------------------------------------------------------------------------
 
-### 39.5 2022 --- `skb_drop_reason`: packet-drop observability
+### 39.5 2022 --- `skb_drop_reason` coverage expansion (foundation is Linux 5.17)
 
 LWN coverage and patch archives show a broad effort to replace opaque
 `kfree_skb()` sites with explicit drop reasons.
