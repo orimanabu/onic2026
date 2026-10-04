@@ -3499,3 +3499,527 @@ Remaining high-priority items:
 7.  complete MPTCP release-by-release milestone table;
 8.  audit the 2019--2026 LWN article list for omissions after these
     thematic passes.
+
+------------------------------------------------------------------------
+
+# 39. Completeness audit --- LWN networking topics missing from the first thematic passes
+
+この章は「mainline に入った大機能」だけを追う前章までの方式を補完する。
+LWN の networking coverage
+を年別に再走査し、次の3種類を区別して記録する。
+
+``` text
+A. merged architecture/API changes
+B. important development series / design discussions
+C. significant failed, stalled, or removed approaches
+```
+
+Linux networking の技術史を理解するには C も重要である。 例えば bpfilter
+や P4TC は、mainline に定着した機能だけを見ていると見落とす。
+
+------------------------------------------------------------------------
+
+## 39.1 2020 --- IPv6 extension-header processing
+
+LWN feature:
+
+-   *The trouble with IPv6 extension headers*
+-   2020-01-07
+-   https://lwn.net/Articles/808896/
+
+IPv6 extension headers は IPv4 option より柔軟な protocol extension
+mechanism だが、 kernel fast path、middlebox
+behavior、security、offloadability との間に tension がある。
+
+この議論は後の BIG TCP で特に興味深い。
+
+``` text
+2020:
+IPv6 extension headers の generic processing をどう扱うか
+
+2019–2022:
+IPv6 BIG TCP が HBH/Jumbogram mechanism を利用
+
+2026:
+BIG TCP が HBH dependency を取り除く方向へ
+```
+
+したがって BIG TCP の HBH removal は単なる code cleanup ではなく、
+長年の IPv6 extension-header processing/offload complexity
+の文脈でも読める。
+
+------------------------------------------------------------------------
+
+## 39.2 2020 --- threaded NAPI
+
+LWN feature:
+
+-   *NAPI polling in kernel threads*
+-   2020-10-09
+-   https://lwn.net/Articles/833840/
+
+Traditional NAPI:
+
+``` text
+NIC IRQ
+  │
+  ▼
+schedule NAPI
+  │
+  ▼
+NET_RX softirq
+  │
+  ▼
+driver poll()
+```
+
+Threaded NAPI:
+
+``` text
+NIC IRQ
+  │
+  ▼
+schedule NAPI
+  │
+  ▼
+dedicated kernel thread
+  │
+  ▼
+driver poll()
+```
+
+Motivation:
+
+-   softirq context から network work を切り離す;
+-   CPU affinity / scheduling priority を管理しやすくする;
+-   heavily loaded CPUs と idle CPUs の imbalance を改善する;
+-   latency-sensitive workloads で network processing
+    を制御しやすくする。
+
+Initial patch evidence:
+
+-   `net: add support for threaded NAPI polling`
+-   2020-08
+-   https://lwn.net/Articles/828372/
+
+この系列は page_pool/BIG TCP
+のような「packet当たりのcostを減らす」変更とは異なり、 **network
+processingをどのexecution contextで実行するか**を変える。
+
+------------------------------------------------------------------------
+
+## 39.3 2020 → 2025 --- bpfilter: failed in-kernel experiment and later userspace revival
+
+### 2020
+
+LWN:
+
+-   *Rethinking bpfilter and user-mode helpers*
+-   2020-06-12
+-   https://lwn.net/Articles/822744/
+
+初期 bpfilter は kernel 内から user-mode helper/blob を起動し、iptables
+compatibility を BPF-based firewallへ変換する構想だった。
+
+しかし開発停滞と user-mode helper infrastructure 自体への懸念から、
+kernel-side experiment は失敗した方向として扱われた。
+
+### 2025
+
+LWN:
+
+-   *Faster firewalls with bpfilter*
+-   2025-05-14
+-   https://lwn.net/Articles/1017705/
+
+2025年の bpfilter は、古い in-kernel user-mode-blob design
+と同一視してはいけない。 userspace daemon / BPF-based packet filtering
+として再構成された別世代の取り組みである。
+
+Change-log classification:
+
+``` text
+bpfilter v1
+  kernel user-mode helper architecture
+       │
+       └── stalled / removed direction
+
+bpfilter later project
+  userspace control plane
+       │
+       └── BPF datapath/firewall acceleration
+```
+
+------------------------------------------------------------------------
+
+## 39.4 2021 --- `SO_REUSEPORT` connection-failure semantics
+
+LWN feature:
+
+-   *Avoiding unintended connection failures with SO_REUSEPORT*
+-   2021-04-23
+-   https://lwn.net/Articles/853637/
+
+`SO_REUSEPORT` allows multiple sockets/processes to bind the same
+listening endpoint and distribute incoming connections.
+
+Problem discussed by LWN:
+
+``` text
+incoming SYN
+     │
+reuseport group
+ ┌───┼───┐
+ ▼   ▼   ▼
+S1  S2  S3
+
+selected listener closes / becomes unavailable
+     │
+     └── connection may be lost unexpectedly
+```
+
+This belongs in the change log because it concerns **listener selection
+and failover semantics at high connection rates**, not merely a
+socket-option bug.
+
+It also forms part of the broader trend toward scalable listener/socket
+selection, together with BPF `SK_REUSEPORT` and socket-lookup hooks.
+
+------------------------------------------------------------------------
+
+## 39.5 2022 --- `skb_drop_reason`: packet-drop observability
+
+LWN coverage and patch archives show a broad effort to replace opaque
+`kfree_skb()` sites with explicit drop reasons.
+
+TCP state-transition series:
+
+-   initial: https://lwn.net/Articles/895346/
+-   v3: https://lwn.net/Articles/897523/
+
+Concept:
+
+``` text
+old:
+
+packet
+  │
+validation/state processing
+  │
+  └── kfree_skb()
+         │
+         └── "packet disappeared"
+
+
+new:
+
+packet
+  │
+validation/state processing
+  │
+  └── SKB_DROP_REASON_*
+         │
+         ▼
+trace / drop monitor / debugging
+```
+
+The important architectural change is that **drop cause becomes
+structured kernel data** instead of requiring inference from packet
+traces or scattered tracepoints.
+
+This is highly relevant to production debugging of:
+
+-   TCP state-machine drops;
+-   routing/input validation;
+-   firewall/stack behavior;
+-   performance loss.
+
+It should therefore be treated as a networking observability milestone.
+
+------------------------------------------------------------------------
+
+## 39.6 2022 --- in-kernel TLS handshake
+
+LWN:
+
+-   *Extending in-kernel TLS support*
+-   2022-04-25
+-   https://lwn.net/Articles/892216/
+-   *Adding an in-kernel TLS handshake*
+-   2022-06-01
+-   https://lwn.net/Articles/896746/
+
+Linux already had KTLS record-layer support, but initiating TLS from
+kernel consumers such as NFS/NVMe was difficult because handshake logic
+remained in userspace.
+
+Existing model:
+
+``` text
+userspace
+  │ TLS handshake
+  ▼
+established TLS socket
+  │
+  └── hand socket to kernel consumer
+```
+
+Desired model:
+
+``` text
+kernel consumer (NFS/NVMe/...)
+       │
+       ▼
+kernel requests handshake
+       │
+       ├── kernel TLS integration
+       └── userspace assistance where needed
+```
+
+This is a significant socket/security API evolution even though the
+cryptographic handshake is not simply "move all TLS code into kernel".
+
+The LSFMM discussion also noted possible relevance to future
+QUIC-related kernel work.
+
+------------------------------------------------------------------------
+
+## 39.7 2024 --- P4TC as an important *non-merged* architecture proposal
+
+LWN:
+
+-   *P4TC hits a brick wall*
+-   2024-06-10
+-   https://lwn.net/Articles/977310/
+
+P4TC proposed integrating P4-programmable packet processing with Linux
+traffic control.
+
+Conceptually:
+
+``` text
+P4 description
+     │
+     ▼
+P4TC objects / pipeline
+     │
+     ▼
+Linux TC datapath
+```
+
+The proposal had been under review since early 2023, but LWN reported
+substantial maintainer objections and a stalled merge path.
+
+This entry is deliberately classified:
+
+``` text
+status: important design effort / not mainline milestone
+```
+
+Why include it?
+
+Because later BPF qdisc and BPF/TC programmability discussions make more
+sense when viewed alongside the kernel community's concerns around
+introducing another programmable network pipeline/API.
+
+------------------------------------------------------------------------
+
+## 39.8 2025 --- BPF qdisc with `struct_ops`
+
+Patch series:
+
+-   `[PATCH bpf-next v6 00/11] bpf qdisc`
+-   2025-03-19
+-   https://lwn.net/Articles/1014971/
+
+The design uses BPF `struct_ops` to implement traffic-control queueing
+disciplines.
+
+``` text
+traditional qdisc:
+
+kernel C qdisc
+   │
+enqueue/dequeue
+   │
+scheduler
+
+
+BPF qdisc:
+
+BPF struct_ops
+   │
+enqueue/dequeue policy
+   │
+TC qdisc framework
+```
+
+v6 intentionally kept the first version minimal:
+
+-   attach only at root or `mq`;
+-   classful qdisc support deferred;
+-   direct `bpf_list` / `bpf_rbtree` skb support deferred.
+
+This directly extends the idea first demonstrated by BPF
+`tcp_congestion_ops` in Linux 5.6:
+
+``` text
+BPF struct_ops
+    ├── TCP congestion control
+    └── qdisc / packet scheduling
+```
+
+LWN's 2025 merge-window coverage records BPF-implemented qdisc support
+among networking changes:
+
+-   https://lwn.net/Articles/1023924/
+
+------------------------------------------------------------------------
+
+## 39.9 2025 --- DCCP removal
+
+Patch series:
+
+-   `[PATCH v1 net-next 0/4] net: Retire DCCP.`
+-   2025-04-07
+-   https://lwn.net/Articles/1016830/
+
+LWN's merge-window coverage later records DCCP removal:
+
+-   https://lwn.net/Articles/1023924/
+
+The series removes:
+
+-   `net/dccp`;
+-   associated netfilter/LSM integration;
+-   documentation;
+-   DCCP-specific shared networking code.
+
+UAPI headers were deliberately retained.
+
+The removal is architecturally interesting because TCP and DCCP shared
+infrastructure. Once DCCP is gone, code such as:
+
+``` text
+tcp_or_dccp_get_hashinfo()
+```
+
+can become TCP-specific, enabling further cleanup.
+
+This is a useful example of **network-stack simplification by protocol
+removal**, not just feature addition.
+
+------------------------------------------------------------------------
+
+# 40. Completeness audit: classification table
+
+  ---------------------------------------------------------------------------------
+  Topic                               Year Classification       Why it matters
+  ------------------ --------------------- -------------------- -------------------
+  IPv6                                2020 design/API           protocol
+  extension-header                         discussion           extensibility vs
+  processing                                                    fast path/offload
+
+  Threaded NAPI                       2020 merged architecture  moves RX polling
+                                           direction            out of softirq
+                                                                context
+
+  bpfilter rethink                    2020 failed/stalled       BPF firewall
+                                           design               architecture
+                                                                history
+
+  SO_REUSEPORT                        2021 socket semantics     scalable listener
+  failover                                                      behavior
+
+  skb drop reasons                    2022 observability        structured
+                                                                packet-drop
+                                                                diagnostics
+
+  in-kernel TLS                       2022 API/architecture     kernel-originated
+  handshake                                                     secure transports
+
+  P4TC                            2023--24 significant          programmable TC
+                                           non-merged proposal  pipeline debate
+
+  BPF qdisc                           2025 merged/programming   `struct_ops`
+                                           model                reaches packet
+                                                                scheduling
+
+  DCCP removal                        2025 removal/cleanup      simplifies shared
+                                                                transport code
+  ---------------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 41. Audit finding: article list vs kernel-change list
+
+The document now intentionally contains **two overlapping indexes**.
+
+## Kernel-change index
+
+Use this when the question is:
+
+> "What changed in Linux networking?"
+
+It prioritizes merged changes and release mapping.
+
+## LWN-history index
+
+Use this when the question is:
+
+> "What networking developments did LWN cover?"
+
+It additionally includes:
+
+-   RFCs;
+-   stalled proposals;
+-   architectural debates;
+-   removals;
+-   user-space/kernel-interface milestones.
+
+This distinction prevents a common completeness error:
+
+``` text
+LWN networking article
+       ≠
+mainline kernel feature
+```
+
+Examples:
+
+``` text
+P4TC article
+    → important LWN networking history
+    → not a mainline feature
+
+Device Memory TCP
+    → LWN development history
+    → later mainline feature
+
+DCCP removal
+    → mainline change
+    → removal rather than feature addition
+```
+
+------------------------------------------------------------------------
+
+# 42. Next completeness-audit pass
+
+The next audit should focus on categories that broad year searches can
+miss:
+
+1.  routing / FIB / nexthop API;
+2.  netlink/YNL specification work;
+3.  TC actions / qdisc / hardware offload;
+4.  bridge / VLAN / multicast;
+5.  IPv6 IOAM / SRv6;
+6.  socket APIs and `SO_*` / `TCP_*` additions;
+7.  network namespaces;
+8.  MCTP and other new protocol families;
+9.  TLS / QUIC / encrypted transports;
+10. removal/deprecation stories;
+11. Wi-Fi/mac80211 only where core networking architecture is affected;
+12. Rust networking abstractions only where they affect netdev core.
+
+After that category audit, the article inventory can be compared against
+the release matrix to produce a final "coverage gaps" section.
