@@ -754,10 +754,11 @@ C/D は現在の canonical milestone table では使用していないが、将�
 | 6.15 | io_uring ZCRX; further RTNL breakup | A | merge/series evidence |
 | 6.16 | Device Memory TCP TX; BPF qdisc; DCCP removal | A | release/final-series generation; BPF-qdisc exact inventory pending |
 | 6.18 | AccECN core; UDP RX evolution; DIBS separate shared-memory lineage | B | release-generation |
-| 7.0 | cake_mq / multi-queue-aware sch_cake; IPv6 BIG TCP without synthetic HBH jumbo header | A | net-next-7.0 / v7.0 release generation |
-| 7.1 | RX HW queue leasing | A | revised RX implementation is contained in final `v7.1`; TX remains unmerged |
-| 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255 | A | two limit-expansion commits are contained in final `v7.2`; remaining series patches are preparation/selftests |
-| 7.3-rc / mainline | BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE | A-rc | net-next-7.3 merged 2026-08-20; final 7.3 pending |
+| 6.19 | `dev_queue_xmit()` llist TX scheduling; threaded-NAPI kthread busy-poll extension; WireGuard YNL-described Netlink | A | final `v6.19`; selected architecture milestones from the 6.19 networking cycle |
+| 7.0 | cake_mq / multi-queue-aware sch_cake; IPv6 BIG TCP without synthetic HBH jumbo header; AccECN enablement; large RX buffers for memory providers/io_uring ZCRX | A | final `v7.0`; AccECN enablement and large-buffer ZCRX complete earlier lineages |
+| 7.1 | RX HW queue leasing; dedicated qdisc-drop tracepoint | A | final `v7.1`; TX queue leasing remains unmerged; qdisc drop context becomes directly observable |
+| 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255; PPPoE GRO/GSO | A | final `v7.2`; MPTCP limit expansion plus aggregation support over PPPoE |
+| 7.3-rc / mainline | BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE; per-netns netdev-unregistration infrastructure | A-rc | net-next-7.3 merged 2026-08-20; final 7.3 pending |
 
 **7.3 status note:** 調査基準日時点では final 7.3 は未リリースのため `A-rc` とする。正式リリースを確認した時点で `A` へ更新する。
 
@@ -1094,6 +1095,22 @@ global RTNL
 rule変更が RTNL-lock-less化され、further RTNL-dependency
 reductionやlock-less GET準備と 同じ「global
 RTNL依存を減らす」流れとしてmainlineへ入った。
+
+さらに 7.3 cycle では per-netns netdev unregistration infrastructure が入り、
+per-netns RTNL の大きな blocker だった device unregistration path の分解も進んだ。
+これは 6.13 以降の per-netns RTNL lineage の継続として扱う。
+
+------------------------------------------------------------------------
+
+## Linux 6.19 --- TX scheduling と structured Netlink の継続
+
+6.19 では `dev_queue_xmit()` の deferred TX path が lockless list (`llist`) を使う形へ
+再構成され、shared qdisc / multiqueue TX scalability の改善が進んだ。ここでは特定 benchmark の
+「4倍」という値を一般化せず、**TX scheduling architecture の変更**として扱う。
+
+同じ release では threaded NAPI の kthread-based busy polling 拡張と、WireGuard Netlink の
+YAML/YNL specification 化も入り、execution model と machine-readable Netlink API の両方で
+既存 lineage が前進した。
 
 ------------------------------------------------------------------------
 
@@ -2018,7 +2035,15 @@ Appendix は evidence catalog である。そこに現れる日付は RFC date�
 | DIM / `net_dim` | B | Linux 4.16 Net DIM generation; Linux 5.3 common `lib/dim` generalization; exact SHAs pending |
 | `cake_mq` | A | `net-next-7.0` pull explicitly lists multi-queue-aware `sch_cake`; canonical generation Linux 7.0 |
 
-**Queue-leasing release boundary:** initial merge `77b9c4a438fc66e2ab004c411056b3fb71a54f2c` と revert `8766d61a1d33cb5f15bfdd6ce9832bbe1fc649c2` はともに v7.0 merge window 内で相殺され、v7.0 release には含まれない。revised RX implementation `15089225889ba4b29f0263757cd66932fa676cb0` は final `v7.1` に含まれる。TX queue leasing は未 merge である。
+**Queue-leasing release boundary:** initial merge `77b9c4a438fc66e2ab004c411056b3fb71a54f2c` と revert `8766d61a1d33cb5f15bfdd6ce9832bbe1fc649c2` はともに v7.0 merge window 内で相殺され、v7.0 release には含まれない。v7.1 の revised RX series では `7789c6bb76ac` (`net: Add queue-create operation`) が queue-leasing infrastructure の代表的な series anchor であり、final `v7.1` に含まれる。以前ここに記載していた `15089225889ba4b29f0263757cd66932fa676cb0` は `Merge branch 'netkit-support-for-io_uring-zero-copy-and-af_xdp'` であり、queue-leasing implementation commit として扱うのは誤りだったため撤回した。TX queue leasing は未 merge である。
+
+### 2026 networking-cycle audit note
+
+6.19--7.3 の再監査では、全 networking commit を chronology に列挙するのではなく、
+本書の6軸（performance / programmability / memory / control plane / observability / driver framework）
+の長期 lineage を変える項目だけを Part II に採用した。したがって TLS RFC 8449、ICMP RFC 5837、
+UDP-Lite removal、個別 XFRM message、TCP-AO crypto-library refactor、個別 tunnel/offload enhancement などは
+有用な変更だが、本版では canonical architecture milestone には昇格させていない。
 
 # Appendix --- Source index（非正規）
 
