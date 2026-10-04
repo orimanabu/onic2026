@@ -1810,46 +1810,46 @@ This upgrades confidence in the anchor itself to **A** while retaining
 
 ### 6.8 Updated exact-anchor table
 
-  ----------------------------------------------------------------------------------------------------------------
-  Kernel         Feature         Exact mainline anchor                        Scope                 Quality
-  -------------- --------------- -------------------------------------------- --------------------- --------------
-  3.2            DQL/BQL         `75957ba36c05b979701e9ec64b37819adc12f830`   DQL core              A
-                 foundation                                                                         
+  -------------------------------------------------------------------------------------------------------
+  Kernel    Feature         Exact mainline anchor                        Scope                 Quality
+  --------- --------------- -------------------------------------------- --------------------- ----------
+  3.2       DQL/BQL         `75957ba36c05b979701e9ec64b37819adc12f830`   DQL core              A
+            foundation                                                                         
 
-  3.5            CoDel           `76e3cc126bb223013a6b9a0e2a51238d1ef2e409`   qdisc/core algorithm  A
+  3.5       CoDel           `76e3cc126bb223013a6b9a0e2a51238d1ef2e409`   qdisc/core algorithm  A
 
-  3.5            fq_codel        `4b549a2ef4bef9965d97cbd992ba67930cd3e0fe`   fq_codel qdisc        A
+  3.5       fq_codel        `4b549a2ef4bef9965d97cbd992ba67930cd3e0fe`   fq_codel qdisc        A
 
-  3.6            TCP Small       `46d3ceabd8d98ed0ad10f20c595ca784e34786c5`   TSQ introduction      A
-                 Queues                                                                             
+  3.6       TCP Small       `46d3ceabd8d98ed0ad10f20c595ca784e34786c5`   TSQ introduction      A
+            Queues                                                                             
 
-  3.6            TCP Fast Open   `cf60af03ca4e71134206809ea892e49b92a88896`   MSG_FASTOPEN client   A
-                 client                                                       API anchor            
+  3.6       TCP Fast Open   `cf60af03ca4e71134206809ea892e49b92a88896`   MSG_FASTOPEN client   A
+            client                                                       API anchor            
 
-  3.7            VXLAN           `d342894c5d2f8c7df194c793ec4059656e09ca31`   initial VXLAN         A
+  3.7       VXLAN           `d342894c5d2f8c7df194c793ec4059656e09ca31`   initial VXLAN         A
 
-  3.13           nftables        `96518518...`                                core introduction     A-anchor
+  3.13      nftables        `96518518...`                                core introduction     A-anchor
 
-  3.13           nftables sets   `20a69341f2d00cd042e81c82289fba8a13c05a25`   netlink set API       A
+  3.13      nftables sets   `20a69341f2d00cd042e81c82289fba8a13c05a25`   netlink set API       A
 
-  3.18           bpf() + maps    `99c55f7d47c0dc6fc64729f37bf435abf43f4c60`   syscall/maps          A
+  3.18      bpf() + maps    `99c55f7d47c0dc6fc64729f37bf435abf43f4c60`   syscall/maps          A
 
-  3.18           BPF program     `09756af46893c18839062976c3252e93a1beeba7`   program load          A
-                 load/verifier                                                                      
-                 API                                                                                
+  3.18      BPF program     `09756af46893c18839062976c3252e93a1beeba7`   program load          A
+            load/verifier                                                                      
+            API                                                                                
 
-  3.18           DCTCP           `e3118e8359bb7c59555aca60c725106e6d78c5ce`   CC algorithm          A
+  3.18      DCTCP           `e3118e8359bb7c59555aca60c725106e6d78c5ce`   CC algorithm          A
 
-  3.19           ipvlan          `2ad7bf363841...`                            initial driver        A
+  3.19      ipvlan          `2ad7bf363841...`                            initial driver        A
 
-  4.9            BBR             `0f8782ea14974ce992618b55f0c041ef43ed0b78`   BBR algorithm         A
+  4.9       BBR             `0f8782ea14974ce992618b55f0c041ef43ed0b78`   BBR algorithm         A
 
-  4.18           AF_XDP          `c0c77d8fb787cfe0c3fca689c2a30d1dad4eaba7`   foundational          A
-                                                                              UMEM/address-family   
-                                                                              anchor                
+  4.18      AF_XDP          `c0c77d8fb787cfe0c3fca689c2a30d1dad4eaba7`   foundational          A
+                                                                         UMEM/address-family   
+                                                                         anchor                
 
-  4.19           CAKE            `046f6fd5daefac7f5abdafb436b30f63bc7c602b`   qdisc introduction    A
-  ----------------------------------------------------------------------------------------------------------------
+  4.19      CAKE            `046f6fd5daefac7f5abdafb436b30f63bc7c602b`   qdisc introduction    A
+  -------------------------------------------------------------------------------------------------------
 
 ### 6.9 What remains intentionally unresolved
 
@@ -1878,6 +1878,352 @@ SO_TXTIME/ETF complete series
 For these, release assignment is already strong. The remaining task is
 exact **series boundary** identification, not rediscovering which kernel
 release contained the feature.
+
+------------------------------------------------------------------------
+
+## 7. v4.x provenance re-audit pass 4 --- series boundaries and design changes
+
+This pass closes the remaining high-value gaps by preserving
+multi-commit and API-rework history.
+
+### 7.1 Linux 4.3 --- VRF, lightweight tunnels, OVS conntrack
+
+David Miller's networking pull for 4.3 explicitly groups these three
+major changes:
+
+-   OVS conntrack support
+-   initial VRF support
+-   lightweight tunnel infrastructure
+
+LWN: https://lwn.net/Articles/657074/
+
+The lightweight-tunnel work is itself a 22-patch series:
+https://lwn.net/Articles/651497/
+
+The cover letter explains that it consolidates OVS/native tunnel
+infrastructure and adds encapsulation-independent, flow-based
+lightweight tunnels.
+
+OVS conntrack is likewise a real series rather than one isolated patch:
+https://lwn.net/Articles/652967/
+
+The initial series contains the CT action plus
+state/zone/mark/label/helper integration. Later revisions reached at
+least v6 before merge.
+
+Correct representation:
+
+``` text
+Linux 4.3
+ ├─ VRF initial foundation
+ ├─ LWT infrastructure (multi-patch)
+ └─ OVS conntrack (multi-patch)
+      ├─ CT action
+      ├─ ct_state / zone
+      ├─ ct_mark
+      ├─ ct_label
+      └─ helpers
+```
+
+**Quality A for release/series provenance; B for complete per-patch SHA
+enumeration.**
+
+### 7.2 Linux 4.7 --- TC direct packet access
+
+The verifier documentation and 4.7 merge evidence agree on the semantic
+boundary: `cls_bpf` / `act_bpf` programs gained direct access through
+`skb->data` and `skb->data_end`.
+
+This is more important historically than forcing one "TC-BPF commit"
+label:
+
+``` text
+old:
+  helper-mediated packet loads
+
+4.7:
+  skb->data / skb->data_end
+  + verifier bounds proof
+
+4.8:
+  same basic verifier model applied to xdp_md packet pointers
+```
+
+**Quality A for the architectural/release statement; exact patch SHA
+remains B-level provenance.**
+
+### 7.3 Linux 4.8 --- XDP initial series boundary
+
+The late XDP review history is now pinned to v8:
+
+https://lists.openwall.net/netdev/2016/07/12/36
+
+Patch 01/11 adds:
+
+``` text
+BPF_PROG_TYPE_XDP
+struct xdp_md
+packet start/end direct access
+XDP action return model
+```
+
+The series then wires this model into early driver receive paths.
+
+The historical unit should therefore be:
+
+``` text
+XDP core program model
+       +
+driver integration
+       =
+first-generation XDP
+```
+
+rather than treating `BPF_PROG_TYPE_XDP` alone as all of XDP.
+
+**Quality A for final-review-series identity / B for canonical SHA
+enumeration.**
+
+### 7.4 Linux 4.10 --- cgroup BPF is a family, not one hook
+
+The 4.10 generation should distinguish:
+
+``` text
+BPF_PROG_TYPE_CGROUP_SKB
+  ingress / egress packet hooks
+
+BPF_PROG_TYPE_CGROUP_SOCK
+  socket-create context
+```
+
+A strong exact socket-side anchor is:
+
+``` text
+610236587600...
+bpf: Add new cgroup attach type to enable sock modifications
+```
+
+The final v7 review patch is:
+https://lists.openwall.net/netdev/2016/12/01/166
+
+The commit explicitly says `BPF_PROG_TYPE_CGROUP_SOCK` is similar to
+`BPF_PROG_TYPE_CGROUP_SKB`, but runs when a process in the cgroup opens
+an AF_INET/AF_INET6 socket.
+
+This corrects an overly compressed "4.10 cgroup BPF" label into multiple
+attachment contexts.
+
+### 7.5 Linux 4.10 --- BPF LWT series boundary
+
+The LWT-BPF series: https://lwn.net/Articles/705609/
+
+establishes BPF execution at lightweight-tunnel input/output/xmit paths.
+
+The correct provenance unit is the series because it includes both:
+
+``` text
+BPF program types / verifier context
+        +
+LWT route attachment and execution
+```
+
+This is a direct ancestor of later programmable route encapsulation and
+SRv6/BPF work.
+
+**Quality A for review/landing identity / B for exact SHA set.**
+
+### 7.6 Linux 4.13 / 4.14 --- SOCK_OPS → SOCKMAP
+
+These should be read as two consecutive architectural steps:
+
+``` text
+4.13 SOCK_OPS
+  observe/control TCP connection events and parameters
+        ↓
+4.14 SOCKMAP
+  store sockets in a BPF map and redirect data between sockets
+```
+
+SOCK_OPS final-series evidence remains: https://lwn.net/Articles/727189/
+
+Kernel documentation independently states SOCKMAP was introduced in
+4.14: https://static.lwn.net/kerneldoc/bpf/map_sockmap.html
+
+This sequence is the immediate foundation for later SK_MSG and
+socket-level BPF data paths.
+
+### 7.7 Linux 4.18 --- AF_XDP is two related landing stories
+
+The history should explicitly separate address-family introduction from
+zero-copy enablement.
+
+AF_XDP address-family review lineage:
+
+-   RFC: https://lwn.net/Articles/745934/
+-   RFC v2: https://lwn.net/Articles/750293/
+-   15-patch merge-near series: https://lwn.net/Articles/752546/
+
+The v2/merge-near series deliberately removed zero-copy code to make the
+AF_XDP socket model reviewable first.
+
+Then zero-copy support followed as a separate series:
+
+-   RFC 12 patches: https://lwn.net/Articles/754659/
+-   11-patch series: https://lwn.net/Articles/756549/
+
+The 4.18 merge-window confirms AF_XDP landed:
+https://lwn.net/Articles/756898/
+
+Therefore:
+
+``` text
+AF_XDP socket model
+ RX/TX rings + UMEM + XSKMAP
+          ↓
+separate ZC series
+ driver queue / DMA integration
+          ↓
+AF_XDP zero-copy fast path
+```
+
+This is a more accurate lineage than saying "4.18 introduced AF_XDP
+zero-copy" as if it were one atomic patch.
+
+### 7.8 Linux 4.18 --- TCP zero-copy receive API changed before release
+
+This feature has an important API-design correction that should remain
+visible.
+
+Initial model: https://lwn.net/Articles/752188/
+
+The first design used `mmap()` itself to consume/map socket data.
+Locking/API concerns led to a rework.
+
+v3 rework series: https://lwn.net/Articles/752938/
+
+Final model:
+
+``` text
+mmap()
+  reserve/setup userspace mapping
+        +
+getsockopt(TCP_ZEROCOPY_RECEIVE)
+  request/consume TCP data into mapping
+```
+
+LWN's detailed rework article: https://lwn.net/Articles/754681/
+
+And 4.18 merge-window confirmation: https://lwn.net/Articles/756898/
+
+This is exactly the kind of case where preserving RFC → API rework →
+landing is more informative than recording only a final SHA.
+
+**Quality A for design/landing provenance.**
+
+### 7.9 Linux 4.19 --- SO_TXTIME / time-based transmission is a series
+
+The early RFC v3 includes 18 patches and introduces `SO_TXTIME`:
+https://lists.openwall.net/netdev/2018/03/07/24
+
+A later v2 net-next series has 14 patches; its socket-option patch is:
+https://lists.openwall.net/netdev/2018/07/03/136
+
+The feature spans:
+
+``` text
+SO_TXTIME userspace API
+      ↓
+SCM_TXTIME ancillary data
+      ↓
+skb transmit timestamp
+      ↓
+time-aware qdisc scheduling
+      ↓
+hardware/software scheduling paths
+```
+
+LWN 4.19 merge-window confirms time-based packet transmission landed.
+
+The previously recorded `80b14dee2bea...` should therefore be labeled an
+API anchor, not "the SO_TXTIME feature commit".
+
+**Quality A for final-series/release provenance / B for full SHA
+enumeration.**
+
+### 7.10 Revised provenance rule for multi-commit networking features
+
+For pre-v5 history the document now uses this rule:
+
+``` text
+single coherent introduction commit
+  → exact SHA can be the feature anchor
+
+multi-patch subsystem feature
+  → identify final/merge-near series
+  → list exact SHAs only when verified
+  → never pretend one patch is the whole feature
+
+API redesigned before release
+  → preserve RFC/design history
+  → preserve rework
+  → identify landed API separately
+```
+
+This prevents false precision while still providing stronger provenance
+than a release-note-only history.
+
+### 7.11 Pass-4 status
+
+  ------------------------------------------------------------------------
+  Feature                                    Release Provenance after pass
+                                                     4
+  --------------------- ---------------------------- ---------------------
+  VRF                                            4.3 release/merge strong;
+                                                     exact full SHA audit
+                                                     optional
+
+  Lightweight tunnels                            4.3 22-patch series +
+                                                     merge verified
+
+  OVS conntrack                                  4.3 multi-revision
+                                                     series + merge
+                                                     verified
+
+  TC direct packet                               4.7 semantics/release
+  access                                             verified
+
+  XDP                                            4.8 late v8 series
+                                                     boundary verified
+
+  cgroup BPF                                    4.10 attachment-family
+                                                     model clarified;
+                                                     exact socket anchor
+                                                     added
+
+  BPF LWT                                       4.10 series boundary
+                                                     verified
+
+  SOCK_OPS                                      4.13 final-series
+                                                     provenance
+
+  SOCKMAP                                       4.14 kernel-doc release
+                                                     provenance
+
+  AF_XDP                                        4.18 address-family series
+                                                     separated from ZC
+                                                     series
+
+  TCP ZC RX                                     4.18 initial API →
+                                                     reworked landed API
+                                                     verified
+
+  SO_TXTIME                                     4.19 RFC/final-series
+                                                     architecture verified
+  ------------------------------------------------------------------------
+
+At this point the remaining exact-SHA work is mainly archival
+completeness rather than a material uncertainty about the historical
+evolution.
 
 ------------------------------------------------------------------------
 
