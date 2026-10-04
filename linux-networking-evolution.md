@@ -1621,6 +1621,266 @@ release identification.
 
 ------------------------------------------------------------------------
 
+## 6. v3.x / v4.x exact-anchor pass 3
+
+This pass upgrades previously release-only or series-only entries where
+an exact mainline introduction anchor can be independently verified.
+
+### 6.1 Linux 3.2 --- Dynamic Queue Limits / BQL foundation
+
+The core DQL implementation is:
+
+``` text
+75957ba36c05b979701e9ec64b37819adc12f830
+dql: Dynamic queue limits
+```
+
+This is the reusable queue-limit library underneath BQL. The original
+LWN series remains:
+
+-   https://lwn.net/Articles/469651/
+-   https://lwn.net/Articles/469652/
+
+Important distinction:
+
+``` text
+DQL = generic dynamic queue-limit algorithm/library
+BQL = networking driver use of DQL through netdev TX queue accounting
+```
+
+Thus `75957ba...` is a strong DQL foundation anchor, not a claim that
+one commit alone converted every NIC driver to BQL.
+
+**Quality A for DQL core / B for complete BQL rollout.**
+
+### 6.2 Linux 3.5 --- CoDel and fq_codel
+
+Exact introduction anchors:
+
+``` text
+76e3cc126bb223013a6b9a0e2a51238d1ef2e409
+codel: Controlled Delay AQM
+
+4b549a2ef4bef9965d97cbd992ba67930cd3e0fe
+fq_codel: Fair Queue Codel AQM
+```
+
+LWN preserves the late CoDel patch: https://lwn.net/Articles/496502/
+
+A 2025 upstream fix independently references both original commits:
+
+``` text
+Fixes: 4b549a2ef4be ("fq_codel: Fair Queue Codel AQM")
+Fixes: 76e3cc126bb2 ("codel: Controlled Delay AQM")
+```
+
+This is unusually strong provenance.
+
+**Quality A.**
+
+### 6.3 Linux 3.6 --- TCP Small Queues
+
+Exact introduction:
+
+``` text
+46d3ceabd8d98ed0ad10f20c595ca784e34786c5
+tcp: TCP Small Queues
+```
+
+LWN: https://lwn.net/Articles/506237/
+
+The commit and review text explicitly state the design goal: reduce TCP
+packets queued in qdisc/device queues, reducing RTT and cwnd bias caused
+by bufferbloat.
+
+**Quality A.**
+
+### 6.4 Linux 3.6 --- TCP Fast Open client
+
+The client feature is a series. One strong userspace/API anchor is:
+
+``` text
+cf60af03ca4e71134206809ea892e49b92a88896
+net-tcp: Fast Open client - sendmsg(MSG_FASTOPEN)
+```
+
+The patch makes `MSG_FASTOPEN` a combined connect+write operation and
+documents the `tcp_fastopen` client bit.
+
+The original v3 series is visible on netdev:
+https://lists.openwall.net/netdev/2012/07/19/99
+
+A 2026 security fix independently references:
+
+``` text
+Fixes: cf60af03ca4e ("net-tcp: Fast Open client - sendmsg(MSG_FASTOPEN)")
+```
+
+This provides particularly strong long-term confirmation.
+
+**Quality A for the client API anchor / B for full TFO series.**
+
+### 6.5 Linux 3.13 --- nftables
+
+The initial nftables core introduction is anchored by:
+
+``` text
+96518518...
+netfilter: add nftables
+```
+
+The commit describes nftables as the intended successor to iptables and
+introduces the register-based pseudo-machine/expression framework.
+
+A neighboring foundational set-API commit is:
+
+``` text
+20a69341f2d00cd042e81c82289fba8a13c05a25
+netfilter: nf_tables: add netlink set API
+```
+
+The initial feature is clearly multi-commit, so `96518518...` is the
+core introduction anchor, not the entire nftables implementation.
+
+**Quality A for core anchor / B for full initial series.**
+
+### 6.6 Linux 3.18 --- bpf() syscall, maps, program load and verifier
+
+This history can now be represented with exact anchors rather than one
+generic "eBPF" entry.
+
+``` text
+99c55f7d47c0dc6fc64729f37bf435abf43f4c60
+bpf: introduce BPF syscall and maps
+```
+
+This commit introduces the multiplexed BPF syscall and `BPF_MAP_CREATE`.
+
+Then:
+
+``` text
+09756af46893c18839062976c3252e93a1beeba7
+bpf: expand BPF syscall with program load/unload
+```
+
+The latter explicitly describes verifier-based safety checking for
+loaded eBPF programs.
+
+LWN RFC: https://lwn.net/Articles/603816/
+
+The original author later identified `99c55f7d47c0` as the BPF syscall
+introduction point when marking BPF's seventh birthday.
+
+The corrected lineage is therefore:
+
+``` text
+BPF VM redesign / generic core
+       ↓
+99c55f7d...
+bpf() syscall + maps
+       ↓
+09756af...
+program load + verifier-facing API
+       ↓
+3.19 socket attachment
+       ↓
+4.x TC/XDP/cgroup/LWT/SOCK_OPS
+```
+
+**Quality A for these two anchors.**
+
+### 6.7 Linux 4.18 --- AF_XDP independent confirmation
+
+The pass-2 foundational anchor is now independently confirmed:
+
+``` text
+c0c77d8fb787cfe0c3fca689c2a30d1dad4eaba7
+xsk: add user memory registration support sockopt
+```
+
+Its commit message states that it sets up the base structure of the
+AF_XDP address family. A subsequent 2018 fix carries:
+
+``` text
+Fixes: c0c77d8fb787 ("xsk: add user memory registration support sockopt")
+```
+
+This upgrades confidence in the anchor itself to **A** while retaining
+**B** for complete AF_XDP series enumeration.
+
+### 6.8 Updated exact-anchor table
+
+  ----------------------------------------------------------------------------------------------------------------
+  Kernel         Feature         Exact mainline anchor                        Scope                 Quality
+  -------------- --------------- -------------------------------------------- --------------------- --------------
+  3.2            DQL/BQL         `75957ba36c05b979701e9ec64b37819adc12f830`   DQL core              A
+                 foundation                                                                         
+
+  3.5            CoDel           `76e3cc126bb223013a6b9a0e2a51238d1ef2e409`   qdisc/core algorithm  A
+
+  3.5            fq_codel        `4b549a2ef4bef9965d97cbd992ba67930cd3e0fe`   fq_codel qdisc        A
+
+  3.6            TCP Small       `46d3ceabd8d98ed0ad10f20c595ca784e34786c5`   TSQ introduction      A
+                 Queues                                                                             
+
+  3.6            TCP Fast Open   `cf60af03ca4e71134206809ea892e49b92a88896`   MSG_FASTOPEN client   A
+                 client                                                       API anchor            
+
+  3.7            VXLAN           `d342894c5d2f8c7df194c793ec4059656e09ca31`   initial VXLAN         A
+
+  3.13           nftables        `96518518...`                                core introduction     A-anchor
+
+  3.13           nftables sets   `20a69341f2d00cd042e81c82289fba8a13c05a25`   netlink set API       A
+
+  3.18           bpf() + maps    `99c55f7d47c0dc6fc64729f37bf435abf43f4c60`   syscall/maps          A
+
+  3.18           BPF program     `09756af46893c18839062976c3252e93a1beeba7`   program load          A
+                 load/verifier                                                                      
+                 API                                                                                
+
+  3.18           DCTCP           `e3118e8359bb7c59555aca60c725106e6d78c5ce`   CC algorithm          A
+
+  3.19           ipvlan          `2ad7bf363841...`                            initial driver        A
+
+  4.9            BBR             `0f8782ea14974ce992618b55f0c041ef43ed0b78`   BBR algorithm         A
+
+  4.18           AF_XDP          `c0c77d8fb787cfe0c3fca689c2a30d1dad4eaba7`   foundational          A
+                                                                              UMEM/address-family   
+                                                                              anchor                
+
+  4.19           CAKE            `046f6fd5daefac7f5abdafb436b30f63bc7c602b`   qdisc introduction    A
+  ----------------------------------------------------------------------------------------------------------------
+
+### 6.9 What remains intentionally unresolved
+
+Exact SHA work should continue only where it adds provenance value.
+Remaining high-value targets are:
+
+``` text
+IPv4 route-cache removal
+TFO server side
+nftables complete initial series
+SO_ATTACH_BPF
+VRF
+LWT core
+OVS conntrack
+devlink
+TC direct packet access
+XDP complete initial series
+cgroup BPF complete series
+BPF LWT complete series
+SOCK_OPS
+SOCKMAP
+TCP zero-copy receive
+SO_TXTIME/ETF complete series
+```
+
+For these, release assignment is already strong. The remaining task is
+exact **series boundary** identification, not rediscovering which kernel
+release contained the feature.
+
+------------------------------------------------------------------------
+
 # Part II --- Expansion: Linux v5.2 → 7.x release chronology
 
 ## 2. 進化を5つの時代で見る
