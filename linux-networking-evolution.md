@@ -1,18 +1,150 @@
-# Linux Networking Evolution --- Linux v5.0 から 7.x まで
+# Linux Networking Evolution --- Linux v4.0 から 7.x まで
 
-**起点:** Linux v5.0 (2019-03)\
-**対象:** Linux networking stack の architecture / API / performance /
-transport / BPF・XDP / netfilter / routing / virtual networking /
-zero-copy / device-memory / control-plane scalability\
 **調査時点:** 2026-10-02
 
-> 従来の「2019-05-07 以降の LWN networking 記事集成」を、 **Linux v5.0
-> を baseline とした networking stack の進化史**として再構成した。
-> LWN、upstream patch/commit、conference は、各技術の
-> `problem → design → upstream → evolution` を裏付ける provenance
-> として扱う。
+この版では v4.x を追加監査した。結論として modern Linux networking
+は単一の release から始まったのではなく、v4.x の複数の milestone
+で形成された。
+
+## v4.x milestone map
+
+``` text
+4.3   VRF / lightweight tunnel / OVS conntrack
+4.6   devlink / per-netns TCP knobs
+4.7   TC BPF direct packet access / BPF tracepoints
+4.8   XDP
+4.9   BBR / NIC BPF offload
+4.10  cgroup BPF / BPF LWT / IPv6 Segment Routing
+4.12  generic XDP
+4.13  BPF SOCK_OPS / kTLS TX
+4.14  SOCKMAP
+4.15  bpftool / netns-aware TCP / CBS qdisc
+4.16  BPF-to-BPF calls / netdevsim
+4.17  bind/connect/sendmsg BPF / kTLS RX / RDS zero-copy
+4.18  AF_XDP / TCP zero-copy receive
+4.19  time-based packet transmission / CAKE
+5.0   EDT pacing / BPF flow dissector / taprio /
+      UDP GRO / UDP MSG_ZEROCOPY
+```
+
+### v4.3 --- cloud/virtual networking foundation
+
+VRF、lightweight tunnel、OVS conntrack が同じ release に入った。
+
+``` text
+VRF → multiple routing domains
+LWT → lightweight programmable encapsulation foundation
+OVS + conntrack → switching + stateful flow processing
+```
+
+現在の Linux routing / OVN-OVS / cloud networking の重要な前史である。
+
+### v4.6 --- devlink and namespace scalability
+
+devlink が導入され、netdevとは別にdevice-wide networking
+resourceを管理する control plane が形成され始めた。多数のTCP/network
+sysctlもnetns-awareになった。
+
+### v4.7 --- BPF becomes a practical datapath language
+
+TC cls_bpf/act_bpf がpacket dataを直接参照可能になり、BPF tracepoint
+attachmentも mainline化した。
+
+### v4.8 --- XDP
+
+``` text
+NIC → driver RX → XDP/BPF → skb allocation → normal stack
+```
+
+skb生成前のprogrammable hookという現在まで続く大きなarchitecture
+change。
+
+### v4.9 --- BBR
+
+delivery rateとRTpropを利用するmodel-based congestion
+controlがmainline化。 後のpacing/EDT/BPF congestion-control
+lineageの重要な節目。
+
+### v4.10 --- cgroup BPF / BPF LWT / SRv6
+
+container identity、programmable policy、programmable
+routing/tunnelが接続される。
+
+### v4.12 --- generic XDP
+
+driver-native XDPを持たないdeviceにもXDP
+semanticsを広げ、XDPを一般的なLinux networking APIへ近づけた。
+
+### v4.13 --- socket BPF and kTLS
+
+BPF_PROG_TYPE_SOCK_OPSによりBPFがsocket lifecycleへ入り、kTLS
+TXもmainline化。
+
+``` text
+packet programmability → socket/protocol programmability
+```
+
+### v4.14--4.17 --- socket datapath and BPF ecosystem
+
+SOCKMAP、bpftool、BPF-to-BPF calls、netdevsim、cgroup bind/connect
+hooks、 sendmsg filtering、kTLS RXなどが続く。
+
+### v4.18 --- AF_XDP and TCP zero-copy RX
+
+``` text
+NIC queue → XDP → XSKMAP → AF_XDP → shared UMEM → userspace
+```
+
+AF_XDP multi-buffer、virtio-net AF_XDP、netkit queue
+leasingへ続く直接的な祖先。 同時にTCP zero-copy receiveも入った。
+
+### v4.19 --- time-aware transmission
+
+time-based packet transmissionとCAKEが入り、packet
+schedulingは単純なqueue managementからtime-aware schedulingへ拡大した。
+
+### v5.0 --- foundationからbaselineへ
+
+v5.0はmodern networkingの開始点ではなく、v4.xで形成された技術が成熟した
+baselineと位置付ける。
+
+## Long-term lineage
+
+``` text
+Programmability:
+TC BPF → XDP → cgroup/LWT BPF → SOCK_OPS → SOCKMAP
+→ AF_XDP → struct_ops → SK_LOOKUP → netkit → BPF qdisc
+
+Cloud/routing:
+VRF/LWT/OVS-CT → devlink → BPF LWT/SRv6
+→ nexthop objects → YNL → OVN/Kubernetes
+
+Zero-copy:
+AF_XDP + TCP ZC RX → UDP MSG_ZEROCOPY
+→ page_pool/netmem → io_uring ZCRX → Device Memory TCP
+
+TCP:
+BBR → time-based TX → EDT → BPF struct_ops CC
+→ BIG TCP → AccECN
+```
+
+## Three-generation interpretation
+
+``` text
+Linux 4.x — FOUNDATIONS
+XDP / BPF / VRF / LWT / devlink / BBR / kTLS / AF_XDP
+
+Linux 5.x — EXPANSION
+MPTCP / struct_ops / SK_LOOKUP / page_pool / BIG TCP
+
+Linux 6.x–7.x — MEMORY + OWNERSHIP
+netmem / Device Memory TCP / io_uring ZCRX /
+netkit / queue leasing / per-netns RTNL
+```
 
 ------------------------------------------------------------------------
+
+# Existing v5.0→7.x audited material
 
 # 1. Linux v5.0 を baseline にする
 
@@ -337,27 +469,27 @@ later networking-specific features.
 
 ### v5.1 canonical summary
 
-  --------------------------------------------------------------------------
-  Area                    v5.1 change             Later lineage
-  ----------------------- ----------------------- --------------------------
-  BPF                     spinlocks               stateful/concurrent BPF
-                                                  networking
+  ------------------------------------------------------------------------
+  Area                   v5.1 change            Later lineage
+  ---------------------- ---------------------- --------------------------
+  BPF                    spinlocks              stateful/concurrent BPF
+                                                networking
 
-  BPF                     verifier dead-code      larger/more sophisticated
-                          elimination             programs
+  BPF                    verifier dead-code     larger/more sophisticated
+                         elimination            programs
 
-  socket API              SO_BINDTOIFINDEX        programmatic/netns-aware
-                                                  socket control
+  socket API             SO_BINDTOIFINDEX       programmatic/netns-aware
+                                                socket control
 
-  timestamping            Y2038-safe APIs         long-lived timestamp ABI
+  timestamping           Y2038-safe APIs        long-lived timestamp ABI
 
-  device management       devlink health          standardized NIC
-                                                  health/recovery
+  device management      devlink health         standardized NIC
+                                                health/recovery
 
-  Wi-Fi                   airtime fairness        airtime-aware scheduling
+  Wi-Fi                  airtime fairness       airtime-aware scheduling
 
-  async I/O               io_uring introduced     networking ZC TX/RX
-  --------------------------------------------------------------------------
+  async I/O              io_uring introduced    networking ZC TX/RX
+  ------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -13113,70 +13245,70 @@ a core networking memory-management primitive.
 
 # 118. LPC timeline mapped to the major change-log lineages
 
-  -----------------------------------------------------------------------------
-        Year LPC topic          Change-log lineage           Phase
-  ---------- ------------------ ---------------------------- ------------------
-        2019 Multipath TCP      MPTCP 5.6                    pre-merge
-             Upstreaming                                     
+  ----------------------------------------------------------------------------
+       Year LPC topic          Change-log lineage           Phase
+  --------- ------------------ ---------------------------- ------------------
+       2019 Multipath TCP      MPTCP 5.6                    pre-merge
+            Upstreaming                                     
 
-        2019 Programmable       SK_LOOKUP                    pre-merge
-             socket lookup with                              
-             BPF                                             
+       2019 Programmable       SK_LOOKUP                    pre-merge
+            socket lookup with                              
+            BPF                                             
 
-        2019 netfilter hardware nftables/flowtable/offload   design/merge-era
-             offloads                                        
+       2019 netfilter hardware nftables/flowtable/offload   design/merge-era
+            offloads                                        
 
-        2020 Programmable Qdisc BPF qdisc                    early design
-             with eBPF                                       
+       2020 Programmable Qdisc BPF qdisc                    early design
+            with eBPF                                       
 
-        2020 BPF TCP header     BPF TCP programmability      design/merge-era
-             option/CC/socket                                
-             storage                                         
+       2020 BPF TCP header     BPF TCP programmability      design/merge-era
+            option/CC/socket                                
+            storage                                         
 
-        2020 OVS + AF_XDP       AF_XDP/virtual networking    application
+       2020 OVS + AF_XDP       AF_XDP/virtual networking    application
 
-        2021 SO_REUSEPORT       SO_REUSEPORT failover        merge/post-merge
-             socket migration                                
+       2021 SO_REUSEPORT       SO_REUSEPORT failover        merge/post-merge
+            socket migration                                
 
-        2021 TSO/GRO/Jumbo for  XDP multi-buffer             pre-merge
-             XDP                                             
+       2021 TSO/GRO/Jumbo for  XDP multi-buffer             pre-merge
+            XDP                                             
 
-        2021 bpfilter           BPF firewall                 design
+       2021 bpfilter           BPF firewall                 design
 
-        2022 high-speed Linux   BIG TCP/ZC/devmem            architecture
-             networking                                      
+       2022 high-speed Linux   BIG TCP/ZC/devmem            architecture
+            networking                                      
 
-        2022 machine-readable   YNL                          pre-merge
-             Netlink YAML                                    
+       2022 machine-readable   YNL                          pre-merge
+            Netlink YAML                                    
 
-        2022 MPTCP BPF +        MPTCP extensibility          merge/design
-             Netlink                                         
+       2022 MPTCP BPF +        MPTCP extensibility          merge/design
+            Netlink                                         
 
-        2022 XDP hardware hints packet metadata              design
+       2022 XDP hardware hints packet metadata              design
 
-        2022 packet queueing in programmable queueing        RFC
-             XDP                                             
+       2022 packet queueing in programmable queueing        RFC
+            XDP                                             
 
-        2023 io_uring ZC        io_uring ZCRX                pre-merge
-             receive                                         
+       2023 io_uring ZC        io_uring ZCRX                pre-merge
+            receive                                         
 
-        2024 Per Netns RTNL     RTNL breakup                 pre/merge-era
+       2024 Per Netns RTNL     RTNL breakup                 pre/merge-era
 
-        2024 network            virtio/AF_XDP/netkit         architecture
-             virtualization                                  
-             overhead                                        
+       2024 network            virtio/AF_XDP/netkit         architecture
+            virtualization                                  
+            overhead                                        
 
-        2025 zero-copy in       netkit queue leasing         design/merge-era
-             containers                                      
+       2025 zero-copy in       netkit queue leasing         design/merge-era
+            containers                                      
 
-        2025 packet metadata    XDP/BPF metadata             ongoing
+       2025 packet metadata    XDP/BPF metadata             ongoing
 
-        2025 XDP on AMD GPU     devmem/P2PDMA/XDP            post-merge
-                                                             extension
+       2025 XDP on AMD GPU     devmem/P2PDMA/XDP            post-merge
+                                                            extension
 
-        2025 MANA RX page_pool  page_pool                    post-merge
-                                                             application
-  -----------------------------------------------------------------------------
+       2025 MANA RX page_pool  page_pool                    post-merge
+                                                            application
+  ----------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
