@@ -1,3 +1,933 @@
+# Linux Networking Evolution --- Linux v5.0 から 7.x まで
+
+**起点:** Linux v5.0 (2019-03)\
+**対象:** Linux networking stack の architecture / API / performance /
+transport / BPF・XDP / netfilter / routing / virtual networking /
+zero-copy / device-memory / control-plane scalability\
+**調査時点:** 2026-10-02
+
+> 従来の「2019-05-07 以降の LWN networking 記事集成」を、 **Linux v5.0
+> を baseline とした networking stack の進化史**として再構成した。
+> LWN、upstream patch/commit、conference は、各技術の
+> `problem → design → upstream → evolution` を裏付ける provenance
+> として扱う。
+
+------------------------------------------------------------------------
+
+# 1. Linux v5.0 を baseline にする
+
+Linux v5.0 時点ですでに
+TCP/UDP、GRO/GSO、qdisc/TC、netfilter/conntrack、 rtnetlink、network
+namespace、veth/bridge/tunnel、virtio-net/TAP/vhost、 XDP/eBPF/AF_XDP
+という現在の主要構成要素は存在していた。
+
+networking の観点で特に重要な v5.0 の節目は:
+
+-   TCP pacing の EDT (Earliest Departure Time) model
+-   UDP `MSG_ZEROCOPY`
+-   UDP GRO
+-   XDP / AF_XDP が既に利用可能
+
+である。
+
+``` text
+Linux v5.0 baseline
+│
+├─ TCP / UDP / socket
+│   ├─ EDT pacing
+│   ├─ UDP MSG_ZEROCOPY
+│   └─ UDP GRO
+├─ skb + struct page
+├─ GRO / GSO / TSO
+├─ qdisc / TC
+├─ netfilter / conntrack / nftables
+├─ rtnetlink + global RTNL
+├─ netns / veth / bridge / tunnel
+├─ virtio-net / TAP / vhost
+└─ XDP / eBPF / AF_XDP
+```
+
+ここから 2026 年までの data-plane evolution は概ね:
+
+``` text
+packet を速く処理する
+        ↓
+packet 数を減らす
+        ↓
+copy / allocation を減らす
+        ↓
+host RAM を経由しない
+        ↓
+queue / datapath を適切な consumer に委譲する
+```
+
+control plane では:
+
+``` text
+global / hand-written API
+        ↓
+machine-readable Netlink API
+        ↓
+per-netns / fine-grained locking
+        ↓
+large-scale container / VM networking
+```
+
+へ進んだ。
+
+------------------------------------------------------------------------
+
+# 1A. v5.0 / v5.1 deep audit --- baseline を5.2以降と同じ粒度にする
+
+この節は、当初の監査範囲（2019-05-07以降）より前に位置する Linux v5.0 と
+v5.1 を、後続 release と同じ観点で追加監査した結果である。
+
+## Linux v5.0 --- modern high-speed networking の baseline
+
+### 1A.1 TCP EDT pacing
+
+v5.0 の重要な networking change の一つが TCP pacing の **Earliest
+Departure Time (EDT)** model への移行である。
+
+従来の考え方を単純化すると:
+
+``` text
+TCP
+ ↓
+packet queue
+ ↓
+qdisc pacing
+```
+
+EDT model では各 packet
+に「いつ送信可能か」という時刻を持たせる方向になる。
+
+``` text
+TCP computes pacing schedule
+        ↓
+skb carries earliest departure time
+        ↓
+FQ/qdisc schedules transmission
+```
+
+この変更は後の BPF/TC based pacing、large-scale host networking、
+container networking に重要な baseline となる。
+
+**LWN:** `4.20/5.0 Merge window part 1`
+
+### 1A.2 BPF programmable flow dissector
+
+v5.0 では network flow dissector を BPF program
+として実装できるようになった。
+
+``` text
+packet
+  ↓
+flow dissector
+  ↓
+flow keys
+  ├─ hash
+  ├─ classifier
+  └─ policy
+```
+
+を:
+
+``` text
+packet
+  ↓
+BPF flow dissector
+  ↓
+custom flow keys / parsing policy
+```
+
+へ拡張する。
+
+これは後の:
+
+``` text
+BPF packet parsing
+ → socket lookup
+ → protocol hooks
+ → netkit/BPF qdisc
+```
+
+という programmable-network-stack lineage の初期段階として位置付ける。
+
+### 1A.3 rtnetlink strict checking
+
+rtnetlink に strict checking option が追加された。
+
+これは YNL ほど大きな architecture change ではないが、
+
+``` text
+loosely validated Netlink messages
+        ↓
+stricter request validation
+        ↓
+better specified Netlink APIs
+        ↓
+YAML/YNL
+```
+
+という control-plane API modernization の前史として記録する。
+
+### 1A.4 UDP GRO
+
+plain UDP socket に GRO が導入された。
+
+``` text
+UDP datagram
+UDP datagram
+UDP datagram
+     │
+     ▼ GRO
+larger receive aggregate
+     │
+     ▼
+fewer receive operations / lower per-packet cost
+```
+
+これは後年の UDP receive optimization、QUIC/high-rate UDP、 tunnel
+aggregation を理解する重要な baseline である。
+
+### 1A.5 UDP MSG_ZEROCOPY
+
+`MSG_ZEROCOPY` が UDP socket でも利用可能になった。
+
+したがって copy-reduction lineage は:
+
+``` text
+v5.0 UDP MSG_ZEROCOPY
+        ↓
+TCP/io_uring zero-copy work
+        ↓
+io_uring ZC TX
+        ↓
+io_uring ZCRX
+        ↓
+device-memory networking
+```
+
+と長い時間軸で見るべきである。
+
+### 1A.6 taprio
+
+Time-Aware Priority Scheduler (`taprio`) も v5.0 の重要な qdisc change。
+
+これは TSN/time-aware networking の branch であり、BIG TCP や XDP とは
+異なるが、TC/qdisc が単なる best-effort queue management から
+time-sensitive scheduling へ広がった節目として残す。
+
+### v5.0 canonical summary
+
+  Area        v5.0 change                   Later lineage
+  ----------- ----------------------------- -------------------------------
+  TCP         EDT pacing                    FQ/BPF pacing, scalable hosts
+  UDP         GRO                           high-rate UDP, QUIC/tunnels
+  zero-copy   UDP MSG_ZEROCOPY              io_uring ZC, device-memory
+  BPF         programmable flow dissector   deeper stack programmability
+  TC          taprio                        TSN/time-aware scheduling
+  Netlink     strict checking               API formalization/YNL
+
+------------------------------------------------------------------------
+
+## Linux v5.1 --- observability, BPF state and the io_uring substrate
+
+### 1A.7 BPF spinlocks
+
+BPF map values gained spinlock-based concurrency control.
+
+``` text
+multiple BPF programs / CPUs / userspace
+             ↓
+          BPF map
+             ↓
+      shared mutable state
+             ↓
+        bpf_spin_lock
+```
+
+Networking BPF programs increasingly maintain flow/state information, so
+this is an important enabling primitive even though it is not
+network-specific.
+
+### 1A.8 BPF verifier dead-code elimination
+
+The verifier gained dead-code detection/removal. This belongs to the BPF
+execution infrastructure lineage that made increasingly complex
+networking programs practical.
+
+### 1A.9 SO_BINDTOIFINDEX
+
+`SO_BINDTOIFINDEX` provides interface binding by ifindex rather than
+interface name.
+
+``` text
+SO_BINDTODEVICE → name based
+SO_BINDTOIFINDEX → stable kernel interface identifier
+```
+
+It is a relatively small socket API change, but useful in
+namespace-heavy and programmatic network management environments.
+
+### 1A.10 Y2038-safe socket timestamps
+
+socket timestamp APIs gained Y2038-safe variants.
+
+This is primarily ABI maintenance, but timestamping is fundamental to
+packet capture, latency measurement, pacing and observability, so it
+belongs in the networking API history.
+
+### 1A.11 devlink health
+
+devlink gained a health-reporting mechanism for network devices.
+
+This marks a broader evolution:
+
+``` text
+driver-specific diagnostics
+       ↓
+devlink health reporter
+       ↓
+standardized device health / recovery / observability
+```
+
+and later devlink became a major NIC/switch management interface.
+
+### 1A.12 Wi-Fi airtime fairness
+
+mac80211 gained airtime-aware fairness support. Unlike byte/packet
+fairness, wireless capacity is fundamentally constrained by airtime:
+
+``` text
+equal packets/bytes ≠ equal radio resource
+
+fairness unit → airtime
+```
+
+This is an important networking scheduler concept even though it is
+Wi-Fi-specific.
+
+### 1A.13 io_uring appears
+
+Linux v5.1 introduced io_uring.
+
+At this point it was not yet the zero-copy networking mechanism seen in
+later kernels, but it is the substrate from which the later lineage
+grows:
+
+``` text
+5.1 io_uring
+   ↓
+sendmsg / recvmsg support
+   ↓
+multishot / registered buffers
+   ↓
+zero-copy TX
+   ↓
+6.15 zero-copy RX
+   ↓
+memory-provider / device-memory integration
+```
+
+Therefore the networking evolution timeline should mark **5.1 as the
+origin of the io_uring branch**, while distinguishing that from the
+later networking-specific features.
+
+### v5.1 canonical summary
+
+  --------------------------------------------------------------------------
+  Area                    v5.1 change             Later lineage
+  ----------------------- ----------------------- --------------------------
+  BPF                     spinlocks               stateful/concurrent BPF
+                                                  networking
+
+  BPF                     verifier dead-code      larger/more sophisticated
+                          elimination             programs
+
+  socket API              SO_BINDTOIFINDEX        programmatic/netns-aware
+                                                  socket control
+
+  timestamping            Y2038-safe APIs         long-lived timestamp ABI
+
+  device management       devlink health          standardized NIC
+                                                  health/recovery
+
+  Wi-Fi                   airtime fairness        airtime-aware scheduling
+
+  async I/O               io_uring introduced     networking ZC TX/RX
+  --------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+## 1A.14 Corrected starting graph
+
+v5.0/v5.1 を追加すると、この文書の evolution graph
+は次のように補正できる。
+
+``` text
+Linux v5.0
+│
+├─ EDT TCP pacing ─────────────→ FQ / BPF pacing / scalable TCP
+│
+├─ UDP GRO ────────────────────→ high-rate UDP / QUIC / tunnels
+│
+├─ UDP MSG_ZEROCOPY ───────────→ zero-copy networking
+│                                      │
+│                                      ├→ io_uring ZC TX/RX
+│                                      └→ device-memory networking
+│
+├─ BPF flow dissector
+│       ↓
+│   socket/cgroup hooks
+│       ↓
+│   struct_ops / SK_LOOKUP
+│       ↓
+│   netkit / BPF qdisc
+│
+└─ rtnetlink strict checking ──→ API formalization → YNL
+
+Linux v5.1
+│
+├─ BPF spinlocks ──────────────→ stateful/concurrent BPF programs
+├─ devlink health ─────────────→ modern NIC health/management
+└─ io_uring ───────────────────→ networking async/ZC branch
+```
+
+これにより「v5.0 は単なる開始番号」という扱いではなく、 **現在の Linux
+networking の複数の主要 lineage がすでに分岐し始めていた 技術的
+baseline** として扱える。
+
+------------------------------------------------------------------------
+
+# 2. 進化を5つの時代で見る
+
+## Phase 0 --- v5.0 baseline (2019)
+
+100--400Gb/s NIC の普及で packet processing だけでなく RX buffer の
+allocation/recycling が bottleneck として顕在化した。ここから
+`page_pool → netmem → device-memory networking` が始まる。
+
+## Phase 1 --- programmable network stack (2019--2021)
+
+``` text
+XDP / TC BPF
+      ↓
+socket/cgroup hooks
+      ↓
+SK_LOOKUP
+      ↓
+BPF struct_ops
+      ↓
+TCP algorithm / socket behavior まで programmable
+```
+
+v5.6 では MPTCP、WireGuard、BPF `struct_ops` が大きな節目となる。
+
+## Phase 2 --- aggregate more, copy less (2021--2023)
+
+``` text
+TCP zero-copy RX
+       +
+io_uring networking
+       +
+BIG TCP
+       +
+AF_XDP multi-buffer
+```
+
+高速化の中心が packet-per-second だけでなく、 **aggregation / copy
+reduction / syscall reduction** へ移る。
+
+## Phase 3 --- packet memory becomes architecture (2023--2025)
+
+``` text
+page_pool
+   ↓
+netmem
+   ↓
+memory-provider abstraction
+   ├─ Device Memory TCP
+   └─ io_uring ZCRX
+```
+
+`network buffer = normal RAM の struct page` という前提が崩れ、
+networking と memory management が不可分になる。
+
+## Phase 4 --- queue ownership + scalable control plane (2024--2026)
+
+``` text
+netkit → queue leasing → AF_XDP/userspace/VMM
+```
+
+と並行して:
+
+``` text
+global RTNL
+   ↓
+unlocked / RCU paths
+   ↓
+per-netns RTNL
+   ↓
+subsystem-specific locking
+```
+
+が進む。
+
+------------------------------------------------------------------------
+
+# 3. Packet aggregation --- GRO/GSO → BIG TCP
+
+v5.0 ですでに GRO/GSO/TSO は成熟していたが、高速 NIC では per-packet
+metadata processing が支配的になる。
+
+``` text
+wire packets
+    ↓ GRO
+large skb
+    ↓ GSO/TSO
+wire packets
+```
+
+v5.19 BIG TCP は kernel internal GRO/GSO aggregate の 64KiB
+制約を緩和した。
+
+``` text
+GRO/GSO
+  ↓
+BIG TCP (5.19 IPv6)
+  ↓
+IPv4 BIG TCP (6.3)
+  ↓
+AF_XDP multi-buffer (6.6)
+  ↓
+VXLAN / GENEVE BIG TCP (7.x)
+```
+
+BIG TCP は wire MTU を巨大化する機能ではなく、 **kernel 内部の
+packet-processing unit を大きくする機能**として理解する。
+
+------------------------------------------------------------------------
+
+# 4. Packet memory --- page_pool → netmem → Device Memory TCP
+
+``` text
+old RX:
+NIC → allocate page → stack → free page
+
+page_pool:
+NIC → recycled page → stack ─┐
+      ↑                      │
+      └──────────────────────┘
+```
+
+その後、device memory を扱うため `struct page`
+前提を弱める必要が生じる。
+
+``` text
+network memory
+      ↓
+    netmem
+   /      \
+RAM      device memory
+```
+
+v6.12 Device Memory TCP RX:
+
+``` text
+traditional:
+NIC → system RAM → CPU/copy/mapping → GPU
+
+devmem:
+NIC ─────────────→ device memory → GPU/accelerator
+```
+
+v6.16 では TX 側も mainline に入る。
+
+**DIBS はこの直系ではない。** `page_pool → netmem → DIBS` ではなく、
+shared-memory transport 側の別 lineage として扱う。
+
+------------------------------------------------------------------------
+
+# 5. XDP / AF_XDP
+
+v5.0 時点で XDP/AF_XDP は存在した。その後の本質は周辺 infrastructure
+の成熟。
+
+``` text
+XDP
+├─ redirect
+├─ page_pool
+├─ link/lifecycle
+└─ AF_XDP
+    ├─ zero-copy
+    ├─ multi-buffer (6.6)
+    ├─ virtio-net ZC
+    └─ queue ownership / netkit integration
+```
+
+v6.6 AF_XDP multi-buffer は:
+
+``` text
+one packet = one buffer
+```
+
+から:
+
+``` text
+one packet
+├─ buffer 1
+├─ buffer 2
+└─ buffer N (EOP)
+```
+
+への重要な変更である。
+
+------------------------------------------------------------------------
+
+# 6. BPF --- packet filter から stack extension へ
+
+``` text
+v5.0: XDP / TC / cgroup BPF
+          ↓
+5.3–5.4: socket hooks / SYN-cookie integration
+          ↓
+5.6: struct_ops → tcp_congestion_ops
+          ↓
+5.9: SK_LOOKUP
+          ↓
+6.x: MPTCP / defrag / timestamp / netkit / BPF qdisc
+```
+
+つまり:
+
+``` text
+packet programmability
+ → socket programmability
+ → protocol algorithm programmability
+ → virtual-device programmability
+ → queue/datapath programmability
+```
+
+へ拡大した。
+
+------------------------------------------------------------------------
+
+# 7. Virtual networking --- veth/virtio → netkit/queue ownership
+
+v5.0 の典型:
+
+``` text
+container → veth → host stack → NIC
+
+guest virtio-net → QEMU/vhost/TAP → bridge/OVS → NIC
+```
+
+現在は複数の branch がある。
+
+``` text
+virtio-net
+├─ vhost
+├─ vDPA
+├─ SR-IOV/VFIO
+└─ AF_XDP zero-copy
+
+container:
+veth → netkit → BPF-native datapath → queue leasing
+```
+
+v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、2026 の netkit queue leasing
+は 「full kernel bypass」よりも、
+
+**kernel が ownership/control を保持し、data movement を最小化する**
+
+方向として読むと理解しやすい。
+
+------------------------------------------------------------------------
+
+# 8. TCP / UDP / transport
+
+## TCP
+
+``` text
+v5.0 EDT pacing
+  ├─ BPF congestion control
+  ├─ MPTCP (5.6)
+  ├─ TCP zero-copy RX
+  ├─ BIG TCP (5.19)
+  ├─ TCP-AO/security
+  ├─ Device Memory TCP
+  ├─ TCP_RTO_MAX_MS
+  └─ AccECN
+```
+
+MPTCP は initial upstream から multi-subflow、userspace path manager、
+Generic Netlink、BPF integration へ進化した。
+
+## UDP
+
+v5.0 自体が `MSG_ZEROCOPY` と GRO の節目。その後は GRO/GSO、
+tunnel/encapsulation、high packet-rate RX、receive-buffer scaling
+が進む。 QUIC や overlay networking の基盤として UDP の重要性も増した。
+
+------------------------------------------------------------------------
+
+# 9. Routing / Netlink / RTNL
+
+routing は nexthop object により:
+
+``` text
+route → embedded nexthop
+```
+
+だけでなく:
+
+``` text
+route → reusable nexthop object → group / resilient group
+```
+
+へ進んだ。
+
+Netlink は YNL により:
+
+``` text
+YAML specification
+├─ UAPI
+├─ policy
+├─ generated helper
+├─ documentation
+└─ userspace client
+```
+
+という machine-readable API の方向へ進む。
+
+RTNL は:
+
+``` text
+global RTNL
+ → unlocked operations
+ → RCU readers
+ → per-netns RTNL
+ → subsystem locks/refcounts
+```
+
+という長期的な scalability 改善が続く。
+
+------------------------------------------------------------------------
+
+# 10. netfilter / nftables / conntrack
+
+``` text
+iptables/netfilter
+      ↓
+nftables maturation
+      ↓
+flowtable
+      ↓
+hardware offload
+```
+
+一方で BPF と nftables は単純な新旧置換ではない。
+
+conntrack では performance だけでなく lifetime/GC、per-netns
+scalability、 hardware flow offload race、BPF kfunc access
+が重要なテーマとなった。
+
+------------------------------------------------------------------------
+
+# 11. io_uring networking
+
+``` text
+sendmsg / recvmsg
+      ↓
+zero-copy TX
+      ↓
+multishot / registered buffers
+      ↓
+zero-copy RX (6.15)
+      ↓
+memory-provider / device-memory integration
+```
+
+目標は syscall reduction だけではなく、 NICからuserspaceまでの buffer
+ownership/lifetime の効率化にある。
+
+------------------------------------------------------------------------
+
+# 12. Linux v5.0 → 7.x release map
+
+  ---------------------------------------------------------------------
+  Kernel                             Major networking evolution
+  ---------------------------------- ----------------------------------
+  **5.0**                            **EDT TCP pacing, UDP
+                                     MSG_ZEROCOPY, UDP GRO, XDP/AF_XDP
+                                     baseline**
+
+  5.1                                XDP/BPF/netdev incremental work
+
+  5.2                                high-speed NIC memory management /
+                                     XDP
+
+  5.3                                cgroup/socket BPF, TCP hooks
+
+  5.4                                XDP/TC SYN-cookie BPF, CO-RE
+                                     foundation
+
+  5.5                                alt interface names, TIPC crypto,
+                                     VSOCK multi-transport
+
+  **5.6**                            **MPTCP, WireGuard, BPF
+                                     struct_ops/TCP CC,
+                                     ethtool-netlink**
+
+  5.7--5.8                           bareudp, XDP buffer API,
+                                     TC/bridge/offload
+
+  **5.9**                            **SK_LOOKUP, BPF socket
+                                     iterators**
+
+  5.10                               BPF TCP options, MPTCP multi-flow
+
+  **5.11**                           **TCP zero-copy receive**
+
+  5.12--5.14                         MPTCP, multicast, routing,
+                                     SO_REUSEPORT
+
+  5.15                               IPv6 IOAM, MCTP, per-VLAN
+                                     multicast
+
+  5.16--5.18                         socket memory, IOAM, TC offload,
+                                     BPF/netdev
+
+  **5.19**                           **BIG TCP, skb_drop_reason, MPTCP
+                                     userspace/fallback**
+
+  6.0--6.2                           BPF/netdev/API continuation
+
+  **6.3**                            **IPv4 BIG TCP, YNL direction**
+
+  6.4--6.5                           XDP/BPF/socket API
+
+  **6.6**                            **AF_XDP multi-buffer, BPF defrag,
+                                     MPTCP BPF**
+
+  **6.7**                            **netkit, io_uring networking**
+
+  6.8--6.10                          network-core optimization, BPF
+                                     token, io_uring ZC send
+
+  **6.11**                           **virtio-net AF_XDP RX zero-copy**
+
+  **6.12**                           **Device Memory TCP RX**
+
+  **6.13**                           **per-netns RTNL, traffic-shaping
+                                     API**
+
+  6.14                               RxRPC/UDP/TCP/IPsec
+
+  **6.15**                           **io_uring ZCRX, RTNL breakup,
+                                     TCP_RTO_MAX_MS, BPF timestamps**
+
+  **6.16**                           **Device Memory TCP TX**
+
+  6.17                               TCP loss-detection cleanup
+
+  **6.18**                           **AccECN, UDP RX optimization,
+                                     DIBS, rmem increase**
+
+  6.19                               TCP TX locking/scalability
+
+  7.0                                AccECN expansion, CAKE multiqueue,
+                                     VSOCK netns
+
+  7.1                                UDP-Lite removal, IPv6
+                                     modularization cleanup
+
+  7.2                                TCP-AO/libcrypto, MPTCP scale,
+                                     RTNL reduction
+
+  **7.3 development**                **BIG TCP over VXLAN/GENEVE**
+  ---------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 13. v5.0 と 2026 を比較する
+
+``` text
+                     v5.0                    2026
+
+packet memory        struct page      →      page_pool / netmem / providers
+fast path            XDP/AF_XDP       →      AF_XDP MB / netkit / queue lease
+aggregation          GRO/GSO          →      BIG TCP / tunnel BIG TCP
+BPF                   packet/socket    →      struct_ops/netkit/BPF qdisc
+virtual networking   veth/virtio      →      vDPA/AF_XDP ZC/netkit
+control locking      global RTNL      →      per-netns/fine-grained
+Netlink API           hand-written     →      YNL-described
+memory path          NIC→RAM          →      NIC→RAM or device memory
+async I/O             conventional     →      io_uring ZC TX/RX
+```
+
+最大の変化は、network stack が **「CPU が system RAM 上の skb
+を逐次処理する単一モデル」から離れたこと** にある。
+
+------------------------------------------------------------------------
+
+# 14. Evolution map
+
+``` text
+                    Linux v5.0
+                        │
+        ┌───────────────┼────────────────┐
+        │               │                │
+        ▼               ▼                ▼
+      XDP/BPF         GRO/GSO          skb/page
+        │               │                │
+        ▼               ▼                ▼
+   struct_ops        BIG TCP          page_pool
+   SK_LOOKUP             │                │
+        │                │             netmem
+        ▼                │          ┌─────┴─────┐
+     netkit              │          ▼           ▼
+        │                │      Devmem TCP   io_uring ZCRX
+  queue leasing          │          │           │
+        └────────────┬───┴──────────┴───────────┘
+                     ▼
+              hybrid / zero-copy
+                     │
+             ┌───────┴────────┐
+             ▼                ▼
+          container           VM
+       BPF/netkit/CNI   virtio/vDPA/AF_XDP
+```
+
+control plane:
+
+``` text
+global RTNL ─────────────→ per-netns / fine-grained locking
+ad-hoc Netlink ──────────→ YNL-described APIs
+single network model ────→ multi-network / VM-aware networking
+```
+
+------------------------------------------------------------------------
+
+# 15. 読み方
+
+この後には、元の
+`linux-networking-lwn-change-log-2019-2026-unified-audited.md` を
+**Research Appendix** としてそのまま保持する。
+
+推奨順序:
+
+1.  Sections 1--14 で v5.0 → 7.x の進化を把握
+2.  Appendix の release chronology で release landing を確認
+3.  commit-level dossier で exact SHA / patch series を確認
+4.  LWN / conference provenance で設計意図と後続 evolution を確認
+
+------------------------------------------------------------------------
+
+# Research Appendix --- original audited material
+
 # Linux Networking Change Log --- LWN / Upstream Cross-Reference
 
 **対象期間:** 2019-05-07 ～ 2026-10-02\
@@ -10973,34 +11903,34 @@ Kernel Recipes archive:
 
 # 106. Kernel Recipes → LWN → mainline mapping
 
-  ------------------------------------------------------------------------------
-  Kernel            Year Archive      Change-log lineage  Phase
-  Recipes                category                         
-  ------------- -------- ------------ ------------------- ----------------------
-  XDP closer        2019 networking   XDP →               design/architecture
-  integration                         page_pool/AF_XDP →  
-  with network                        netkit              
-  stack                                                   
+  -----------------------------------------------------------------------------
+  Kernel           Year Archive      Change-log lineage  Phase
+  Recipes               category                         
+  ------------- ------- ------------ ------------------- ----------------------
+  XDP closer       2019 networking   XDP →               design/architecture
+  integration                        page_pool/AF_XDP →  
+  with network                       netkit              
+  stack                                                  
 
-  BPF at            2019 networking   BPF networking →    deployment/design
-  Facebook                            struct_ops/socket   
-                                      hooks/netkit        
+  BPF at           2019 networking   BPF networking →    deployment/design
+  Facebook                           struct_ops/socket   
+                                     hooks/netkit        
 
-  Faster IO         2019 storage      io_uring →          pre-networking
-  through                             networking TX/RX    foundation
-  io_uring                                                
+  Faster IO        2019 storage      io_uring →          pre-networking
+  through                            networking TX/RX    foundation
+  io_uring                                               
 
-  What's new        2022 storage      io_uring → ZC       foundation/merge-era
-  with io_uring                       networking          
+  What's new       2022 storage      io_uring → ZC       foundation/merge-era
+  with io_uring                      networking          
 
-  On the way to     2023 storage      io_uring ZC TX/RX   design/merge-era
-  io_uring                                                
-  networking                                              
+  On the way to    2023 storage      io_uring ZC TX/RX   design/merge-era
+  io_uring                                               
+  networking                                             
 
-  Netconf 2023      2023 networking   SO_DEVMEM, BIG TCP, multi-lineage workshop
-  Workshop                            XDP/BPF, IPsec,     
-                                      nftables, TCP/ML    
-  ------------------------------------------------------------------------------
+  Netconf 2023     2023 networking   SO_DEVMEM, BIG TCP, multi-lineage workshop
+  Workshop                           XDP/BPF, IPsec,     
+                                     nftables, TCP/ML    
+  -----------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -12183,70 +13113,70 @@ a core networking memory-management primitive.
 
 # 118. LPC timeline mapped to the major change-log lineages
 
-  -------------------------------------------------------------------------------
-          Year LPC topic          Change-log lineage           Phase
-  ------------ ------------------ ---------------------------- ------------------
-          2019 Multipath TCP      MPTCP 5.6                    pre-merge
-               Upstreaming                                     
+  -----------------------------------------------------------------------------
+        Year LPC topic          Change-log lineage           Phase
+  ---------- ------------------ ---------------------------- ------------------
+        2019 Multipath TCP      MPTCP 5.6                    pre-merge
+             Upstreaming                                     
 
-          2019 Programmable       SK_LOOKUP                    pre-merge
-               socket lookup with                              
-               BPF                                             
+        2019 Programmable       SK_LOOKUP                    pre-merge
+             socket lookup with                              
+             BPF                                             
 
-          2019 netfilter hardware nftables/flowtable/offload   design/merge-era
-               offloads                                        
+        2019 netfilter hardware nftables/flowtable/offload   design/merge-era
+             offloads                                        
 
-          2020 Programmable Qdisc BPF qdisc                    early design
-               with eBPF                                       
+        2020 Programmable Qdisc BPF qdisc                    early design
+             with eBPF                                       
 
-          2020 BPF TCP header     BPF TCP programmability      design/merge-era
-               option/CC/socket                                
-               storage                                         
+        2020 BPF TCP header     BPF TCP programmability      design/merge-era
+             option/CC/socket                                
+             storage                                         
 
-          2020 OVS + AF_XDP       AF_XDP/virtual networking    application
+        2020 OVS + AF_XDP       AF_XDP/virtual networking    application
 
-          2021 SO_REUSEPORT       SO_REUSEPORT failover        merge/post-merge
-               socket migration                                
+        2021 SO_REUSEPORT       SO_REUSEPORT failover        merge/post-merge
+             socket migration                                
 
-          2021 TSO/GRO/Jumbo for  XDP multi-buffer             pre-merge
-               XDP                                             
+        2021 TSO/GRO/Jumbo for  XDP multi-buffer             pre-merge
+             XDP                                             
 
-          2021 bpfilter           BPF firewall                 design
+        2021 bpfilter           BPF firewall                 design
 
-          2022 high-speed Linux   BIG TCP/ZC/devmem            architecture
-               networking                                      
+        2022 high-speed Linux   BIG TCP/ZC/devmem            architecture
+             networking                                      
 
-          2022 machine-readable   YNL                          pre-merge
-               Netlink YAML                                    
+        2022 machine-readable   YNL                          pre-merge
+             Netlink YAML                                    
 
-          2022 MPTCP BPF +        MPTCP extensibility          merge/design
-               Netlink                                         
+        2022 MPTCP BPF +        MPTCP extensibility          merge/design
+             Netlink                                         
 
-          2022 XDP hardware hints packet metadata              design
+        2022 XDP hardware hints packet metadata              design
 
-          2022 packet queueing in programmable queueing        RFC
-               XDP                                             
+        2022 packet queueing in programmable queueing        RFC
+             XDP                                             
 
-          2023 io_uring ZC        io_uring ZCRX                pre-merge
-               receive                                         
+        2023 io_uring ZC        io_uring ZCRX                pre-merge
+             receive                                         
 
-          2024 Per Netns RTNL     RTNL breakup                 pre/merge-era
+        2024 Per Netns RTNL     RTNL breakup                 pre/merge-era
 
-          2024 network            virtio/AF_XDP/netkit         architecture
-               virtualization                                  
-               overhead                                        
+        2024 network            virtio/AF_XDP/netkit         architecture
+             virtualization                                  
+             overhead                                        
 
-          2025 zero-copy in       netkit queue leasing         design/merge-era
-               containers                                      
+        2025 zero-copy in       netkit queue leasing         design/merge-era
+             containers                                      
 
-          2025 packet metadata    XDP/BPF metadata             ongoing
+        2025 packet metadata    XDP/BPF metadata             ongoing
 
-          2025 XDP on AMD GPU     devmem/P2PDMA/XDP            post-merge
-                                                               extension
+        2025 XDP on AMD GPU     devmem/P2PDMA/XDP            post-merge
+                                                             extension
 
-          2025 MANA RX page_pool  page_pool                    post-merge
-                                                               application
-  -------------------------------------------------------------------------------
+        2025 MANA RX page_pool  page_pool                    post-merge
+                                                             application
+  -----------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -12773,69 +13703,69 @@ enough of the physical data path to containers and VMs.
 
 # 125. Updated LPC canonical inventory
 
-  ---------------------------------------------------------------------------
-              Year Session          LPC area          Canonical role
-  ---------------- ---------------- ----------------- -----------------------
-              2019 Multipath TCP    Networking        MPTCP pre-merge
-                   Upstreaming                        
+  -------------------------------------------------------------------------
+            Year Session          LPC area          Canonical role
+  -------------- ---------------- ----------------- -----------------------
+            2019 Multipath TCP    Networking        MPTCP pre-merge
+                 Upstreaming                        
 
-              2019 Programmable     Networking        SK_LOOKUP pre-merge
-                   socket lookup                      
-                   with BPF                           
+            2019 Programmable     Networking        SK_LOOKUP pre-merge
+                 socket lookup                      
+                 with BPF                           
 
-              2019 Challenges of    Refereed/RDMA     DMA/P2P/device-memory
-                   the RDMA                           problem-space
-                   subsystem                          
+            2019 Challenges of    Refereed/RDMA     DMA/P2P/device-memory
+                 the RDMA                           problem-space
+                 subsystem                          
 
-              2019 RDMA MC          RDMA              HMM/DMA-BUF/P2P
-                                                      supporting context
+            2019 RDMA MC          RDMA              HMM/DMA-BUF/P2P
+                                                    supporting context
 
-              2020 xen-netfront and Networking+BPF    virtual-NIC XDP design
-                   virtio_net XDP                     
-                   offloading                         
+            2020 xen-netfront and Networking+BPF    virtual-NIC XDP design
+                 virtio_net XDP                     
+                 offloading                         
 
-              2020 Userspace OVS    Networking+BPF    hybrid HW/XDP/AF_XDP
-                   with HW Offload                    datapath
-                   and AF_XDP                         
+            2020 Userspace OVS    Networking+BPF    hybrid HW/XDP/AF_XDP
+                 with HW Offload                    datapath
+                 and AF_XDP                         
 
-              2020 A programmable   Networking+BPF    BPF-qdisc early design
-                   Qdisc with eBPF                    
+            2020 A programmable   Networking+BPF    BPF-qdisc early design
+                 Qdisc with eBPF                    
 
-              2021 TSO/GRO/Jumbo    BPF+Networking    XDP multi-buffer
-                   frames for XDP                     precursor
+            2021 TSO/GRO/Jumbo    BPF+Networking    XDP multi-buffer
+                 frames for XDP                     precursor
 
-              2021 io_uring: BPF    Refereed          io_uring/BPF context
-                   controlled I/O                     
+            2021 io_uring: BPF    Refereed          io_uring/BPF context
+                 controlled I/O                     
 
-              2022 High-speed Linux eBPF+Networking   BIG-TCP/ZC architecture
-                   TCP                                
+            2022 High-speed Linux eBPF+Networking   BIG-TCP/ZC architecture
+                 TCP                                
 
-              2022 Netlink YAML     eBPF+Networking   YNL pre-merge
+            2022 Netlink YAML     eBPF+Networking   YNL pre-merge
 
-              2022 MPTCP BPF +      eBPF+Networking   MPTCP extensibility
-                   Netlink                            
+            2022 MPTCP BPF +      eBPF+Networking   MPTCP extensibility
+                 Netlink                            
 
-              2022 PCIe topology to VFIO/IOMMU/PCI    virtualized P2P
-                   guest for P2P                      constraint
+            2022 PCIe topology to VFIO/IOMMU/PCI    virtualized P2P
+                 guest for P2P                      constraint
 
-              2023 Zero Copy        eBPF+Networking   io_uring ZCRX pre-merge
-                   Receive using                      
-                   io_uring                           
+            2023 Zero Copy        eBPF+Networking   io_uring ZCRX pre-merge
+                 Receive using                      
+                 io_uring                           
 
-              2024 Per Netns RTNL   Networking        RTNL breakup
+            2024 Per Netns RTNL   Networking        RTNL breakup
 
-              2024 Network          Networking        virtual-network
-                   virtualization                     optimization
-                   overhead                           
+            2024 Network          Networking        virtual-network
+                 virtualization                     optimization
+                 overhead                           
 
-              2025 Zero-copy in     Networking        netkit queue leasing
-                   containers                         
+            2025 Zero-copy in     Networking        netkit queue leasing
+                 containers                         
 
-              2025 Packet Metadata  Networking        metadata API evolution
+            2025 Packet Metadata  Networking        metadata API evolution
 
-              2025 XDP on AMD GPUs  Networking        devmem/P2PDMA
-                                                      post-merge extension
-  ---------------------------------------------------------------------------
+            2025 XDP on AMD GPUs  Networking        devmem/P2PDMA
+                                                    post-merge extension
+  -------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
