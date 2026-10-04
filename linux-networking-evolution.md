@@ -49,23 +49,23 @@ Appendix  evidence catalog
 
 This document uses the following terms consistently:
 
-  --------------------------------------------------------------------------------------------------------------------------------------------------------
-  Term                               Meaning
-  ---------------------------------- ---------------------------------------------------------------------------------------------------------------------
-  **design / RFC**                   proposal or architecture under discussion; no merge is implied
+  -------------------------------------------------------------------------------------------------------------------------------------------
+  Term                  Meaning
+  --------------------- ---------------------------------------------------------------------------------------------------------------------
+  **design / RFC**      proposal or architecture under discussion; no merge is implied
 
-  **series**                         a posted patch series; `final series` means the latest merge-near revision identified by this research
+  **series**            a posted patch series; `final series` means the latest merge-near revision identified by this research
 
-  **landing**                        acceptance into the relevant subsystem tree or `net-next`; this is not automatically a released kernel
+  **landing**           acceptance into the relevant subsystem tree or `net-next`; this is not automatically a released kernel
 
-  **mainline anchor**                a verified commit in Linus's mainline history that anchors part of a feature
+  **mainline anchor**   a verified commit in Linus's mainline history that anchors part of a feature
 
-  **release**                        a feature is present in a released mainline kernel version
+  **release**           a feature is present in a released mainline kernel version
 
-  **generation**                     a release-era milestone spanning multiple commits or incremental follow-ups; not necessarily a single origin commit
+  **generation**        a release-era milestone spanning multiple commits or incremental follow-ups; not necessarily a single origin commit
 
-  **development**                    accepted, merged into a development tree, or posted for a future cycle, but not treated here as a released baseline
-  --------------------------------------------------------------------------------------------------------------------------------------------------------
+  **development**       accepted, merged into a development tree, or posted for a future cycle, but not treated here as a released baseline
+  -------------------------------------------------------------------------------------------------------------------------------------------
 
 A mainline anchor can be a core/origin commit, an integration commit, or a protocol-specific enablement commit. The text names the anchor type when that distinction matters.
 
@@ -694,107 +694,113 @@ subsystem-tree / net-next landing
 released mainline version
 ```
 
-  ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  Release                 Selected canonical milestones                                                                                            Evidence
-  ----------------------- ------------------------------------------------------------------------------------------------------------------------ --------------------------------------------------------------
-  3.0                     namespace / `setns()`-era foundation                                                                                     release-generation
+  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Release             Selected canonical milestones                                                                                                  Evidence
+  ------------------- ------------------------------------------------------------------------------------------------------------------------------ ----------------------------------------------------------------------------
+  3.0                 namespace / `setns()`-era foundation                                                                                           release-generation
 
-  3.3                     DQL/BQL; team; `net_prio`; TCP memcg                                                                                     release + exact DQL anchor
+  3.3                 DQL/BQL; team; `net_prio`; TCP memcg                                                                                           release + exact DQL anchor
 
-  3.5                     CoDel / fq_codel                                                                                                         release + exact anchors
+  3.5                 CoDel / fq_codel                                                                                                               release + exact anchors
 
-  3.6                     TSQ; TFO client; IPv4 route-cache removal                                                                                release + exact anchors
+  3.6                 TSQ; TFO client; IPv4 route-cache removal                                                                                      release + exact anchors
 
-  3.7                     VXLAN; TFO server; IPv6 NAT                                                                                              release verified
+  3.7                 VXLAN; TFO server; IPv6 NAT                                                                                                    release verified
 
-  3.9                     TCP/UDP `SO_REUSEPORT`; conntrack labels; VM sockets                                                                     release; exact SO_REUSEPORT infrastructure anchor
+  3.9                 TCP/UDP `SO_REUSEPORT`; conntrack labels; VM sockets                                                                           release; exact SO_REUSEPORT infrastructure anchor
 
-  3.12                    `sch_fq`; TCP pacing; TSO autosizing generation                                                                          release-generation
+  3.12                `sch_fq`; TCP pacing; TSO autosizing generation                                                                                release-generation
 
-  3.13                    nftables                                                                                                                 release + exact anchor
+  3.13                nftables                                                                                                                       release + exact anchor
 
-  3.14                    TCP autocorking; continuing BPF transition                                                                               release-generation
+  3.14                TCP autocorking                                                                                                                release-generation
 
-  3.18                    `bpf()` syscall/maps/verifier generation; DCTCP; Geneve/FOU                                                              release + exact anchors
+  3.15                internal BPF interpreter ISA rework toward eBPF/native-JIT-friendly format                                                     final series + release-generation
 
-  3.19                    ipvlan; switchdev origin; `SO_ATTACH_BPF`                                                                                release-generation
+  3.18                `bpf()` syscall/maps/verifier generation; DCTCP; Geneve/FOU                                                                    release + exact anchors
 
-  4.3                     VRF; LWT; OVS conntrack                                                                                                  series + release
+  3.19                ipvlan; switchdev origin; `SO_ATTACH_BPF`                                                                                      release-generation
 
-  4.6                     devlink                                                                                                                  release origin
+  4.3                 VRF; LWT; OVS conntrack                                                                                                        series + release
 
-  4.7                     TC BPF direct packet access                                                                                              series + release
+  4.6                 devlink                                                                                                                        release origin
 
-  4.8                     XDP                                                                                                                      initial series + release
+  4.7                 TC BPF direct packet access                                                                                                    series + release
 
-  4.9                     BBR                                                                                                                      release + exact anchor
+  4.8                 XDP                                                                                                                            initial series + release
 
-  4.10                    cgroup BPF; BPF LWT; IPv6 Segment Routing                                                                                series + release
+  4.9                 BBR                                                                                                                            release + exact anchor
 
-  4.13                    `SOCK_OPS`; kTLS TX; phylink infrastructure                                                                              release; exact phylink anchor
+  4.10                cgroup BPF; BPF LWT; IPv6 Segment Routing                                                                                      series + release
 
-  4.14                    SOCKMAP; TCP `MSG_ZEROCOPY`                                                                                              release; exact TCP enablement anchor
+  4.13                `SOCK_OPS`; kTLS TX; phylink infrastructure                                                                                    release; exact phylink anchor
 
-  4.16                    netdevsim                                                                                                                release
+  4.14                SOCKMAP; TCP `MSG_ZEROCOPY`                                                                                                    release; exact TCP enablement anchor
 
-  4.17                    `BPF_PROG_TYPE_SK_MSG`; sockmap sendmsg/sendfile                                                                         final-series generation
+  4.16                netdevsim; Net DIM (`net_dim`) generation                                                                                      release; DIM exact origin SHA pending
 
-  4.18                    AF_XDP; `TCP_ZEROCOPY_RECEIVE`; refurbished page_pool/XDP memory return; cgroup UDP sendmsg hooks                        series + release
+  4.17                `BPF_PROG_TYPE_SK_MSG`; sockmap sendmsg/sendfile                                                                               final-series generation
 
-  4.19                    `SO_TXTIME`; CAKE                                                                                                        release + exact anchors
+  4.18                AF_XDP; `TCP_ZEROCOPY_RECEIVE`; refurbished page_pool/XDP memory return; cgroup UDP sendmsg hooks                              series + release
 
-  4.20                    TCP EDT pacing; BPF flow dissector; taprio; rtnetlink strict checking                                                    release
+  4.19                `SO_TXTIME`; CAKE                                                                                                              release + exact anchors
 
-  5.0                     UDP GRO; UDP `MSG_ZEROCOPY`                                                                                              release
+  4.20                TCP EDT pacing; BPF flow dissector; taprio; rtnetlink strict checking                                                          release
 
-  5.1                     devlink health; BPF spinlocks/DCE; `SO_BINDTOIFINDEX`; Y2038 timestamps; mac80211 airtime fairness; io_uring substrate   release
+  5.0                 UDP GRO; UDP `MSG_ZEROCOPY`                                                                                                    release
 
-  5.3                     nexthop objects                                                                                                          release; exact core anchor
+  5.1                 devlink health; BPF spinlocks/DCE; `SO_BINDTOIFINDEX`; Y2038 timestamps; mac80211 airtime-fairness merge-window milestone; i   o_uring substrate release
 
-  5.5                     mac80211 Airtime Queue Limits (AQL)                                                                                      release-generation
+  5.3                 nexthop objects; DIM generalized into common `lib/dim` infrastructure                                                          release; DIM generalization series verified
 
-  5.6                     MPTCP; WireGuard; BPF `struct_ops`/TCP CC; ethtool Generic Netlink groundwork                                            release; exact ethtool core anchor
+  5.5                 mac80211 Airtime Queue Limits (AQL)                                                                                            release-generation
 
-  5.9                     `BPF_PROG_TYPE_SK_LOOKUP`                                                                                                release + exact anchor
+  5.6                 MPTCP; WireGuard; BPF `struct_ops`/TCP CC; ethtool Generic Netlink groundwork                                                  release; exact ethtool core anchor
 
-  5.11                    auxiliary bus                                                                                                            release + final-series/tag evidence
+  5.9                 `BPF_PROG_TYPE_SK_LOOKUP`                                                                                                      release + exact anchor
 
-  5.12                    threaded NAPI                                                                                                            release
+  5.11                auxiliary bus                                                                                                                  release + final-series/tag evidence
 
-  5.15                    IPv6 IOAM core; MCTP; bridge per-VLAN multicast                                                                          release
+  5.12                threaded NAPI                                                                                                                  release
 
-  5.17                    `kfree_skb_reason()` / structured drop-reason foundation                                                                 release
+  5.15                IPv6 IOAM core; MCTP; bridge per-VLAN multicast                                                                                release
 
-  5.19                    IPv6 BIG TCP; drop-reason expansion                                                                                      release; exact BIG TCP anchors
+  5.17                `kfree_skb_reason()` / structured drop-reason foundation                                                                       release
 
-  6.2--6.3                YNL/YAML Netlink specification/tooling generation; exact boundary spans early rollout                                    release-generation; boundary kept explicit
+  5.19                IPv6 BIG TCP; drop-reason expansion                                                                                            release; exact BIG TCP anchors
 
-  6.2                     TCP PLB; XFRM/IPsec packet offload                                                                                       release; exact XFRM anchor
+  6.0                 io_uring `IORING_OP_SEND_ZC`; multishot receive                                                                                release-generation
 
-  6.3                     IPv4 BIG TCP                                                                                                             release; exact commit set
+  6.2--6.3            YNL/YAML Netlink specification/tooling generation; exact boundary spans early rollout                                          release-generation; boundary kept explicit
 
-  6.6                     AF_XDP multi-buffer                                                                                                      release + exact anchors
+  6.2                 TCP PLB; XFRM/IPsec packet offload                                                                                             release; exact XFRM anchor
 
-  6.7                     netkit; initial TCP-AO                                                                                                   release
+  6.3                 IPv4 BIG TCP                                                                                                                   release; exact commit set
 
-  6.8                     Rust phylib + Rust Asix reference PHY; queue/NAPI netdev-genl object visibility                                          release/final-series + docs
+  6.6                 AF_XDP multi-buffer                                                                                                            release + exact anchors
 
-  6.11                    virtio-net AF_XDP RX zero-copy                                                                                           release + exact anchors
+  6.7                 netkit; initial TCP-AO                                                                                                         release
 
-  6.12                    Device Memory TCP RX                                                                                                     final-series + exact commit set
+  6.8                 Rust phylib + Rust Asix reference PHY; queue/NAPI netdev-genl object visibility                                                release/final-series + docs
 
-  6.13                    per-netns RTNL infrastructure/migration milestone                                                                        milestone, **not completion**
+  6.11                virtio-net AF_XDP RX zero-copy                                                                                                 release + exact anchors
 
-  6.15                    io_uring ZCRX; further RTNL breakup                                                                                      exact merge/series evidence
+  6.12                Device Memory TCP RX                                                                                                           final series verified; implementation SHAs kept outside this clean edition
 
-  6.16                    Device Memory TCP TX; BPF qdisc; DCCP removal                                                                            exact/series evidence
+  6.13                per-netns RTNL infrastructure/migration milestone                                                                              milestone, **not completion**
 
-  6.18                    AccECN core; UDP RX evolution; DIBS as a separate shared-memory lineage                                                  release-generation
+  6.15                io_uring ZCRX; further RTNL breakup                                                                                            exact merge/series evidence
 
-  7.0--7.2                released 7.x evolution; RX queue-leasing generation; MPTCP in-kernel PM limit expansion                                  released branch; subfeature tag containment noted separately
+  6.16                Device Memory TCP TX; BPF qdisc; DCCP removal                                                                                  final series verified; key BPF-qdisc anchors retained
 
-  7.3-rc / mainline       BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers \> `PAGE_SIZE`                                     `net-next-7.3` merged 2026-08-20; final 7.3 release pending
-  ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  6.18                AccECN core; UDP RX evolution; DIBS as a separate shared-memory lineage                                                        release-generation
+
+  7.0--7.2            released 7.x evolution; RX queue-leasing generation; MPTCP in-kernel PM limit expansion (subflows 8→64; endpoints 8→255)       released branch; subfeature tag containment noted separately
+
+  7.3-rc / mainline   BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers \> `PAGE_SIZE`                                           `net-next-7.3` merged 2026-08-20; final 7.3 release pending
+  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+**mac80211 airtime fairness note:** 5.1 is retained as the canonical merge-window milestone used by this document, not as a claim that every airtime-accounting or TXQ scheduling primitive first appeared in 5.1.
 
 For the last row, the authoritative networking pull explicitly lists all three items above. The merge into Linus's tree is `91ec2035134982b98fab0609a9fd8480e8217dc1` (`Merge tag 'net-next-7.3' ...`).
 
@@ -1030,6 +1036,10 @@ v5.0 (EDT pacing already present since 4.20)
 
 MPTCP は initial upstream から multi-subflow、userspace path manager、 Generic Netlink、BPF integration へ進化した。
 
+### Linux 6.0 --- io_uring networking inflection
+
+Linux 6.0 is the selected networking milestone for io_uring zero-copy send (`IORING_OP_SEND_ZC`) and multishot receive. This closes the chronology between the earlier io_uring substrate and the later 6.15 ZCRX memory-provider architecture.
+
 ### UDP
 
 v5.0 自体が `MSG_ZEROCOPY` と GRO の節目。その後は GRO/GSO、 tunnel/encapsulation、high packet-rate RX、receive-buffer scaling が進む。 QUIC や overlay networking の基盤として UDP の重要性も増した。
@@ -1128,35 +1138,35 @@ This chapter focuses on the contract between networking core and drivers. Where 
 
 This is the Driver Framework projection of the Part II release map. It is not a second independent chronology; every release below must agree with Part II.
 
-  -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  Release                 Driver-framework milestone                                              Architectural effect
-  ----------------------- ----------------------------------------------------------------------- -----------------------------------------------------------------------------
-  3.3                     DQL/BQL                                                                 common queue-pressure control replaces driver-local queue sizing policy
+  ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Release   Driver-framework milestone                                              Architectural effect
+  --------- ----------------------------------------------------------------------- -----------------------------------------------------------------------------
+  3.3       DQL/BQL                                                                 common queue-pressure control replaces driver-local queue sizing policy
 
-  3.19                    switchdev origin                                                        Linux forwarding objects begin to drive switch-ASIC offload
+  3.19      switchdev origin                                                        Linux forwarding objects begin to drive switch-ASIC offload
 
-  4.6                     devlink                                                                 device/ASIC-wide resources and control separated from one `net_device`
+  4.6       devlink                                                                 device/ASIC-wide resources and control separated from one `net_device`
 
-  4.8                     XDP                                                                     driver RX path gains a programmable pre-skb execution point
+  4.8       XDP                                                                     driver RX path gains a programmable pre-skb execution point
 
-  4.13                    phylink                                                                 common MAC/PHY/PCS/SFP link-management state machine
+  4.13      phylink                                                                 common MAC/PHY/PCS/SFP link-management state machine
 
-  4.16                    netdevsim                                                               common offload APIs become testable without physical hardware
+  4.16      netdevsim                                                               common offload APIs become testable without physical hardware
 
-  4.18                    refurbished page_pool/XDP memory return                                 RX allocation/recycling begins moving into common memory infrastructure
+  4.18      refurbished page_pool/XDP memory return                                 RX allocation/recycling begins moving into common memory infrastructure
 
-  5.1                     devlink health                                                          common reporting/recovery model for device health
+  5.1       devlink health                                                          common reporting/recovery model for device health
 
-  5.6                     ethtool Generic Netlink                                                 driver management ABI becomes structured/extensible
+  5.6       ethtool Generic Netlink                                                 driver management ABI becomes structured/extensible
 
-  5.11                    auxiliary bus                                                           complex devices can expose independently bound subfunctions
+  5.11      auxiliary bus                                                           complex devices can expose independently bound subfunctions
 
-  5.12                    threaded NAPI                                                           NAPI execution model becomes more explicitly configurable
+  5.12      threaded NAPI                                                           NAPI execution model becomes more explicitly configurable
 
-  6.8                     Rust phylib + queue/NAPI netdev-genl objects                            safe driver abstraction and explicit netdev objects develop in parallel
+  6.8       Rust phylib + queue/NAPI netdev-genl objects                            safe driver abstraction and explicit netdev objects develop in parallel
 
-  6.x→7.x                 page_pool introspection → queue/NAPI configuration → memory providers   queue, poller and memory ownership become first-class driver/core contracts
-  -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  6.x→7.x   page_pool introspection → queue/NAPI configuration → memory providers   queue, poller and memory ownership become first-class driver/core contracts
+  ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ### The long architectural transition
 
@@ -1369,7 +1379,7 @@ The last point directly motivates page_pool.
 
 ### DIM --- interrupt moderation becomes a common library
 
-**Release attribution:** the 2018 Netdev material confirms the common `net_dim` library was already upstream/in use, but this edition does not assign an exact first release until the origin commit/tag is re-audited.
+**Release attribution:** Net DIM is treated as a Linux 4.16 generation; the later DIM refactor/generalization into common `lib/dim` infrastructure is a Linux 5.3 generation. Exact origin/generalization SHAs remain to be pinned in this edition.
 
 Netdev 0x12 (2018) presented DIM as a driver-independent Dynamic Interrupt Moderation library.
 
@@ -1730,7 +1740,7 @@ Kernel Recipes is especially useful for architecture:
 2026  compile-time enforcement of driver lifecycle rules
 ```
 
-## Revised six-axis model
+## Revised Part II six-axis model
 
 The complete document can now use six interacting axes:
 
@@ -1762,7 +1772,7 @@ DRIVER FRAMEWORK
 
 The key insight is that the driver-framework axis is not independent. It is the layer that makes the other five axes implementable across heterogeneous hardware without every driver reinventing the same mechanisms.
 
-## Topics worth a second exact-commit audit
+## Topics worth a remaining exact-commit audit
 
 Before assigning every item a precise kernel release/commit, a follow-up provenance pass should enumerate:
 
@@ -2023,7 +2033,7 @@ Retis-style packet journey tracing
 
 observabilityは付加的なdebug機能ではなく、programmable/heterogeneousな network datapathを運用するためのarchitecture capabilityへ発展したと考えられる。
 
-### Updated six-axis model
+### Six-axis projection for this chapter
 
 ``` text
 PERFORMANCE
@@ -2669,41 +2679,41 @@ pwruでもOVS kernel functionsを観測できるが、 RetisのOVS collectorはO
 
 ### Comparison matrix
 
-  ----------------------------------------------------------------------------------------------------------------
-  Aspect                  pwru                                        Retis
-  ----------------------- ------------------------------------------- --------------------------------------------
-  Primary model           broad kernel-function tracing               event/collector-based correlation
+  ---------------------------------------------------------------------------------------------------------------
+  Aspect                 pwru                                        Retis
+  ---------------------- ------------------------------------------- --------------------------------------------
+  Primary model          broad kernel-function tracing               event/collector-based correlation
 
-  Starting point          target packet, location unknown             probes/events + collectors
+  Starting point         target packet, location unknown             probes/events + collectors
 
-  Probe discovery         BTFからskb functionsを広く発見              configured/selected probes and profiles
+  Probe discovery        BTFからskb functionsを広く発見              configured/selected probes and profiles
 
-  kprobe-multi            supported                                   different probe architecture
+  kprobe-multi           supported                                   different probe architecture
 
-  Packet filter           pcap-style                                  pcap-style
+  Packet filter          pcap-style                                  pcap-style
 
-  Kernel metadata         skb/BTF/expressions                         skb/BTF metadata filters
+  Kernel metadata        skb/BTF/expressions                         skb/BTF metadata filters
 
-  skb tracking            yes                                         yes
+  skb tracking           yes                                         yes
 
-  clone handling          yes                                         tracking/correlation logic
+  clone handling         yes                                         tracking/correlation logic
 
-  XDP tracking            supported                                   XDP/kernel probes depending on collection
+  XDP tracking           supported                                   XDP/kernel probes depending on collection
 
-  Drop reason             can observe/output relevant path/state      dedicated skb-drop semantics
+  Drop reason            can observe/output relevant path/state      dedicated skb-drop semantics
 
-  Conntrack               generic tracing/state inspection possible   dedicated collector
+  Conntrack              generic tracing/state inspection possible   dedicated collector
 
-  nftables                generic kernel trajectory                   dedicated semantic collector
+  nftables               generic kernel trajectory                   dedicated semantic collector
 
-  OVS kernel path         visible                                     dedicated OVS collector
+  OVS kernel path        visible                                     dedicated OVS collector
 
-  OVS userspace upcall    not the central model                       explicit kernel↔ovs-vswitchd correlation
+  OVS userspace upcall   not the central model                       explicit kernel↔ovs-vswitchd correlation
 
-  Post-processing         trajectory-oriented output/JSON             collect → store → sort/reconstruct
+  Post-processing        trajectory-oriented output/JSON             collect → store → sort/reconstruct
 
-  Best first question     "where did this packet go?"                 "what happened in this subsystem context?"
-  ----------------------------------------------------------------------------------------------------------------
+  Best first question    "where did this packet go?"                 "what happened in this subsystem context?"
+  ---------------------------------------------------------------------------------------------------------------
 
 この表は絶対的な機能境界ではない。両projectとも進化しており、 overlapする機能は多い。比較軸は「できる/できない」より**design center**。
 
@@ -2898,77 +2908,77 @@ The synthesis is intentionally compact. Part VII records the attribution boundar
 
 These are representative **anchor commits**, not necessarily every commit in the feature series.
 
-  --------------------------------------------------------------------------------------------------------------------------------------------------
-  Feature                       Mainline anchor                              Subject / role
-  ----------------------------- -------------------------------------------- -----------------------------------------------------------------------
-  DQL                           `75957ba36c05b979701e9ec64b37819adc12f830`   `dql: Dynamic queue limits`
+  --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Feature                          Mainline anchor                                                Subject / role
+  -------------------------------- -------------------------------------------------------------- --------------------------------------------------------------------------------------
+  DQL                              `75957ba36c05b979701e9ec64b37819adc12f830`                     `dql: Dynamic queue limits`
 
-  CoDel                         `76e3cc126bb223013a6b9a0e2a51238d1ef2e409`   CoDel qdisc core anchor
+  CoDel                            `76e3cc126bb223013a6b9a0e2a51238d1ef2e409`                     CoDel qdisc core anchor
 
-  SO_REUSEPORT infrastructure   `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a`   `soreuseport: infrastructure`
+  SO_REUSEPORT infrastructure      `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a`                     `soreuseport: infrastructure`
 
-  nftables set API              `20a69341f2d00cd042e81c82289fba8a13c05a25`   nftables core-generation anchor
+  nftables core nftables set API   `96518518cc41...` `20a69341f2d00cd042e81c82289fba8a13c05a25`   `netfilter: add nftables` --- core origin anchor set-API anchor; not the core origin
 
-  BBR                           `0f8782ea14974ce992618b55f0c041ef43ed0b78`   initial BBR mainline anchor
+  BBR                              `0f8782ea14974ce992618b55f0c041ef43ed0b78`                     initial BBR mainline anchor
 
-  phylink                       `9525ae83959b60c6061fe2f2caabdc8f69a48bc6`   `phylink: add phylink infrastructure`
+  phylink                          `9525ae83959b60c6061fe2f2caabdc8f69a48bc6`                     `phylink: add phylink infrastructure`
 
-  TCP MSG_ZEROCOPY              `f214f915e7db99091f1312c48b30928c1e0c90b7`   `tcp: enable MSG_ZEROCOPY`
+  TCP MSG_ZEROCOPY                 `f214f915e7db99091f1312c48b30928c1e0c90b7`                     `tcp: enable MSG_ZEROCOPY`
 
-  page_pool/XDP integration     `60bbf7eeef10dc647430646d7fe5e3d8d132dbec`   mlx5 page_pool/XDP integration anchor; **not page_pool origin**
+  page_pool/XDP integration        `60bbf7eeef10dc647430646d7fe5e3d8d132dbec`                     mlx5 page_pool/XDP integration anchor; **not page_pool origin**
 
-  ethtool Generic Netlink       `2b4a8990b7df55875745a80a609a1ceaaf51f322`   `ethtool: introduce ethtool netlink interface`
+  ethtool Generic Netlink          `2b4a8990b7df55875745a80a609a1ceaaf51f322`                     `ethtool: introduce ethtool netlink interface`
 
-  SK_LOOKUP                     `e9ddbb7707ff...`                            `bpf: Introduce SK_LOOKUP program type with a dedicated attach point`
+  SK_LOOKUP                        `e9ddbb7707ff...`                                              `bpf: Introduce SK_LOOKUP program type with a dedicated attach point`
 
-  XFRM packet offload           `d14f28b8c1de668bab863bf5892a49c824cb110d`   `xfrm: add new packet offload flag`
+  XFRM packet offload              `d14f28b8c1de668bab863bf5892a49c824cb110d`                     `xfrm: add new packet offload flag`
 
-  IPv6 BIG TCP / GRO            `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12`   `net: allow gro_max_size to exceed 65536`
+  IPv6 BIG TCP / GRO               `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12`                     `net: allow gro_max_size to exceed 65536`
 
-  IPv6 BIG TCP / GSO            `7c4e983c4f3cf94fcd879730c6caa877e0768a4d`   `net: allow gso_max_size to exceed 65536`
+  IPv6 BIG TCP / GSO               `7c4e983c4f3cf94fcd879730c6caa877e0768a4d`                     `net: allow gso_max_size to exceed 65536`
 
-  netkit                        `35dfaad7188cdc043fde31709c796f5a692ba2bd`   netkit core anchor
+  netkit                           `35dfaad7188cdc043fde31709c796f5a692ba2bd`                     netkit core anchor
 
-  net-next 7.3 merge            `91ec2035134982b98fab0609a9fd8480e8217dc1`   `Merge tag 'net-next-7.3' ...`
-  --------------------------------------------------------------------------------------------------------------------------------------------------
+  net-next 7.3 merge               `91ec2035134982b98fab0609a9fd8480e8217dc1`                     `Merge tag 'net-next-7.3' ...`
+  --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 Where only a shortened SHA is shown (currently SK_LOOKUP), the full SHA remains an explicit re-audit item rather than being guessed.
 
 This section records only unresolved or especially important attribution boundaries. The detailed research diary from the re-audit passes is intentionally omitted from the clean edition.
 
-  -------------------------------------------------------------------------------------------------------------------------------------
-  Topic                              Canonical status
-  ---------------------------------- --------------------------------------------------------------------------------------------------
-  BQL/DQL                            Linux 3.3 mainline generation; DQL exact anchor retained
+  ----------------------------------------------------------------------------------------------------------------------------
+  Topic                     Canonical status
+  ------------------------- --------------------------------------------------------------------------------------------------
+  BQL/DQL                   Linux 3.3 mainline generation; DQL exact anchor retained
 
-  SO_REUSEPORT                       Linux 3.9; infrastructure exact anchor retained
+  SO_REUSEPORT              Linux 3.9; infrastructure exact anchor retained
 
-  switchdev                          3.19 origin; later 4.x work treated as expansion
+  switchdev                 3.19 origin; later 4.x work treated as expansion
 
-  devlink                            Linux 4.6 release origin; exact initial commit set still pending
+  devlink                   Linux 4.6 release origin; exact initial commit set still pending
 
-  phylink                            2015 RFC → Linux 4.13 infrastructure; exact anchor retained
+  phylink                   2015 RFC → Linux 4.13 infrastructure; exact anchor retained
 
-  MSG_ZEROCOPY                       TCP foundation 4.14; UDP extension 5.0
+  MSG_ZEROCOPY              TCP foundation 4.14; UDP extension 5.0
 
-  SK_MSG                             4.17 generation; final series verified, core SHA still pending
+  SK_MSG                    4.17 generation; final series verified, core SHA still pending
 
-  page_pool                          4.18 refurbished/XDP-memory-return generation; do not claim all page_pool ideas originated there
+  page_pool                 4.18 refurbished/XDP-memory-return generation; do not claim all page_pool ideas originated there
 
-  ethtool Generic Netlink            5.6 generation; exact core-interface anchor retained
+  ethtool Generic Netlink   5.6 generation; exact core-interface anchor retained
 
-  SK_LOOKUP                          5.9; exact program-type anchor retained
+  SK_LOOKUP                 5.9; exact program-type anchor; full SHA pending re-audit
 
-  auxiliary bus                      5.11; final series/tag verified, exact feature-origin SHA pending
+  auxiliary bus             5.11; final series/tag verified, exact feature-origin SHA pending
 
-  XFRM packet offload                6.2; exact `XFRM_OFFLOAD_PACKET` anchor retained
+  XFRM packet offload       6.2; exact `XFRM_OFFLOAD_PACKET` anchor retained
 
-  Rust PHY                           2023 RFC/final v11 → Linux 6.8; per-patch mainline SHA set pending
+  Rust PHY                  2023 RFC/final v11 → Linux 6.8; per-patch mainline SHA set pending
 
-  queue/NAPI objects                 6.8 documentation-level milestone; later write/configuration APIs must not be backdated
+  queue/NAPI objects        6.8 documentation-level milestone; later write/configuration APIs must not be backdated
 
-  7.x development                    released 7.2 separated from 7.3-rc/mainline-but-unreleased work
-  -------------------------------------------------------------------------------------------------------------------------------------
+  7.x development           released 7.2 separated from 7.3-rc/mainline-but-unreleased work
+  ----------------------------------------------------------------------------------------------------------------------------
 
 ## Evidence grades
 
@@ -2987,23 +2997,23 @@ The appendix is an evidence catalog. Dates found there may be RFC dates, posting
 
 ## Open attribution items and evidence grade
 
-  ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  Item                                     Grade                   Current treatment
-  ---------------------------------------- ----------------------- -------------------------------------------------------------------------------------------------------------------------------------
-  queue leasing                            B                       RX side is merged; TX queue leasing remains PoC/design in the cited 2026 discussion; exact released tag for RX remains to be pinned
+  --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Item                                 Grade                   Current treatment
+  ------------------------------------ ----------------------- -------------------------------------------------------------------------------------------------------------------------------------
+  queue leasing                        B                       RX side is merged; TX queue leasing remains PoC/design in the cited 2026 discussion; exact released tag for RX remains to be pinned
 
-  devmem buffers \> `PAGE_SIZE`            A for 7.3 mainline-rc   explicitly listed in the `net-next-7.3` pull merged to Linus mainline
+  devmem buffers \> `PAGE_SIZE`        A for 7.3 mainline-rc   explicitly listed in the `net-next-7.3` pull merged to Linus mainline
 
-  MPTCP max subflows 8 → 64                B                       2026 merge series verified; exact released-tag containment should be pinned before using it as a 7.2-specific anchor
+  MPTCP max subflows 8 → 64            B                       2026 merge series verified; exact released-tag containment should be pinned before using it as a 7.2-specific anchor
 
-  YNL initial rollout boundary             C                       treated as a 6.2--6.3 generation pending exact origin/tag audit
+  YNL initial rollout boundary         C                       treated as a 6.2--6.3 generation pending exact origin/tag audit
 
-  DIM / `net_dim` origin                   C                       upstream/in-use by 2018 is established; exact origin commit/release pending
+  DIM / `net_dim`                      B                       Linux 4.16 Net DIM generation; Linux 5.3 common `lib/dim` generalization; exact SHAs pending
 
-  `cake_mq` release attribution            C                       mainline merge dated 2026-01-13 verified; exact release tag pending
+  `cake_mq`                            A/B                     `net-next-7.0` pull explicitly lists multi-queue-aware `sch_cake`; canonical generation Linux 7.0
 
-  queue-leasing revert/remerge narrative   removed                 not retained without a re-verified primary-source chain
-  ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  queue-leasing merge/revert/remerge   B                       verified: `77b9c4a438fc...` → revert `8766d61a1d33...` → re-merge `15089225889b...`; RX only, TX remains PoC
+  --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # Appendix --- Evidence catalog and research notes (non-normative)
 
@@ -3549,7 +3559,7 @@ Linux 6.3
 IPv4 BIG TCP
       │
       ▼
-Linux 7.3 development
+Linux 7.3-rc/mainline
 VXLAN/GENEVE BIG TCP
 ```
 
@@ -4009,7 +4019,7 @@ IPv4 BIG TCP
 HBH removal + UDP tunnel work
         │
         ▼
-Linux 7.3 development
+Linux 7.3-rc/mainline
 VXLAN/GENEVE BIG TCP
 ```
 
@@ -4060,7 +4070,7 @@ mainline traffic-control programmability
 ### P4TC
 
 ``` text
-Netdev 0x13 (pre-window)
+Netdev 0x13 (historical provenance)
 P4 compiler backend for TC
         │
         ▼
@@ -4163,7 +4173,7 @@ Future provenance work should add a `Netdev` column to the canonical LWN invento
 
   IPv4 BIG TCP                      BIG TCP 0x15 as origin                                                                                                                   pre-merge                 2023 IPv4 BIG TCP series                                     6.3                                   original design generalized to IPv4
 
-  BIG TCP over tunnels              BIG TCP 0x15 as origin; later tunnel work                                                                                                historical origin         BIG TCP for UDP tunnels series                               7.3 development                       BIG TCP extended to VXLAN/GENEVE
+  BIG TCP over tunnels              BIG TCP 0x15 as origin; later tunnel work                                                                                                historical origin         BIG TCP for UDP tunnels series                               7.3-rc/mainline                       BIG TCP extended to VXLAN/GENEVE
 
   TCP RX zero-copy                  0x14 --- **The Path To TCP 4K MTU and RX ZeroCopy**                                                                                      pre-merge                 multiple later ZC RX RFCs                                    multi-release                         early socket/TCP receive-copy reduction work
 
@@ -4231,7 +4241,7 @@ IPv6 BIG TCP
         │
         ├── 2026: IPv6 HBH dependency removal
         │
-        └── Linux 7.3 development:
+        └── Linux 7.3-rc/mainline:
             BIG TCP over VXLAN/GENEVE
 ```
 
@@ -4330,7 +4340,7 @@ Netdev 0x19 (2025)
         │
         ▼
 2026 mainline generation
-in-kernel PM: max subflows 8 → 64
+in-kernel PM: max subflows 8 → 64; endpoint limit 8 → 255
 (merged series verified; exact 7.2 tag containment should be read from Part VII evidence grade)
 ```
 
@@ -4887,21 +4897,21 @@ Kernel Recipes archive: `https://archives.kernel-recipes.org/document/on-the-way
 
 ## Kernel Recipes → LWN → mainline mapping
 
-  ---------------------------------------------------------------------------------------------------------------------------------------------------------
-  Kernel Recipes                                 Year Archive category   Change-log lineage                                     Phase
-  ------------------------------------------- ------- ------------------ ------------------------------------------------------ ---------------------------
-  XDP closer integration with network stack      2019 networking         XDP → page_pool/AF_XDP → netkit                        design/architecture
+  --------------------------------------------------------------------------------------------------------------------------------------------------------
+  Kernel Recipes                                Year Archive category   Change-log lineage                                     Phase
+  ------------------------------------------- ------ ------------------ ------------------------------------------------------ ---------------------------
+  XDP closer integration with network stack     2019 networking         XDP → page_pool/AF_XDP → netkit                        design/architecture
 
-  BPF at Facebook                                2019 networking         BPF networking → struct_ops/socket hooks/netkit        deployment/design
+  BPF at Facebook                               2019 networking         BPF networking → struct_ops/socket hooks/netkit        deployment/design
 
-  Faster IO through io_uring                     2019 storage            io_uring → networking TX/RX                            pre-networking foundation
+  Faster IO through io_uring                    2019 storage            io_uring → networking TX/RX                            pre-networking foundation
 
-  What's new with io_uring                       2022 storage            io_uring → ZC networking                               foundation/merge-era
+  What's new with io_uring                      2022 storage            io_uring → ZC networking                               foundation/merge-era
 
-  On the way to io_uring networking              2023 storage            io_uring ZC TX/RX                                      design/merge-era
+  On the way to io_uring networking             2023 storage            io_uring ZC TX/RX                                      design/merge-era
 
-  Netconf 2023 Workshop                          2023 networking         SO_DEVMEM, BIG TCP, XDP/BPF, IPsec, nftables, TCP/ML   multi-lineage workshop
-  ---------------------------------------------------------------------------------------------------------------------------------------------------------
+  Netconf 2023 Workshop                         2023 networking         SO_DEVMEM, BIG TCP, XDP/BPF, IPsec, nftables, TCP/ML   multi-lineage workshop
+  --------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -5386,6 +5396,22 @@ Linux Networking with MANA: RX Path Optimization and Netshaper
 
 ### Zero-copy in containers / netkit queue leasing
 
+**Verified development history:**
+
+``` text
+2026-01-20  initial net-next merge
+            77b9c4a438fc...
+                 ↓
+2026-01-20  reverted
+            8766d61a1d33...
+            reason: io_uring cross-dependency + code needed more polish
+                 ↓
+2026-04-09  revised RX queue-leasing series re-merged
+            15089225889b...
+```
+
+This history is about **RX queue leasing**. TX queue leasing is not presented as merged.
+
 **Status boundary:** merged queue leasing is the **RX** side. Later 2026 developer discussion explicitly describes TX queue leasing as symmetric first-class infrastructure still at PoC/design stage. This document therefore does not describe TX queue leasing as merged.
 
 This is the most important LPC 2025 session for the current document.
@@ -5522,51 +5548,51 @@ This is a useful post-merge production example of why `page_pool` became a core 
 
 ## LPC timeline mapped to the major change-log lineages
 
-  --------------------------------------------------------------------------------------------------------
-      Year LPC topic                                 Change-log lineage           Phase
-  -------- ----------------------------------------- ---------------------------- ------------------------
-      2019 Multipath TCP Upstreaming                 MPTCP 5.6                    pre-merge
+  ------------------------------------------------------------------------------------------------------
+    Year LPC topic                                 Change-log lineage           Phase
+  ------ ----------------------------------------- ---------------------------- ------------------------
+    2019 Multipath TCP Upstreaming                 MPTCP 5.6                    pre-merge
 
-      2019 Programmable socket lookup with BPF       SK_LOOKUP                    pre-merge
+    2019 Programmable socket lookup with BPF       SK_LOOKUP                    pre-merge
 
-      2019 netfilter hardware offloads               nftables/flowtable/offload   design/merge-era
+    2019 netfilter hardware offloads               nftables/flowtable/offload   design/merge-era
 
-      2020 Programmable Qdisc with eBPF              BPF qdisc                    early design
+    2020 Programmable Qdisc with eBPF              BPF qdisc                    early design
 
-      2020 BPF TCP header option/CC/socket storage   BPF TCP programmability      design/merge-era
+    2020 BPF TCP header option/CC/socket storage   BPF TCP programmability      design/merge-era
 
-      2020 OVS + AF_XDP                              AF_XDP/virtual networking    application
+    2020 OVS + AF_XDP                              AF_XDP/virtual networking    application
 
-      2021 SO_REUSEPORT socket migration             SO_REUSEPORT failover        merge/post-merge
+    2021 SO_REUSEPORT socket migration             SO_REUSEPORT failover        merge/post-merge
 
-      2021 TSO/GRO/Jumbo for XDP                     XDP multi-buffer             pre-merge
+    2021 TSO/GRO/Jumbo for XDP                     XDP multi-buffer             pre-merge
 
-      2021 bpfilter                                  BPF firewall                 design
+    2021 bpfilter                                  BPF firewall                 design
 
-      2022 high-speed Linux networking               BIG TCP/ZC/devmem            architecture
+    2022 high-speed Linux networking               BIG TCP/ZC/devmem            architecture
 
-      2022 machine-readable Netlink YAML             YNL                          pre-merge
+    2022 machine-readable Netlink YAML             YNL                          pre-merge
 
-      2022 MPTCP BPF + Netlink                       MPTCP extensibility          merge/design
+    2022 MPTCP BPF + Netlink                       MPTCP extensibility          merge/design
 
-      2022 XDP hardware hints                        packet metadata              design
+    2022 XDP hardware hints                        packet metadata              design
 
-      2022 packet queueing in XDP                    programmable queueing        RFC
+    2022 packet queueing in XDP                    programmable queueing        RFC
 
-      2023 io_uring ZC receive                       io_uring ZCRX                pre-merge
+    2023 io_uring ZC receive                       io_uring ZCRX                pre-merge
 
-      2024 Per Netns RTNL                            RTNL breakup                 pre/merge-era
+    2024 Per Netns RTNL                            RTNL breakup                 pre/merge-era
 
-      2024 network virtualization overhead           virtio/AF_XDP/netkit         architecture
+    2024 network virtualization overhead           virtio/AF_XDP/netkit         architecture
 
-      2025 zero-copy in containers                   netkit queue leasing         design/merge-era
+    2025 zero-copy in containers                   netkit queue leasing         design/merge-era
 
-      2025 packet metadata                           XDP/BPF metadata             ongoing
+    2025 packet metadata                           XDP/BPF metadata             ongoing
 
-      2025 XDP on AMD GPU                            devmem/P2PDMA/XDP            post-merge extension
+    2025 XDP on AMD GPU                            devmem/P2PDMA/XDP            post-merge extension
 
-      2025 MANA RX page_pool                         page_pool                    post-merge application
-  --------------------------------------------------------------------------------------------------------
+    2025 MANA RX page_pool                         page_pool                    post-merge application
+  ------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -6055,47 +6081,47 @@ The later netkit queue-leasing work can therefore be understood as part of a bro
 
 ## Updated LPC canonical inventory
 
-  -------------------------------------------------------------------------------------------------------------------
-            Year Session                                      LPC area          Canonical role
-  -------------- -------------------------------------------- ----------------- -------------------------------------
-            2019 Multipath TCP Upstreaming                    Networking        MPTCP pre-merge
+  -----------------------------------------------------------------------------------------------------------
+    Year Session                                      LPC area          Canonical role
+  ------ -------------------------------------------- ----------------- -------------------------------------
+    2019 Multipath TCP Upstreaming                    Networking        MPTCP pre-merge
 
-            2019 Programmable socket lookup with BPF          Networking        SK_LOOKUP pre-merge
+    2019 Programmable socket lookup with BPF          Networking        SK_LOOKUP pre-merge
 
-            2019 Challenges of the RDMA subsystem             Refereed/RDMA     DMA/P2P/device-memory problem-space
+    2019 Challenges of the RDMA subsystem             Refereed/RDMA     DMA/P2P/device-memory problem-space
 
-            2019 RDMA MC                                      RDMA              HMM/DMA-BUF/P2P supporting context
+    2019 RDMA MC                                      RDMA              HMM/DMA-BUF/P2P supporting context
 
-            2020 xen-netfront and virtio_net XDP offloading   Networking+BPF    virtual-NIC XDP design
+    2020 xen-netfront and virtio_net XDP offloading   Networking+BPF    virtual-NIC XDP design
 
-            2020 Userspace OVS with HW Offload and AF_XDP     Networking+BPF    hybrid HW/XDP/AF_XDP datapath
+    2020 Userspace OVS with HW Offload and AF_XDP     Networking+BPF    hybrid HW/XDP/AF_XDP datapath
 
-            2020 A programmable Qdisc with eBPF               Networking+BPF    BPF-qdisc early design
+    2020 A programmable Qdisc with eBPF               Networking+BPF    BPF-qdisc early design
 
-            2021 TSO/GRO/Jumbo frames for XDP                 BPF+Networking    XDP multi-buffer precursor
+    2021 TSO/GRO/Jumbo frames for XDP                 BPF+Networking    XDP multi-buffer precursor
 
-            2021 io_uring: BPF controlled I/O                 Refereed          io_uring/BPF context
+    2021 io_uring: BPF controlled I/O                 Refereed          io_uring/BPF context
 
-            2022 High-speed Linux TCP                         eBPF+Networking   BIG-TCP/ZC architecture
+    2022 High-speed Linux TCP                         eBPF+Networking   BIG-TCP/ZC architecture
 
-            2022 Netlink YAML                                 eBPF+Networking   YNL pre-merge
+    2022 Netlink YAML                                 eBPF+Networking   YNL pre-merge
 
-            2022 MPTCP BPF + Netlink                          eBPF+Networking   MPTCP extensibility
+    2022 MPTCP BPF + Netlink                          eBPF+Networking   MPTCP extensibility
 
-            2022 PCIe topology to guest for P2P               VFIO/IOMMU/PCI    virtualized P2P constraint
+    2022 PCIe topology to guest for P2P               VFIO/IOMMU/PCI    virtualized P2P constraint
 
-            2023 Zero Copy Receive using io_uring             eBPF+Networking   io_uring ZCRX pre-merge
+    2023 Zero Copy Receive using io_uring             eBPF+Networking   io_uring ZCRX pre-merge
 
-            2024 Per Netns RTNL                               Networking        RTNL breakup
+    2024 Per Netns RTNL                               Networking        RTNL breakup
 
-            2024 Network virtualization overhead              Networking        virtual-network optimization
+    2024 Network virtualization overhead              Networking        virtual-network optimization
 
-            2025 Zero-copy in containers                      Networking        netkit queue leasing
+    2025 Zero-copy in containers                      Networking        netkit queue leasing
 
-            2025 Packet Metadata                              Networking        metadata API evolution
+    2025 Packet Metadata                              Networking        metadata API evolution
 
-            2025 XDP on AMD GPUs                              Networking        devmem/P2PDMA post-merge extension
-  -------------------------------------------------------------------------------------------------------------------
+    2025 XDP on AMD GPUs                              Networking        devmem/P2PDMA post-merge extension
+  -----------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -6202,7 +6228,7 @@ Linux 5.15
   ↓
 YAML specs → YNL → protocol conversions
 
-[KR] io_uring path to zero-copy
+[KR] What's new with io_uring
   ├─ registered buffers
   ├─ future ZC RX
   └─ DMA-BUF/P2P
@@ -6355,23 +6381,23 @@ global RTNL → unlocked flags → RCU readers → per-netns RTNL → subsystem 
 
 ## Source-role matrix
 
-  -----------------------------------------------------------------------------------------------------
-  Source                             Best used for
-  ---------------------------------- ------------------------------------------------------------------
-  Kernel Recipes                     architectural motivation and production experience
+  ----------------------------------------------------------------------------------------------
+  Source                      Best used for
+  --------------------------- ------------------------------------------------------------------
+  Kernel Recipes              architectural motivation and production experience
 
-  Linux Plumbers Conference          cross-subsystem API/design discussion and unresolved problems
+  Linux Plumbers Conference   cross-subsystem API/design discussion and unresolved problems
 
-  Netdev                             networking-specific implementation and datapath design
+  Netdev                      networking-specific implementation and datapath design
 
-  LWN                                independent explanation, review history and merge interpretation
+  LWN                         independent explanation, review history and merge interpretation
 
-  lore / patchwork                   exact revision and accepted-series evidence
+  lore / patchwork            exact revision and accepted-series evidence
 
-  git.kernel.org                     canonical mainline commits
+  git.kernel.org              canonical mainline commits
 
-  release pulls/tags                 release-level confirmation
-  -----------------------------------------------------------------------------------------------------
+  release pulls/tags          release-level confirmation
+  ----------------------------------------------------------------------------------------------
 
 ``` text
 Why?            → KR / LPC / Netdev
