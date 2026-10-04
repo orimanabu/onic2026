@@ -10008,3 +10008,276 @@ Under this definition:
 
 The remaining work is therefore concentrated in complete multi-commit
 enumeration, not in determining whether these features actually landed.
+
+------------------------------------------------------------------------
+
+# 96. Provenance verification pass 9 --- MPTCP 5.6 and IOAM commit expansion
+
+## 96.1 MPTCP 5.6: core implementation anchors
+
+The initial native MPTCP implementation can now be anchored more
+precisely than by the selftest alone.
+
+### Socket infrastructure
+
+``` text
+f870fa0b5768842cb4690c1c11f19f28b731ae6d
+mptcp: Add MPTCP socket stubs
+```
+
+This commit creates the MPTCP socket infrastructure and allows userspace
+to call:
+
+``` c
+socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP)
+```
+
+At this point the socket is still essentially a wrapper around one
+regular TCP subflow; the full on-wire MPTCP protocol is added by the
+subsequent commits in the initial series.
+
+### Receive path
+
+``` text
+648ef4b88673
+mptcp: Implement MPTCP receive path
+```
+
+This commit parses incoming DSS information, carries MPTCP metadata
+through an skb extension, validates mappings and exposes in-sequence
+data to the MPTCP socket layer.
+
+Its status as an introduction anchor is independently confirmed by 2026
+fixes using:
+
+``` text
+Fixes: 648ef4b88673
+("mptcp: Implement MPTCP receive path")
+```
+
+### Initial selftest
+
+``` text
+048d19d444be
+mptcp: add basic kselftest for mptcp
+```
+
+remains the test-suite anchor.
+
+### More accurate initial lineage
+
+``` text
+TCP/socket prerequisites
+        │
+        ▼
+f870fa0b5768
+MPTCP socket stubs
+        │
+        ▼
+initial option / handshake / send-receive commits
+        │
+        ├── 648ef4b88673 receive path
+        │
+        ▼
+048d19d444be
+basic kselftest
+        │
+        ▼
+Linux 5.6
+native MPTCP generation
+```
+
+This is significantly stronger provenance than treating the selftest as
+the only exact 5.6 anchor.
+
+**Quality: A for socket-stub and receive-path anchors; B for complete
+initial-series SHA enumeration.**
+
+------------------------------------------------------------------------
+
+## 96.2 IOAM v5: four of six commits now exactly anchored
+
+The final v5 series contains:
+
+``` text
+1. uapi: IPv6 IOAM headers definition
+2. ipv6: ioam: Data plane support for Pre-allocated Trace
+3. ipv6: ioam: IOAM Generic Netlink API
+4. ipv6: ioam: Support for IOAM injection with lwtunnels
+5. ipv6: ioam: Documentation for new IOAM sysctls
+6. selftests: net: Test for the IOAM insertion with IPv6
+```
+
+Exact canonical objects now independently verified:
+
+``` text
+9ee11f0fff205b4b3df9750bff5e94f97c71b6a0
+ipv6: ioam: Data plane support for Pre-allocated Trace
+
+3edede08ff37c6a9370510508d5eeb54890baf47
+ipv6: ioam: Support for IOAM injection with lwtunnels
+
+de8e80a54c96d2b75377e0e5319a64d32c88c690
+ipv6: ioam: Documentation for new IOAM sysctls
+
+968691c777af78d2daa2ee87cfaeeae825255a58
+selftests: net: Test for the IOAM insertion with IPv6
+```
+
+The networking pull for Linux 5.15 lists the complete IOAM feature set,
+including the above six feature commits plus a later selftest
+improvement.
+
+### Remaining exact objects
+
+Still pending canonical SHA verification:
+
+``` text
+uapi: IPv6 IOAM headers definition
+ipv6: ioam: IOAM Generic Netlink API
+```
+
+These are known to be present in the final v5 series and the Linux 5.15
+networking pull, but their SHA values are not inferred merely from
+parent adjacency.
+
+### IOAM provenance chain
+
+``` text
+Netdev 0x14
+implementation discussion
+       │
+       ▼
+v3 / v4 review
+       │
+       ▼
+v5 / 6 final generation
+       │
+       ├── UAPI
+       ├── 9ee11f0fff20 data plane
+       ├── Generic Netlink
+       ├── 3edede08ff37 lwtunnel injection
+       ├── de8e80a54c96 documentation
+       └── 968691c777af selftest
+       │
+       ▼
+Linux 5.15
+       │
+       ▼
+5.16+ encapsulation / later export and security work
+```
+
+**Quality: A for 4/6 exact commits; B only for the two still-unresolved
+hashes.**
+
+------------------------------------------------------------------------
+
+# 97. Nexthop core: exact initial-object anchor
+
+The initial nexthop infrastructure has an independently verified core
+commit:
+
+``` text
+ab84be7e54fc
+net: Initial nexthop code
+```
+
+Later 2025/2026 bug and memory-accounting discussions explicitly use:
+
+``` text
+Fixes: ab84be7e54fc
+("net: Initial nexthop code")
+```
+
+This is an important distinction from the later route-integration
+series.
+
+The architecture is now anchored as:
+
+``` text
+ab84be7e54fc
+Initial nexthop object infrastructure
+        │
+        ├── IPv4 nexthops
+        ├── IPv6 gateways
+        ├── lwt encapsulation
+        └── nexthop groups
+        │
+        ▼
+2019 v4 / 20
+IPv4/IPv6 route integration
+        │
+        ├── 493ced1a... IPv4 route use
+        └── cab14d1087d9 multipath selftest
+        │
+        ▼
+2021
+resilient nexthop groups
+```
+
+This resolves an ambiguity in earlier versions of the document: the
+20-patch v4 series is the final **route-integration** stage of the
+initial work, not the first creation of the nexthop object
+infrastructure.
+
+**Quality: A for the object-core anchor and final-series identity; B for
+full route-series SHA enumeration.**
+
+------------------------------------------------------------------------
+
+# 98. Release-level cross-check
+
+The exact commit work is also checked against release-level pull
+requests rather than treated in isolation.
+
+### MPTCP
+
+The initial MPTCP socket and protocol commits are part of the native
+MPTCP generation landing for Linux 5.6.
+
+### IOAM
+
+The Linux 5.15 networking pull explicitly lists:
+
+``` text
+uapi: IPv6 IOAM headers definition
+ipv6: ioam: Data plane support for Pre-allocated Trace
+ipv6: ioam: IOAM Generic Netlink API
+ipv6: ioam: Support for IOAM injection with lwtunnels
+ipv6: ioam: Documentation for new IOAM sysctls
+selftests: net: Test for the IOAM insertion with IPv6
+```
+
+This release-level cross-check protects against confusing a commit from
+a development branch with an actually pulled feature.
+
+------------------------------------------------------------------------
+
+# 99. Provenance status after pass 9
+
+  -----------------------------------------------------------------------
+  Lineage                             Exact coverage
+  ----------------------------------- -----------------------------------
+  MPTCP 5.6 socket API                `f870fa0b5768` verified
+
+  MPTCP 5.6 RX path                   `648ef4b88673` verified
+
+  MPTCP initial selftest              `048d19d444be` verified
+
+  MPTCP/BPF 2022                      all 7 commits verified
+
+  MPTCP protocol switching            `0dd061a6a115` verified
+
+  IOAM v5                             **4/6 exact commits verified**
+
+  nexthop object core                 `ab84be7e54fc` verified
+
+  nexthop v4 route integration        accepted series verified; partial
+                                      SHA set
+
+  resilient nexthop                   baseline previously verified
+  -----------------------------------------------------------------------
+
+The remaining SHA gaps are now small enough that they should be treated
+as an appendix normalization task rather than blocking the architectural
+history.
