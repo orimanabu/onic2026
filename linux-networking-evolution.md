@@ -110,7 +110,7 @@ The arrows describe the usual path, not a guarantee that every project passes th
  │
 3.13  nftables
  │
-3.14–3.17
+3.15–3.17
  │     classic BPF → extended/generalized BPF architecture
  │
 3.18  bpf() syscall / maps / verifier
@@ -683,8 +683,7 @@ Grade は `A / A-rc / B / C / D` を用い、定義もこの表を生成する c
 | 4.19 | SO_TXTIME; CAKE | A | release + exact anchors |
 | 4.20 | TCP EDT pacing; BPF flow dissector; taprio; rtnetlink strict checking | A | release |
 | 5.0 | UDP GRO; UDP MSG_ZEROCOPY | A | release |
-| 5.1 | devlink health; BPF spinlocks/DCE; SO_BINDTOIFINDEX; Y2038 timestamps; io_uring substrate | A | release |
-| 5.0–5.1 | mac80211 airtime-fairness merge-window milestone | C | exact tag boundary still pending |
+| 5.1 | devlink health; BPF spinlocks/DCE; SO_BINDTOIFINDEX; Y2038 timestamps; io_uring substrate; mac80211 airtime accounting/scheduling to TXQs | A | release; airtime commit contained in v5.1-rc1 |
 | 5.3 | nexthop objects; DIM generalized into common lib/dim | A | release; nexthop exact core anchor |
 | 5.5 | mac80211 Airtime Queue Limits (AQL) | B | release-generation |
 | 5.6 | MPTCP; WireGuard; BPF struct_ops/TCP CC; ethtool Generic Netlink | A | release; exact ethtool anchor |
@@ -697,7 +696,7 @@ Grade は `A / A-rc / B / C / D` を用い、定義もこの表を生成する c
 | 5.19 | IPv6 BIG TCP; drop-reason expansion | A | release; exact BIG TCP anchors |
 | 6.0 | io_uring IORING_OP_SEND_ZC; multishot receive | A | release-generation |
 | 6.2 | TCP PLB; XFRM/IPsec packet offload | A | release; exact XFRM anchor |
-| 6.3 | YNL/YAML Netlink specification/tooling generation (`Documentation/netlink/specs`, generated C code, `tools/net/ynl`) | A | first released generation is v6.3 |
+| 6.3 | YNL/YAML Netlink specification/tooling generation (`Documentation/netlink/specs`, generated C code, `tools/net/ynl`) | A | first released generation is v6.3; origin commit is contained in v6.3-rc1 |
 | 6.3 | IPv4 BIG TCP | A | release; exact commit set |
 | 6.6 | AF_XDP multi-buffer; TCX / bpf_mprog multi-program attachment | A | release; TCX/bpf_mprog present in v6.6 sources |
 | 6.7 | netkit; initial TCP-AO | A | release |
@@ -711,6 +710,8 @@ Grade は `A / A-rc / B / C / D` を用い、定義もこの表を生成する c
 | 7.0 | cake_mq / multi-queue-aware sch_cake; IPv6 BIG TCP without synthetic HBH jumbo header | A | net-next-7.0 / v7.0 release generation |
 | 7.1 | RX HW queue leasing | A | revised RX queue-leasing merge is contained in v7.1-rc1; TX remains unmerged |
 | 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255 | A | three limit-expansion commits are contained in v7.2-rc1 |
+
+**MPTCP endpoint-limit note:** the effective endpoint maximum is **255**, not 256: the endpoint ID is an 8-bit value and ID 0 is reserved.
 | 7.3-rc / mainline | BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE | A-rc | net-next-7.3 merged 2026-08-20; final 7.3 pending |
 
 ## Dominant-theme eras
@@ -1754,7 +1755,7 @@ series.
 | BBR | `0f8782ea14974ce992618b55f0c041ef43ed0b78` | initial BBR mainline anchor |
 | phylink | `9525ae83959b60c6061fe2f2caabdc8f69a48bc6` | `phylink: add phylink infrastructure`; Linux 4.14 |
 | TCP MSG_ZEROCOPY | `f214f915e7db99091f1312c48b30928c1e0c90b7` | `tcp: enable MSG_ZEROCOPY` |
-| page_pool origin | `ff7d6b27f894f1469dc51cccb828c7bf1aeb64bc` | `page_pool: refurbish version of page_pool code` |
+| page_pool origin | `ff7d6b27f894f1469dc51ccb828b7363ccd9799f` | `page_pool: refurbish version of page_pool code` |
 | page_pool/XDP integration | `60bbf7eeef10dc647430646d7fe5e3d8d132dbec` | mlx5 page_pool/XDP integration anchor |
 | ethtool Generic Netlink | `2b4a8990b7df55875745a80a609a1ceaaf51f322` | `ethtool: introduce ethtool netlink interface` |
 | SK_LOOKUP | `e9ddbb7707ff5891616240026062b8c1e29864ca` | `bpf: Introduce SK_LOOKUP program type with a dedicated attach point`;  |
@@ -1782,11 +1783,12 @@ The BIG TCP no-synthetic-HBH change is attributed to Linux 7.0; it is a prerequi
   ------------------------------------ ----------------------- -------------------------------------------------------------------------------------------------------------------------------------
   queue leasing                        A                       RX side is merged; TX queue leasing remains PoC/design in the cited 2026 discussion; Linux 7.1 attribution confirmed; revised merge is contained in v7.1-rc1
 
+**Queue-leasing release boundary:** the initial merge `77b9c4a438fc...` and revert `8766d61a1d33...` were both part of the v7.0 merge-window development history and never appeared in the v7.0 release. The revised RX implementation `15089225889b...` is contained in v7.1-rc1. TX queue leasing remains unmerged.
+
   devmem buffers \> `PAGE_SIZE`        A for 7.3 mainline-rc   explicitly listed in the `net-next-7.3` pull merged to Linus mainline
 
   MPTCP max subflows 8 → 64            A                       v7.2-rc1 containment confirmed for the three limit-expansion commits
 
-  YNL initial rollout boundary         C                       treated as a 6.2--6.3 generation pending exact origin/tag audit
 
   DIM / `net_dim`                      B                       Linux 4.16 Net DIM generation; Linux 5.3 common `lib/dim` generalization; exact SHAs pending
 
@@ -1794,7 +1796,6 @@ The BIG TCP no-synthetic-HBH change is attributed to Linux 7.0; it is a prerequi
 
   queue-leasing merge/revert/remerge   B                       verified: `77b9c4a438fc...` → revert `8766d61a1d33...` → re-merge `15089225889b...`; RX only, TX remains PoC
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 # Appendix --- Compact source index (non-normative)
 
 Appendix は chronology や lineage を再定義しません。正本は以下です。
