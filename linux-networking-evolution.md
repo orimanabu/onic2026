@@ -7938,3 +7938,387 @@ Remaining high-value commit enumeration:
 
 The next pass should also start replacing mirror commit links with
 canonical `git.kernel.org` links wherever the exact object is known.
+
+------------------------------------------------------------------------
+
+# 75. Provenance verification pass 3 --- MPTCP, IOAM, BIG TCP tunnels
+
+## 75.1 Initial upstream MPTCP --- Linux 5.6
+
+The upstream MPTCP project documents Linux 5.6 as the first kernel
+release exposing the native MPTCP socket API:
+
+``` c
+socket(AF_INET6, SOCK_STREAM, IPPROTO_MPTCP)
+```
+
+with:
+
+``` text
+IPPROTO_MPTCP = 262
+```
+
+The upstreaming work was deliberately split into prerequisite and
+protocol series. An October 2019 prerequisite RFC states that the
+following series would:
+
+-   add `CONFIG_MPTCP`;
+-   introduce the MPTCP socket type;
+-   implement the basic protocol;
+-   add selftests.
+
+A useful exact anchor for the initial 5.6 implementation is the original
+MPTCP selftest:
+
+``` text
+048d19d444be1e42abca19a6b969343954ae4e17
+mptcp: add basic kselftest for mptcp
+```
+
+Later selftest fixes continue to carry:
+
+``` text
+Fixes: 048d19d444be ("mptcp: add basic kselftest for mptcp")
+```
+
+which independently verifies the initial-test provenance.
+
+The canonical inventory should still treat the initial MPTCP
+implementation as a **multi-commit feature**, not equate `048d19d444be`
+with the whole protocol.
+
+### Lineage
+
+``` text
+2019 LWN
+Upstreaming multipath TCP
+        │
+        ▼
+prerequisite series
+        │
+        ▼
+MPTCP socket/protocol series
+        │
+        ├── native IPPROTO_MPTCP socket
+        └── 048d19d444be initial kselftest
+        │
+        ▼
+Linux 5.6
+```
+
+**Quality: B** for the initial feature series; **A** for the initial
+selftest anchor and first-release identification.
+
+------------------------------------------------------------------------
+
+## 75.2 `update_socket_protocol()` --- exact BPF/MPTCP anchor
+
+The BPF hook used to transparently convert eligible TCP socket creation
+to MPTCP has an exact upstream anchor:
+
+``` text
+0dd061a6a115
+bpf: Add update_socket_protocol hook
+```
+
+The earlier review lineage includes:
+
+``` text
+RFC bpf-next v7 1/6
+PATCH bpf-next v8 1/4
+```
+
+The hook is placed in the socket-creation path and allows a BPF program
+to alter the protocol before the socket is created.
+
+Primary MPTCP use case:
+
+``` text
+application:
+socket(AF_INET, SOCK_STREAM, 0)
+          │
+          ▼
+update_socket_protocol()
+          │
+          ▼
+BPF return:
+IPPROTO_MPTCP
+```
+
+A later SMC design discussion explicitly cites:
+
+``` text
+commit 0dd061a6a115 ("bpf: Add update_socket_protocol hook")
+```
+
+and describes it as allowing protocol modification dynamically through
+eBPF.
+
+This independently confirms that the hook is merged infrastructure, not
+merely an RFC.
+
+**Quality: A.**
+
+------------------------------------------------------------------------
+
+## 75.3 IPv6 IOAM Pre-allocated Trace --- exact data-plane anchor
+
+Final development series:
+
+``` text
+[PATCH net-next v5 0/6]
+Support for the IOAM Pre-allocated Trace with IPv6
+2021-07-20
+```
+
+The series implements the Pre-allocated Trace carried in an IPv6
+Hop-by-Hop option and includes UAPI, data plane, configuration and
+tests.
+
+Exact mainline data-plane anchor:
+
+``` text
+9ee11f0fff205b4b3df9750bff5e94f97c71b6a0
+ipv6: ioam: Data plane support for Pre-allocated Trace
+```
+
+This commit adds processing for the IOAM IPv6 Hop-by-Hop TLV and
+associated per-interface and per-netns configuration such as:
+
+``` text
+net.ipv6.conf.<if>.ioam6_enabled
+net.ipv6.ioam6_id
+net.ipv6.conf.<if>.ioam6_id
+```
+
+Later 2026 fixes repeatedly use:
+
+``` text
+Fixes: 9ee11f0fff20
+```
+
+which independently validates it as the data-plane introduction point.
+
+### Scope warning
+
+`9ee11f0fff20` is the data-plane anchor, not the complete IOAM series.
+The final series also contains:
+
+-   IPv6 IOAM UAPI header definitions;
+-   namespace/schema configuration;
+-   lightweight tunnel/output support;
+-   selftests.
+
+### Netdev relationship
+
+``` text
+Netdev 0x14
+Implementation of IPv6 IOAM
+        │
+        ▼
+v4 / v5 upstream series
+        │
+        ▼
+9ee11f0fff20
+IPv6 IOAM data plane
+        │
+        ▼
+Linux 5.15/5.16-era evolution
+        │
+        ├── encapsulation
+        ├── direct export
+        └── security work
+```
+
+**Quality: A for the data-plane introduction; B for complete-series
+commit enumeration.**
+
+------------------------------------------------------------------------
+
+## 75.4 Initial IPv6 BIG TCP --- Linux 5.19 exact introduction anchor
+
+The Linux 5.19 networking pull describes the new feature as:
+
+``` text
+TCPv6 segmentation offload with super-segments > 64KiB
+using IPv6 Jumbogram support
+```
+
+and explicitly names it **BIG TCP**.
+
+A later kernel CVE/stable history independently identifies the
+introduction point:
+
+``` text
+0fe79f28bfaf73b66b7b1562d2468f94aa03bd12
+```
+
+as introducing the affected BIG TCP behavior in Linux 5.19.
+
+The earlier audit also identified another introduction-related commit:
+
+``` text
+7c4e983c4f3cf94fcd879730c6caa877e0768a4d
+```
+
+The canonical interpretation remains:
+
+``` text
+0fe79f28bfaf...
+7c4e983c4f3c...
+    = introduction-related BIG TCP commits
+
+NOT
+    = proof that either single commit equals the whole feature
+```
+
+The 5.19 networking pull is the release-level authoritative anchor.
+
+### Evolution
+
+``` text
+Netdev 0x15 (2021)
+BIG TCP
+       │
+       ▼
+Linux 5.19
+IPv6 BIG TCP / >64KiB super-segments
+       │
+       ▼
+Linux 6.3
+IPv4 BIG TCP
+       │
+       ▼
+2026
+IPv6 BIG TCP without HBH
+       │
+       ▼
+Linux 7.3 development
+BIG TCP over VXLAN/GENEVE
+```
+
+**Quality: A/B** --- exact introduction anchor and release verified;
+complete initial multi-commit series can still be enumerated.
+
+------------------------------------------------------------------------
+
+## 75.5 BIG TCP over UDP tunnels --- Linux 7.3 development tree
+
+Final accepted series:
+
+``` text
+[PATCH net-next v9 0/9] BIG TCP for UDP tunnels
+2026-07-10
+```
+
+The series is explicitly a follow-up to **BIG TCP without HBH in IPv6**
+and enables IPv4/IPv6 BIG TCP workloads over VXLAN and GENEVE.
+
+Patchwork/netdev bot confirms that all nine patches were applied to
+`netdev/net-next.git`.
+
+Exact commits:
+
+``` text
+5329647dad1b  net: Use helpers to get/set UDP len tree-wide
+842870cdfa33  net: Enable BIG TCP with partial GSO
+47282504ad21  udp: Support BIG TCP GSO packets where they can occur
+efbc1aa8ed54  udp: Support gro_ipv4_max_size > 65536
+8475a3efe6e6  udp: Validate UDP length in udp_gro_receive
+99ad24516295  udp: Set length in UDP header to 0 for big GSO packets
+f3d0f753f066  vxlan: Enable BIG TCP packets
+03ebe91b0f61  geneve: Enable BIG TCP packets
+5cb53743e1ff  selftests: net: Add a test for BIG TCP in UDP tunnels
+```
+
+The two most visible feature anchors are therefore:
+
+``` text
+f3d0f753f066  VXLAN
+03ebe91b0f61  GENEVE
+```
+
+but they rely on the preceding generic UDP/GSO/GRO work in the same
+series.
+
+### Packet-format detail
+
+The series uses UDP length `0` for BIG UDP/GSO packets where the true
+length cannot be represented in the 16-bit UDP length field, adds
+receive-side validation, and raises `tso_max_size` for the VXLAN/GENEVE
+devices.
+
+### Release status
+
+As of the document cutoff (2026-10-02):
+
+``` text
+merged into net-next / Linux 7.3 development
+final 7.3 release pending
+```
+
+so the status remains **merged-development**, not "released".
+
+**Quality: A.**
+
+------------------------------------------------------------------------
+
+# 76. Updated provenance matrix
+
+  -----------------------------------------------------------------------------------------------
+  Feature                    Kernel            Exact anchor(s)                  Quality
+  -------------------------- ----------------- -------------------------------- -----------------
+  initial MPTCP              5.6               `048d19d444be` selftest + native B
+                                               API/release verification         
+
+  BPF                        later MPTCP/BPF   `0dd061a6a115`                   **A**
+  `update_socket_protocol`   era                                                
+
+  IPv6 IOAM data plane       5.x               `9ee11f0fff20`                   **A**
+
+  IPv6 BIG TCP               5.19              `0fe79f28bfaf...` + release pull A/B
+
+  IPv4 BIG TCP               6.3               `9eefedd58ae1`, `b1a78b9b9886`   **A**
+
+  BIG TCP VXLAN              7.3 dev           `f3d0f753f066`                   **A**
+
+  BIG TCP GENEVE             7.3 dev           `03ebe91b0f61`                   **A**
+
+  AF_XDP multi-buffer        6.6               `804627751b42` et al.            **A**
+
+  Device Memory TCP RX       6.12              `8f0b3cc9a4c1` + series          **A**
+
+  io_uring ZCRX              6.15              merge `ca0b04ba0b35...`          B
+
+  BPF qdisc                  2025-era          `c8240344956e...`                **A**
+
+  netkit core                6.7               `35dfaad7188c...`                **A**
+
+  netkit queue leasing       2026              merge→revert→`15089225889b...`   **A**
+                                               remerge                          
+  -----------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 77. Remaining capability audit
+
+The provenance backlog is now narrower:
+
+1.  enumerate all initial MPTCP 5.6 protocol commits rather than using
+    the selftest as the easiest exact anchor;
+2.  enumerate final 2019 nexthop-object commits;
+3.  enumerate complete IOAM v5 accepted commit set around
+    `9ee11f0fff20`;
+4.  produce the virtio-net AF_XDP capability matrix:
+    -   XDP refactoring;
+    -   AF_XDP copy mode;
+    -   zero-copy RX;
+    -   zero-copy TX;
+    -   mergeable-buffer support;
+    -   multi-buffer support;
+5.  enumerate MPTCP subflow BPF iterator/kfunc commits;
+6.  track the major RTNL conversion commits by release rather than
+    trying to invent a single RTNL "feature commit".
+
+The tunnel BIG TCP branch no longer needs status research: the v9 series
+and all nine net-next commits are now exactly identified.
