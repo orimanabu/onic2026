@@ -3913,41 +3913,41 @@ removal**, not just feature addition.
 
 # 40. Completeness audit: classification table
 
-  ---------------------------------------------------------------------------------
-  Topic                               Year Classification       Why it matters
-  ------------------ --------------------- -------------------- -------------------
-  IPv6                                2020 design/API           protocol
-  extension-header                         discussion           extensibility vs
-  processing                                                    fast path/offload
+  ------------------------------------------------------------------------------
+  Topic                            Year Classification       Why it matters
+  ------------------ ------------------ -------------------- -------------------
+  IPv6                             2020 design/API           protocol
+  extension-header                      discussion           extensibility vs
+  processing                                                 fast path/offload
 
-  Threaded NAPI                       2020 merged architecture  moves RX polling
-                                           direction            out of softirq
-                                                                context
+  Threaded NAPI                    2020 merged architecture  moves RX polling
+                                        direction            out of softirq
+                                                             context
 
-  bpfilter rethink                    2020 failed/stalled       BPF firewall
-                                           design               architecture
-                                                                history
+  bpfilter rethink                 2020 failed/stalled       BPF firewall
+                                        design               architecture
+                                                             history
 
-  SO_REUSEPORT                        2021 socket semantics     scalable listener
-  failover                                                      behavior
+  SO_REUSEPORT                     2021 socket semantics     scalable listener
+  failover                                                   behavior
 
-  skb drop reasons                    2022 observability        structured
-                                                                packet-drop
-                                                                diagnostics
+  skb drop reasons                 2022 observability        structured
+                                                             packet-drop
+                                                             diagnostics
 
-  in-kernel TLS                       2022 API/architecture     kernel-originated
-  handshake                                                     secure transports
+  in-kernel TLS                    2022 API/architecture     kernel-originated
+  handshake                                                  secure transports
 
-  P4TC                            2023--24 significant          programmable TC
-                                           non-merged proposal  pipeline debate
+  P4TC                         2023--24 significant          programmable TC
+                                        non-merged proposal  pipeline debate
 
-  BPF qdisc                           2025 merged/programming   `struct_ops`
-                                           model                reaches packet
-                                                                scheduling
+  BPF qdisc                        2025 merged/programming   `struct_ops`
+                                        model                reaches packet
+                                                             scheduling
 
-  DCCP removal                        2025 removal/cleanup      simplifies shared
-                                                                transport code
-  ---------------------------------------------------------------------------------
+  DCCP removal                     2025 removal/cleanup      simplifies shared
+                                                             transport code
+  ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -4023,3 +4023,441 @@ miss:
 
 After that category audit, the article inventory can be compared against
 the release matrix to produce a final "coverage gaps" section.
+
+------------------------------------------------------------------------
+
+# 43. Completeness audit pass 2 --- routing, Netlink/YNL, bridge, MCTP, SRv6, socket APIs, QUIC
+
+## 43.1 2019 --- nexthop objects and FIB scalability
+
+David Ahern's nexthop-object work separates the nexthop lifecycle from
+route-prefix objects.
+
+Final initial series:
+
+-   `[PATCH v3 net-next 00/20] net: Enable nexthop objects with IPv4 and IPv6 routes`
+-   2019-06-07
+-   https://lwn.net/Articles/790828/
+
+The earlier RFC explains the model succinctly:
+
+``` text
+traditional route
+
+prefix
+  └── gateway + device + encapsulation inline
+
+
+nexthop-object model
+
+prefix
+  │
+  └── nexthop ID
+          │
+          └── gateway + device + encapsulation
+```
+
+Motivations:
+
+-   avoid repeatedly validating identical nexthop information;
+-   reduce excessive RCU synchronization during large route installs;
+-   align the kernel model with routing daemons and switch ASICs;
+-   allow independent nexthop lifecycle and groups.
+
+The series cites a full IPv4 feed of roughly 700k routes as a motivating
+scalability case.
+
+This is a major FIB/control-plane API milestone and is now tracked
+separately from generic "routing improvements".
+
+------------------------------------------------------------------------
+
+## 43.2 2022--2024 --- Netlink specifications and YNL
+
+Netlink historically has a large amount of manually maintained:
+
+-   UAPI definitions;
+-   attribute policies;
+-   kernel operation tables;
+-   userspace encoders/decoders;
+-   documentation.
+
+Jakub Kicinski's YAML specification work changes this model.
+
+### 2022 documentation groundwork
+
+-   *docs: netlink: basic introduction to Netlink*
+-   https://lwn.net/Articles/905079/
+
+### 2023 mergeable protocol-spec series
+
+-   `[PATCH net-next v3 0/8] Netlink protocol specs`
+-   https://lwn.net/Articles/920499/
+
+The series adds:
+
+-   YAML schemas for Netlink specifications;
+-   kernel C code generators;
+-   FOU protocol specification;
+-   generated UAPI/policy/operation tables;
+-   generic YNL userspace client;
+-   documentation.
+
+Architecture:
+
+``` text
+before:
+
+UAPI headers ─┐
+policy tables ─┼── manually synchronized
+docs ─────────┤
+userspace ────┘
+
+
+YNL/spec model:
+
+          YAML protocol spec
+           /      |       \
+          ▼       ▼        ▼
+      kernel C   docs    userspace client
+```
+
+This is one of the most important networking-UAPI maintainability
+changes in the period.
+
+### Follow-up adoption
+
+MPTCP conversion:
+
+-   https://lwn.net/Articles/947314/
+
+nftables specification + transactional multi-message support:
+
+-   https://lwn.net/Articles/969496/
+
+The kernel Netlink Handbook now documents the specification format, code
+generation, and YNL library/client.
+
+------------------------------------------------------------------------
+
+## 43.3 2021 --- bridge per-VLAN multicast snooping
+
+Nikolay Aleksandrov's series adds per-VLAN multicast contexts to Linux
+bridge.
+
+Kernel series:
+
+-   `[PATCH net-next 00/15] net: bridge: multicast: add vlan support`
+-   https://lwn.net/Articles/863487/
+
+Userspace/global-options series:
+
+-   `[PATCH iproute2-next v2 00/19] bridge: vlan: add global multicast options`
+-   https://lwn.net/Articles/867804/
+
+Before:
+
+``` text
+bridge
+  │
+  └── one multicast context
+```
+
+After:
+
+``` text
+bridge
+  │
+  ├── VLAN 10 multicast context
+  ├── VLAN 20 multicast context
+  └── VLAN 30 multicast context
+```
+
+The implementation introduced context pointers so packet processing can
+switch between bridge-wide and per-VLAN multicast state when VLAN
+snooping is enabled.
+
+This is relevant to Kubernetes/OpenShift L2 networking and
+virtual-switch behavior because multicast policy/state can be isolated
+by VLAN rather than globally across the bridge.
+
+------------------------------------------------------------------------
+
+## 43.4 2021 --- Management Component Transport Protocol (MCTP)
+
+Initial MCTP series:
+
+-   https://lwn.net/Articles/858176/
+-   later revision: https://lwn.net/Articles/864175/
+
+The series introduces a complete new protocol family for
+platform-management traffic.
+
+Key components:
+
+``` text
+AF_MCTP
+SOCK_DGRAM
+    │
+    ├── sockaddr_mctp
+    ├── routing
+    ├── neighbour table
+    ├── fragmentation/reassembly
+    ├── netlink management
+    └── physical transport bindings
+```
+
+Kernel documentation describes MCTP interfaces as `struct netdevice`
+instances and MCTP networks as separate endpoint-ID address spaces.
+
+This is not Internet packet forwarding; it is
+management-controller/device communication, but it is a genuine Linux
+networking protocol stack and therefore belongs in a broad networking
+history.
+
+### Follow-ups
+
+2022:
+
+-   tag-control API: https://lwn.net/Articles/884100/
+
+2025:
+
+-   gateway routing: https://lwn.net/Articles/1026183/
+
+2026:
+
+-   MCTP over Platform Communication Channel (PCC):
+    https://lwn.net/Articles/1061131/
+
+------------------------------------------------------------------------
+
+## 43.5 SRv6 evolution after initial mainline support
+
+SRv6 itself predates this document's start date (initial Linux support
+appeared in Linux 4.10), but substantial capability growth occurs inside
+the audit period.
+
+### 2022 --- Headend Reduced
+
+-   `[net-next v5 0/4] seg6: add support for SRv6 Headend Reduced`
+-   https://lwn.net/Articles/902806/
+
+Reduced encapsulation avoids carrying an unnecessary first segment in
+the SRH in cases where the IPv6 destination already represents it.
+
+### 2023 --- PSP flavor
+
+-   `seg6: add PSP flavor support for SRv6 End behavior`
+-   https://lwn.net/Articles/923380/
+
+### 2023 --- NEXT-C-SID
+
+-   `seg6: add NEXT-C-SID support for SRv6 End.X behavior`
+-   https://lwn.net/Articles/939830/
+
+Compressed SID mechanisms address the overhead of carrying many 128-bit
+SIDs in an SRH.
+
+### 2026 --- Mobile User Plane
+
+-   `seg6: add SRv6 Mobile User Plane (RFC 9433) behaviors`
+-   https://lwn.net/Articles/1070981/
+
+### 2026 --- L2 VPN RFC
+
+-   End.DT2U + `srl2` Ethernet pseudowire device
+-   https://lwn.net/Articles/1064184/
+
+Status distinction is important: the 2026 L2 VPN item is an RFC series,
+not automatically a merged feature.
+
+------------------------------------------------------------------------
+
+## 43.6 2023 --- `SCM_PIDFD` and `SO_PEERPIDFD`
+
+Alexander Mikhalitsyn's series adds pidfd-based peer/process
+identification to Unix/socket APIs.
+
+Selected revisions:
+
+-   v1: https://lwn.net/Articles/926312/
+-   v3: https://lwn.net/Articles/928752/
+-   v7: https://lwn.net/Articles/934278/
+
+APIs:
+
+``` text
+SCM_CREDENTIALS
+      │
+      └── plain PID
+              │
+              └── PID reuse ambiguity
+
+
+SCM_PIDFD
+      │
+      └── pidfd
+
+
+SO_PEERCRED
+      │
+      └── peer PID/credentials
+
+SO_PEERPIDFD
+      │
+      └── peer pidfd
+```
+
+This is especially useful for long-lived service/socket relationships
+where PID reuse makes a numeric PID a weak identity token.
+
+------------------------------------------------------------------------
+
+## 43.7 2024--2026 --- in-kernel QUIC
+
+### 2024 initial implementation proposal
+
+-   `[PATCH net-next 0/5] net: implement the QUIC protocol in linux kernel`
+-   2024-09-09
+-   https://lwn.net/Articles/989623/
+
+### 2025 LWN feature
+
+-   *QUIC for the kernel*
+-   2025-07-22
+-   https://lwn.net/Articles/1029851/
+
+The motivation is not primarily to replace userspace QUIC
+implementations used by browsers. Kernel consumers such as SMB/NFS need
+an in-kernel secure, multiplexed transport API.
+
+QUIC provides:
+
+-   UDP-based transport;
+-   integrated encryption;
+-   stream multiplexing;
+-   low-latency connection establishment;
+-   path/connection migration.
+
+### 2025 redesign
+
+The later series splits out core infrastructure/subcomponents:
+
+-   v1: https://lwn.net/Articles/1028932/
+-   v3: https://lwn.net/Articles/1038836/
+-   v5: https://lwn.net/Articles/1047727/
+
+The v3/v5 design integrates with `net/handshake` and exposes familiar
+socket semantics such as:
+
+``` text
+listen()
+accept()
+connect()
+sendmsg()
+recvmsg()
+getsockopt()
+setsockopt()
+```
+
+Classification in this document:
+
+``` text
+2024–2026:
+important active development series
+
+NOT assumed merged merely because LWN covered it
+```
+
+This distinction is essential for the final completeness table.
+
+------------------------------------------------------------------------
+
+## 43.8 2026 --- BPF access across network namespaces
+
+LWN:
+
+-   *Examining other network namespaces using BPF*
+-   2026-08-05
+-   https://lwn.net/Articles/1085896/
+
+The motivating Cilium use case is socket-level load balancing where a
+sufficiently privileged BPF program needs to inspect sockets belonging
+to another network namespace.
+
+Conceptual issue:
+
+``` text
+BPF program in context A
+        │
+        X traditional namespace boundary
+        │
+        ▼
+sockets in netns B
+```
+
+The discussion explores mechanisms for controlled cross-netns inspection
+rather than simply weakening network-namespace isolation.
+
+This belongs alongside the netkit/KubeVirt work because both expose a
+broader 2026 theme:
+
+``` text
+retain namespace isolation
+        +
+allow explicitly delegated high-performance / observability operations
+```
+
+------------------------------------------------------------------------
+
+# 44. Updated completeness matrix
+
+  Area                 Important audit additions
+  -------------------- -----------------------------------------------
+  Routing/FIB          nexthop objects
+  Netlink/UAPI         YAML protocol specs, YNL, generated APIs/docs
+  Bridge               per-VLAN multicast snooping
+  Platform protocols   MCTP / AF_MCTP
+  IPv6/SRv6            Headend Reduced, PSP, NEXT-C-SID, MUP
+  Socket API           SCM_PIDFD, SO_PEERPIDFD
+  Secure transports    KTLS handshake, in-kernel QUIC development
+  Namespaces/BPF       cross-netns socket inspection discussion
+  Packet scheduling    BPF qdisc, P4TC
+  Observability        skb_drop_reason
+  RX execution         threaded NAPI
+
+------------------------------------------------------------------------
+
+# 45. Coverage status
+
+After this pass, the largest remaining audit gaps are narrower:
+
+1.  IPv6 IOAM;
+2.  TC action/offload evolution beyond BPF qdisc/P4TC;
+3.  socket-memory/default-buffer and socket API additions;
+4.  routing-policy and FIB changes after nexthop objects;
+5.  network-device configuration API (`ethtool` netlink, devlink where
+    networking-core relevant);
+6.  TLS/KTLS follow-ups;
+7.  protocol removals/deprecations beyond DCCP;
+8.  2025--2026 article-by-article final sweep;
+9.  exact mapping of every retained LWN article to
+    merged/RFC/stalled/removed status.
+
+The final audit should then generate a canonical article inventory with
+fields:
+
+``` text
+date
+title
+LWN URL
+category
+kernel release
+status
+upstream series
+mainline commit(s)
+tags
+```
+
+and compare that inventory against the thematic chapters above.
