@@ -2460,146 +2460,146 @@ upstream landing anchor. `Inherited` means the assignment is retained
 from the earlier exact-provenance passes and remains subject to the
 continuing full sweep.
 
-  -----------------------------------------------------------------------
-  Release              Canonical networking      Audit
-                       milestones                
-  -------------------- ------------------------- ------------------------
-  3.0                  namespace/setns-era       inherited
-                       foundation                
+  ----------------------------------------------------------------------
+  Release             Canonical networking      Audit
+                      milestones                
+  ------------------- ------------------------- ------------------------
+  3.0                 namespace/setns-era       inherited
+                      foundation                
 
-  3.3                  BQL/DQL mainline          **corrected**
-                       generation; team;         
-                       net_prio; TCP memcg       
+  3.3                 BQL/DQL mainline          **corrected**
+                      generation; team;         
+                      net_prio; TCP memcg       
 
-  3.5                  CoDel / fq_codel          verified earlier
+  3.5                 CoDel / fq_codel          verified earlier
 
-  3.6                  TSQ; TFO client; IPv4     verified earlier
-                       route-cache removal       
+  3.6                 TSQ; TFO client; IPv4     verified earlier
+                      route-cache removal       
 
-  3.7                  VXLAN; TFO server; IPv6   inherited
-                       NAT                       
+  3.7                 VXLAN; TFO server; IPv6   inherited
+                      NAT                       
 
-  3.9                  SO_REUSEPORT and          inherited
-                       socket-scaling work       
+  3.9                 SO_REUSEPORT and          inherited
+                      socket-scaling work       
 
-  3.13                 nftables                  verified earlier
+  3.13                nftables                  verified earlier
 
-  3.14                 TCP autocorking;          **corrected**
-                       continuing BPF transition 
+  3.14                TCP autocorking;          **corrected**
+                      continuing BPF transition 
 
-  3.18                 bpf()                     verified earlier
-                       syscall/maps/verifier     
-                       generation; DCTCP;        
-                       Geneve/FOU                
+  3.18                bpf()                     verified earlier
+                      syscall/maps/verifier     
+                      generation; DCTCP;        
+                      Geneve/FOU                
 
-  3.19                 ipvlan; initial switchdev **corrected**
-                       generation                
+  3.19                ipvlan; initial switchdev **corrected**
+                      generation                
 
-  4.3                  VRF; LWT; OVS conntrack   verified earlier
+  4.3                 VRF; LWT; OVS conntrack   verified earlier
 
-  4.6                  devlink                   inherited
+  4.6                 devlink                   inherited
 
-  4.7                  TC BPF direct packet      verified earlier
-                       access                    
+  4.7                 TC BPF direct packet      verified earlier
+                      access                    
 
-  4.8                  XDP                       verified earlier
+  4.8                 XDP                       verified earlier
 
-  4.9                  BBR                       verified
+  4.9                 BBR                       verified
 
-  4.10                 cgroup BPF; BPF LWT; IPv6 verified earlier
-                       Segment Routing           
+  4.10                cgroup BPF; BPF LWT; IPv6 verified earlier
+                      Segment Routing           
 
-  4.13                 SOCK_OPS; kTLS TX         inherited
-                       generation                
+  4.13                SOCK_OPS; kTLS TX         inherited
+                      generation                
 
-  4.14                 SOCKMAP; TCP              **verified/corrected**
-                       `MSG_ZEROCOPY`            
+  4.14                SOCKMAP; TCP              **verified/corrected**
+                      `MSG_ZEROCOPY`            
 
-  4.17                 `SK_MSG`/sockmap sendmsg  **split/corrected**
-                       path; mac80211            
-                       airtime-fairness          
-                       generation                
+  4.17                `SK_MSG`/sockmap sendmsg  **split/corrected**
+                      path; mac80211            
+                      airtime-fairness          
+                      generation                
 
-  4.18                 AF_XDP;                   **verified/corrected**
-                       `TCP_ZEROCOPY_RECEIVE`;   
-                       page_pool refurbished/XDP 
-                       memory-model generation;  
-                       cgroup UDP sendmsg hooks  
+  4.18                AF_XDP;                   **verified/corrected**
+                      `TCP_ZEROCOPY_RECEIVE`;   
+                      page_pool refurbished/XDP 
+                      memory-model generation;  
+                      cgroup UDP sendmsg hooks  
 
-  4.19                 SO_TXTIME/time-based TX;  verified earlier
-                       CAKE                      
+  4.19                SO_TXTIME/time-based TX;  verified earlier
+                      CAKE                      
 
-  4.20                 TCP EDT pacing; BPF flow  **verified/corrected**
-                       dissector; taprio;        
-                       rtnetlink strict checking 
+  4.20                TCP EDT pacing; BPF flow  **verified/corrected**
+                      dissector; taprio;        
+                      rtnetlink strict checking 
 
-  5.0                  UDP GRO; UDP              corrected
-                       `MSG_ZEROCOPY`            
+  5.0                 UDP GRO; UDP              corrected
+                      `MSG_ZEROCOPY`            
 
-  5.1                  devlink health; BPF       inherited
-                       spinlocks/DCE;            
-                       SO_BINDTOIFINDEX; Y2038   
-                       timestamps; io_uring      
+  5.1                 devlink health; BPF       inherited
+                      spinlocks/DCE;            
+                      SO_BINDTOIFINDEX; Y2038   
+                      timestamps; io_uring      
 
-  5.3                  nexthop objects           **corrected**
+  5.3                 nexthop objects           **corrected**
 
-  5.5                  Wi-Fi AQL generation      corrected
+  5.5                 Wi-Fi AQL generation      corrected
 
-  5.6                  MPTCP; WireGuard; BPF     verified earlier
-                       struct_ops/TCP CC;        
-                       ethtool-netlink           
+  5.6                 MPTCP; WireGuard; BPF     verified earlier
+                      struct_ops/TCP CC;        
+                      ethtool-netlink           
 
-  5.9                  SK_LOOKUP                 inherited
+  5.9                 SK_LOOKUP                 inherited
 
-  5.12                 threaded NAPI             **verified**
+  5.12                threaded NAPI             **verified**
 
-  5.15                 IPv6 IOAM; MCTP; bridge   inherited/partly
-                       per-VLAN multicast        verified
+  5.15                IPv6 IOAM; MCTP; bridge   inherited/partly
+                      per-VLAN multicast        verified
 
-  5.17                 `kfree_skb_reason()` /    **verified**
-                       structured skb            
-                       drop-reason foundation    
+  5.17                `kfree_skb_reason()` /    **verified**
+                      structured skb            
+                      drop-reason foundation    
 
-  5.19                 IPv6 BIG TCP; later       verified earlier
-                       drop-reason expansion;    
-                       MPTCP evolution           
+  5.19                IPv6 BIG TCP; later       verified earlier
+                      drop-reason expansion;    
+                      MPTCP evolution           
 
-  6.2                  TCP PLB; IPsec            **series/release
-                       packet-offload generation generation verified**
+  6.2                 TCP PLB; IPsec            **series/release
+                      packet-offload generation generation verified**
 
-  6.3                  IPv4 BIG TCP; YNL         verified earlier
-                       generation                
+  6.3                 IPv4 BIG TCP; YNL         verified earlier
+                      generation                
 
-  6.6                  AF_XDP multi-buffer       verified earlier
+  6.6                 AF_XDP multi-buffer       verified earlier
 
-  6.7                  netkit; initial TCP-AO    **verified**
-                       mainline support          
+  6.7                 netkit; initial TCP-AO    **verified**
+                      mainline support          
 
-  6.11                 virtio-net AF_XDP RX      verified earlier
-                       zero-copy                 
+  6.11                virtio-net AF_XDP RX      verified earlier
+                      zero-copy                 
 
-  6.12                 Device Memory TCP RX      verified earlier
+  6.12                Device Memory TCP RX      verified earlier
 
-  6.13                 per-netns RTNL            **corrected**
-                       infrastructure and        
-                       migration milestone ---   
-                       not completion            
+  6.13                per-netns RTNL            **corrected**
+                      infrastructure and        
+                      migration milestone ---   
+                      not completion            
 
-  6.15                 io_uring ZCRX; further    verified earlier
-                       RTNL breakup              
+  6.15                io_uring ZCRX; further    verified earlier
+                      RTNL breakup              
 
-  6.16                 Device Memory TCP TX; BPF verified earlier
-                       qdisc; DCCP removal       
+  6.16                Device Memory TCP TX; BPF verified earlier
+                      qdisc; DCCP removal       
 
-  6.18                 AccECN core; UDP RX work; verified earlier
-                       DIBS --- separate         
-                       shared-memory lineage     
+  6.18                AccECN core; UDP RX work; verified earlier
+                      DIBS --- separate         
+                      shared-memory lineage     
 
-  7.x                  later                     continuing audit
-                       AccECN/default-policy,    
-                       queue/memory/offload and  
-                       protocol evolution        
-  -----------------------------------------------------------------------
+  7.x                 later                     continuing audit
+                      AccECN/default-policy,    
+                      queue/memory/offload and  
+                      protocol evolution        
+  ----------------------------------------------------------------------
 
 ## Corrected boundary notes
 
@@ -2895,6 +2895,117 @@ final/merge-near series and its API boundary have been identified.
 `exact SHA` is reserved for a canonical mainline commit that has itself
 been checked; a series article alone is not promoted to exact-SHA
 status.
+
+## Release-attribution re-audit --- pass 4: exact mainline anchors
+
+This pass records only commit IDs that can be independently
+corroborated. A feature can span several commits; an "anchor" is not
+automatically the entire feature.
+
+### Linux 3.9 --- `SO_REUSEPORT`
+
+Exact infrastructure anchor:
+
+``` text
+055dc21a1d1d219608cd4baac7d0683fb2cbbe8a
+soreuseport: infrastructure
+Tom Herbert
+2013-01-23
+```
+
+This commit adds the common socket-level infrastructure. TCP/IPv4,
+TCP/IPv6 and UDP support are additional commits in the same series, so
+`055dc21a...` is deliberately labeled an **infrastructure anchor**, not
+"the complete SO_REUSEPORT feature in one commit".
+
+### Linux 4.14 --- TCP `MSG_ZEROCOPY`
+
+Exact TCP enablement anchor:
+
+``` text
+f214f915e7db99091f1312c48b30928c1e0c90b7
+tcp: enable MSG_ZEROCOPY
+Willem de Bruijn
+2017-08-03
+```
+
+The full feature is a multi-commit branch including the generic
+`MSG_ZEROCOPY` definition, socket opt-in, completion
+notification/coalescing, accounting and TCP enablement. The anchor above
+is the protocol-specific TCP enablement commit.
+
+### Linux 4.17 --- `SK_MSG`
+
+The final v3 series and the bpf-next pull request are verified,
+including the new sendmsg / sendfile BPF hook and helpers. An exact
+canonical implementation SHA is **not inserted yet** because the
+currently recovered SHA `82a8616889d5` is a selftest commit, not the
+core program-type/ULP implementation. This is intentionally left at
+final-series confidence.
+
+### Linux 4.18 --- page_pool / XDP memory return
+
+A strong exact integration anchor is:
+
+``` text
+60bbf7eeef10dc647430646d7fe5e3d8d132dbec
+mlx5: use page_pool for xdp_return_frame call
+Jesper Dangaard Brouer
+2018-04-17
+```
+
+Later fixes explicitly use this commit in `Fixes:` tags when referring
+to where page_pool was added to mlx5 XDP handling. It is therefore a
+strong integration anchor, but the document does **not** label it as the
+single origin commit of page_pool itself. The series contains separate
+commits for refurbishing page_pool and registering it as an XDP memory
+allocator type.
+
+### Linux 5.9 --- `SK_LOOKUP`
+
+Exact program-type anchor:
+
+``` text
+e9ddbb7707ff
+bpf: Introduce SK_LOOKUP program type with a dedicated attach point
+Jakub Sitnicki
+2020-07-17
+```
+
+This hash is independently referenced by later fixes, and the original
+author later stated that SK_LOOKUP first appeared in Linux 5.9. This is
+A-grade provenance for the program-type origin.
+
+### Linux 6.2 --- XFRM packet offload
+
+Exact UAPI/core anchor:
+
+``` text
+d14f28b8c1de668bab863bf5892a49c824cb110d
+xfrm: add new packet offload flag
+Leon Romanovsky
+2022-12-02
+```
+
+This introduces `XFRM_OFFLOAD_PACKET`. It is the cleanest anchor for
+distinguishing the new packet-offload mode from the older crypto-offload
+model. The complete functionality is again a series, not one commit.
+
+## Exact-anchor policy after pass 4
+
+The canonical inventory now distinguishes:
+
+``` text
+origin/core anchor
+integration anchor
+protocol-specific enablement anchor
+series merge/pull
+release attribution
+```
+
+This prevents a common historical error: finding one convenient commit
+in a feature series and presenting it as if the entire architecture
+landed atomically.
 
 # Part III --- Long-term feature lineages
 
@@ -5045,30 +5156,58 @@ landing evidence.
 
 ## Pass 3 resolved items
 
-  -----------------------------------------------------------------------
-  Topic                               Result
-  ----------------------------------- -----------------------------------
-  3.9 `SO_REUSEPORT`                  explicit 3.9 merge-cycle
-                                      confirmation; review-base ambiguity
-                                      removed
+  ---------------------------------------------------------------------
+  Topic                              Result
+  ---------------------------------- ----------------------------------
+  3.9 `SO_REUSEPORT`                 explicit 3.9 merge-cycle
+                                     confirmation; review-base
+                                     ambiguity removed
 
-  4.14 `MSG_ZEROCOPY`                 TX foundation separated from TCP
-                                      receive zero-copy
+  4.14 `MSG_ZEROCOPY`                TX foundation separated from TCP
+                                     receive zero-copy
 
-  4.17 `SK_MSG`                       sendmsg/sendfile ULP final-series
-                                      boundary identified
+  4.17 `SK_MSG`                      sendmsg/sendfile ULP final-series
+                                     boundary identified
 
-  4.18 page_pool                      wording narrowed to refurbished
-                                      page_pool in XDP memory-return
-                                      generation
+  4.18 page_pool                     wording narrowed to refurbished
+                                     page_pool in XDP memory-return
+                                     generation
 
-  5.9 `SK_LOOKUP`                     program type, attach model and
-                                      receive-side semantics identified
+  5.9 `SK_LOOKUP`                    program type, attach model and
+                                     receive-side semantics identified
 
-  6.2 IPsec packet offload            XFRM driver contract and
-                                      crypto-vs-packet distinction
-                                      integrated
-  -----------------------------------------------------------------------
+  6.2 IPsec packet offload           XFRM driver contract and
+                                     crypto-vs-packet distinction
+                                     integrated
+  ---------------------------------------------------------------------
+
+## Pass 4 exact-anchor table
+
+  --------------------------------------------------------------------------------------------------
+  Feature           Exact anchor                                 Anchor meaning    Release
+  ----------------- -------------------------------------------- ----------------- -----------------
+  SO_REUSEPORT      `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a`   common            3.9
+                                                                 infrastructure    
+
+  TCP MSG_ZEROCOPY  `f214f915e7db99091f1312c48b30928c1e0c90b7`   TCP protocol      4.14
+                                                                 enablement        
+
+  SK_MSG            pending                                      final series/pull 4.17
+                                                                 verified; do not  
+                                                                 misuse selftest   
+                                                                 SHA               
+
+  page_pool/XDP     `60bbf7eeef10dc647430646d7fe5e3d8d132dbec`   mlx5              4.18 generation
+                                                                 page_pool/XDP     
+                                                                 integration       
+
+  SK_LOOKUP         `e9ddbb7707ff...`                            program type +    5.9
+                                                                 attach point      
+
+  XFRM packet       `d14f28b8c1de668bab863bf5892a49c824cb110d`   packet-offload    6.2
+  offload                                                        UAPI flag/core    
+                                                                 series anchor     
+  --------------------------------------------------------------------------------------------------
 
 # Appendix --- Provenance and research notes
 
