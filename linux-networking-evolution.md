@@ -8265,9 +8265,9 @@ so the status remains **merged-development**, not "released".
 
 # 76. Updated provenance matrix
 
-  -----------------------------------------------------------------------------------
+  ---------------------------------------------------------------------------------
   Feature                    Kernel      Exact anchor(s)                  Quality
-  -------------------------- ----------- -------------------------------- -----------
+  -------------------------- ----------- -------------------------------- ---------
   initial MPTCP              5.6         `048d19d444be` selftest + native B
                                          API/release verification         
 
@@ -8297,7 +8297,7 @@ so the status remains **merged-development**, not "released".
 
   netkit queue leasing       2026        merge→revert→`15089225889b...`   **A**
                                          remerge                          
-  -----------------------------------------------------------------------------------
+  ---------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -9243,3 +9243,234 @@ Highest-value unresolved exact mappings are now:
 
 The discovery/architecture phase for these topics is effectively
 complete; remaining work is now canonical Git provenance normalization.
+
+------------------------------------------------------------------------
+
+# 88. Provenance verification pass 6 --- review lineage vs actual landing
+
+This pass tightens an important rule: an old patch series may explain
+the design without being the series that actually landed upstream.
+
+## 88.1 MPTCP+BPF: 2020 series is design/review provenance, not final landing
+
+The 2020 final review series was:
+
+``` text
+[PATCH bpf-next v3 0/5] bpf: add MPTCP subflow support
+2020-09-18
+```
+
+with five patches:
+
+``` text
+1. bpf: expose is_mptcp flag to bpf_tcp_sock
+2. mptcp: attach subflow socket to parent cgroup
+3. bpf: add 'bpf_mptcp_sock' structure and helper
+4. bpf: selftests: add MPTCP test base
+5. bpf: selftests: add bpf_mptcp_sock() verifier tests
+```
+
+Its motivation is well established: `BPF_PROG_TYPE_SOCK_OPS` could not
+distinguish ordinary TCP sockets from MPTCP subflow TCP sockets,
+preventing per-subflow BPF policy.
+
+However, this exact five-patch series must **not** be labeled as the
+final merged series.
+
+### Evidence: cgroup part landed separately
+
+Later kernel fixes identify the mainline introduction of the cgroup
+behavior as:
+
+``` text
+3764b0c5651e3
+mptcp: attach subflow socket to parent cgroup
+```
+
+and a December 2020 MPTCP net-next series contains that patch
+independently.
+
+### Evidence: BPF mptcp_sock work was substantially reworked
+
+In 2022 the BPF side returned as:
+
+``` text
+[PATCH bpf-next ...] bpf: mptcp: Support for mptcp_sock
+```
+
+The cover letter explicitly says that code from the 2020 series was
+recognizable but had been **reworked quite a bit**.
+
+The series continued through v5:
+
+``` text
+[PATCH bpf-next v5 0/7]
+bpf: mptcp: Support for mptcp_sock
+2022-05-19
+```
+
+and patchwork-bot confirms on 2022-05-20:
+
+``` text
+This series was applied to bpf/bpf-next.git (master)
+by Andrii Nakryiko
+```
+
+The accepted v5 consists of:
+
+``` text
+bpf: add bpf_skc_to_mptcp_sock_proto
+selftests/bpf: Enable CONFIG_IKCONFIG_PROC in config
+selftests/bpf: test bpf_skc_to_mptcp_sock
+selftests/bpf: add MPTCP test base
+selftests/bpf: verify token of struct mptcp_sock
+selftests/bpf: verify ca_name of struct mptcp_sock
+selftests/bpf: verify first of struct mptcp_sock
+```
+
+Notably, by v4 the special-case kernel handling for `tcp_sock.is_mptcp`
+had been dropped in favor of existing BPF TCP helpers.
+
+### Correct canonical lineage
+
+``` text
+2020 v1→v3
+MPTCP subflow BPF design/review
+        │
+        ├── cgroup issue
+        │       └── 3764b0c5651e3 lands separately
+        │
+        ▼
+2022 reworked BPF series
+mptcp_sock / BTF access
+        │
+        ▼
+v5 / 7 patches
+        │
+        ▼
+applied to bpf-next
+        │
+        ▼
+later update_socket_protocol()
+and newer MPTCP BPF facilities
+```
+
+This replaces the earlier oversimplified interpretation that the 2020 v3
+series itself was the final mainline implementation.
+
+**Quality: A for review/landing chronology; exact SHA enumeration of the
+seven accepted 2022 commits remains pending.**
+
+------------------------------------------------------------------------
+
+## 88.2 MPTCP 5.6 initial selftest anchor remains independently strong
+
+The initial test anchor remains:
+
+``` text
+048d19d444be
+mptcp: add basic kselftest for mptcp
+```
+
+Multiple later net/stable fixes carry:
+
+``` text
+Fixes: 048d19d444be
+```
+
+including 2023, 2025 and 2026 fixes.
+
+Therefore it remains a safe exact anchor for the initial MPTCP
+generation, while not being misrepresented as the whole MPTCP
+implementation.
+
+------------------------------------------------------------------------
+
+## 88.3 IOAM data-plane anchor independently reconfirmed
+
+The exact IOAM data-plane introduction remains:
+
+``` text
+9ee11f0fff20
+ipv6: ioam: Data plane support for Pre-allocated Trace
+```
+
+A 2026 receive-path overflow fix again uses:
+
+``` text
+Fixes: 9ee11f0fff20
+```
+
+and modifies the same IOAM6 Pre-allocated Trace receive/send validation
+path.
+
+This raises confidence in the existing IOAM mapping without requiring
+inference from an old development branch.
+
+------------------------------------------------------------------------
+
+# 89. Canonical provenance rule
+
+For every remaining multi-year feature, the inventory now distinguishes
+three layers:
+
+``` text
+DESIGN PROVENANCE
+    RFC / Netdev talk / early patch series
+             │
+             ▼
+LANDING PROVENANCE
+    exact accepted series + patchwork-bot / pull request
+             │
+             ▼
+MAINLINE PROVENANCE
+    canonical SHA + later Fixes: references
+```
+
+An early series is no longer promoted to "merged" merely because later
+code resembles it.
+
+This rule is particularly important for:
+
+``` text
+MPTCP+BPF
+virtio-net AF_XDP
+Device Memory TCP
+netkit queue leasing
+RTNL conversion
+QUIC
+P4TC
+```
+
+all of which underwent substantial redesign, partial landing, revert, or
+multi-stage integration.
+
+------------------------------------------------------------------------
+
+# 90. Updated MPTCP provenance quality
+
+  ----------------------------------------------------------------------------
+  MPTCP item                   Status                  Quality
+  ---------------------------- ----------------------- -----------------------
+  native MPTCP API / Linux 5.6 merged                  A/B
+
+  initial kselftest            merged                  **A**
+  `048d19d444be`                                       
+
+  2020 BPF subflow v3 design   review/design           **A**
+                               provenance              
+
+  subflow parent-cgroup        merged separately       **A**
+  `3764b0c5651e3`                                      
+
+  2022 BPF `mptcp_sock` v5     applied to bpf-next     **A landing
+                                                       provenance**
+
+  `update_socket_protocol()`   merged                  **A**
+
+  later iterator/kfunc work    evolving                pending exact
+                                                       enumeration
+  ----------------------------------------------------------------------------
+
+The remaining MPTCP task is now mostly mechanical SHA enumeration rather
+than historical interpretation.
