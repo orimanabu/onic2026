@@ -7,7 +7,7 @@
 > evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02\
-**構成改訂:** 2026-10-04（r15: architecture-story restructuring）
+**構成改訂:** 2026-10-04（r17）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel
 networking がどのように進化したかを読む順序**に再構成した版である。
@@ -18,106 +18,17 @@ queue management （airtime / AQL）の観点から選択的に扱う。
 
 ## この文書の読み方
 
-> **Canonicalization rule:** release attribution と evidence grade
-> を決定する唯一の正本は **Part VI** とする。Part I--V は architecture
-> thesis / era / lineage / framework / observability のために release
-> 番号を参照してよいが、独立した attribution や grade を定義しない。Part
-> VII は exact commit / unresolved boundary、Appendix は supporting
-> evidence を保持する。
-
-本版では、まず結論と architecture map を示し、その後に根拠を深掘りする。
-
-``` text
-Part I    executive thesis / architecture map
-          15年間で「何が変わったか」を先に示す
-
-Part II   four architecture eras
-          kernel major version ではなく、主問題の変化で時代を区切る
-
-Part III  long-term lineages
-          v3.x foundations / aggregation / memory / XDP / BPF /
-          virtual networking / transport / control plane
-
-Part IV   Network Device Driver Framework Evolution
-          driver-private mechanism が common contract へ移る過程
-
-Part V    observability / explainability
-          複雑化した datapath / ownership / offload を運用可能にする evidence layer
-
-Part VI   canonical release chronology
-          v3.0 → current mainline / release-candidate state
-
-Part VII  canonical provenance ledger
-          exact anchors / unresolved attribution
-
-Appendix  evidence catalog
-          research / documentation / conference provenance
-```
-
-読み方は **thesis → map → era → lineage → chronology → provenance**
-を基本とする。 「いつ入ったか」だけを調べたい場合は Part VI
+本編は **thesis → architecture map → era → lineage → driver framework /
+observability → conclusion** の順で読む。release 番号を調べる場合は Part
+VI、 commit-level provenance を再監査する場合は Part VII
 へ直接進んでよい。
 
+Part I--V の version 表記は説明上の参照であり、release attribution
+を独立に定義しない。 その正本は Part VI、exact anchor の台帳は Part VII
+である。詳細な evidence 用語と canonicalization rule は Part VI
+冒頭で定義する。
+
 ------------------------------------------------------------------------
-
-## 編集上の用語と規約
-
-本書では以下の用語を一貫して次の意味で使用する。
-
-  -----------------------------------------------------------------------
-  Term                                Meaning
-  ----------------------------------- -----------------------------------
-  **design / RFC**                    proposal or architecture under
-                                      discussion; no merge is implied
-
-  **series**                          a posted patch series;
-                                      `final series` means the latest
-                                      merge-near revision identified by
-                                      this research
-
-  **landing**                         acceptance into the relevant
-                                      subsystem tree or `net-next`; this
-                                      is not automatically a released
-                                      kernel
-
-  **mainline anchor**                 a verified commit in Linus's
-                                      mainline history that anchors part
-                                      of a feature
-
-  **release**                         a feature is present in a released
-                                      mainline kernel version
-
-  **generation**                      a release-era milestone spanning
-                                      multiple commits or incremental
-                                      follow-ups; not necessarily a
-                                      single origin commit
-
-  **development**                     accepted, merged into a development
-                                      tree, or posted for a future cycle,
-                                      but not treated here as a released
-                                      baseline
-  -----------------------------------------------------------------------
-
-A mainline anchor can be a core/origin commit, an integration commit, or
-a protocol-specific enablement commit. The text names the anchor type
-when that distinction matters.
-
-### Provenance の段階
-
-``` text
-design / RFC
-      ↓
-patch series
-      ↓
-subsystem-tree / net-next landing
-      ↓
-mainline commit
-      ↓
-released kernel
-```
-
-The arrows describe the usual path, not a guarantee that every project
-passes through each stage in exactly this form.
 
 # Part I --- Executive thesis: Linux networking は何が変わったのか
 
@@ -221,47 +132,144 @@ VI--VII が release attribution と provenance を検証可能な形で保持す
 
 ------------------------------------------------------------------------
 
+## 6軸・contract・cross-cutting domain の対応
+
+6軸は **architecture analysis の主軸**であり、Linux networking の全
+milestone を 排他的に分類する taxonomy
+ではない。transport/protocol、virtual/overlay、security は
+複数軸を横断する **cross-cutting domain** として扱う。
+
+  ----------------------------------------------------------------------------------------------
+  Architecture axis 主に問うこと                             代表的な contract 代表 lineage
+                                                             / evidence        
+  ----------------- ---------------------------------------- ----------------- -----------------
+  PERFORMANCE       どこに、どれだけ、いつ送るか             accounting /      BQL, TSQ,
+                                                             scheduling        fq/pacing, BIG
+                                                             semantics         TCP
+
+  PROGRAMMABILITY   kernel path のどこを拡張できるか         API / verified    BPF, XDP,
+                                                             program contract  struct_ops, BPF
+                                                                               qdisc
+
+  MEMORY            packet buffer                            lifetime /        page_pool,
+                    を誰が確保・再利用・保持するか           assignment        AF_XDP, netmem,
+                                                                               memory providers
+
+  CONTROL PLANE     state をどう表現・変更・同期するか       object / API /    nftables,
+                                                             synchronization   nexthop, YNL,
+                                                                               per-netns RTNL
+
+  OBSERVABILITY     上記の状態・実行をどう説明可能にするか   typed identity /  BTF/tracing, drop
+                                                             evidence layer    reason,
+                                                                               queue/NAPI
+                                                                               identity
+
+  DRIVER FRAMEWORK  driver-local convention                  object / API /    switchdev,
+                    を何に共通化するか                       lifetime /        devlink, phylink,
+                                                             accounting        DIM, page_pool
+  ----------------------------------------------------------------------------------------------
+
+### thesis を検証する代表例
+
+  -------------------------------------------------------------------------------------------------
+  Milestone      private /        explicit にしたもの           Contract form     Axis
+                 implicit /                                                       
+                 global                                                           
+                 だったもの                                                       
+  -------------- ---------------- ----------------------------- ----------------- -----------------
+  DQL/BQL        driver ごとの TX queued/completed byte         accounting        PERFORMANCE /
+                 ring 滞留        accounting                                      DRIVER
+
+  `bpf()` / maps 固定機能の       verified program + map API    API               PROGRAMMABILITY
+  / verifier     kernel path                                                      
+
+  switchdev      vendor-local     kernel forwarding object と   object            DRIVER
+                 ASIC forwarding  offload contract                                
+
+  devlink        `net_device`     device/port/resource object   object            DRIVER
+                 外の device-wide                                                 
+                 state                                                            
+
+  page_pool      driver-local     common                        lifetime          MEMORY
+                 page recycle /   allocation/recycle/lifetime                     
+                 DMA lifetime                                                     
+
+  AF_XDP         kernel-centric   queue/UMEM binding            assignment +      MEMORY /
+                 queue/buffer                                   lifetime          PROGRAMMABILITY
+                 handling                                                         
+
+  YNL            手書き Netlink   machine-readable schema       API               CONTROL PLANE
+                 family 定義                                                      
+
+  queue/NAPI     opaque driver    ID と関係を持つ objects       object            DRIVER /
+  netdev-genl    rings/NAPI                                                       OBSERVABILITY
+
+  per-netns RTNL global RTNL      namespace-scoped              synchronization   CONTROL PLANE
+                 scope            synchronization                                 
+
+  RX HW queue    queue が         queue assignment/leasing      assignment        MEMORY / DRIVER
+  leasing        physical device                                                  
+                 に固定                                                           
+  -------------------------------------------------------------------------------------------------
+
+この表は release attribution の正本ではない。version と evidence grade
+は Part VI に従う。
+
+### この thesis が説明しないもの
+
+`explicit resource / control contracts` は本書が観察する強い
+architecture tendency であり、 Linux networking
+の全変更を説明する万能則ではない。TFO / DCTCP / BBR / MPTCP / PLB /
+AccECN のような **transport algorithm / protocol evolution**、GRO/GSO /
+BIG TCP のような **処理単位の拡大**、`dev_queue_xmit()` llist 化のような
+**implementation scalability** は、それ自体を contract
+化として説明しない。これらは対応する cross-cutting lineage で扱う。
+
+Observability も7番目の contract form とはしない。typed identity、drop
+reason、tracepoint、 timestamp などは、resource/control contract と
+runtime behavior を理解・検証する **evidence layer** と位置付ける。
+
 # Part II --- Four architecture eras
 
 ここでの era は kernel major version の境界ではなく、**networking
 architecture が主に解こうとした問題**で区切る。 境界は重なり、ある era
 で始まった仕組みは後続 era でも継続して発展する。
 
-  -----------------------------------------------------------------------------------------------------------
-  Era                おおよその期間    主問題                                              代表的な milestone
-  ------------------ ----------------- --------------------------------------------------- ------------------
-  **Era 1 --- Queue  ～2014頃          queue                                               BQL,
-  & scalability                        backlog、multicore、namespace、overlay、filtering   CoDel/fq_codel,
-  foundation**                         の基礎                                              TSQ, pacing,
-                                                                                           namespace/setns,
-                                                                                           VXLAN, nftables,
-                                                                                           eBPF foundation
+  ----------------------------------------------------------------------------------------------------------
+  Era                おおよその期間   主問題                                              代表的な milestone
+  ------------------ ---------------- --------------------------------------------------- ------------------
+  **Era 1 --- Queue  ～2014頃         queue                                               BQL,
+  & scalability                       backlog、multicore、namespace、overlay、filtering   CoDel/fq_codel,
+  foundation**                        の基礎                                              TSQ, pacing,
+                                                                                          namespace/setns,
+                                                                                          VXLAN, nftables,
+                                                                                          eBPF foundation
 
-  **Era 2 ---        2015～2018頃      packet path を安全に拡張し、hardware/offload        TC BPF, XDP,
-  Programmable                         と接続する                                          cgroup/LWT BPF,
-  datapath**                                                                               SOCKMAP,
-                                                                                           switchdev,
-                                                                                           devlink, AF_XDP,
-                                                                                           page_pool
+  **Era 2 ---        2015～2018頃     packet path を安全に拡張し、hardware/offload        TC BPF, XDP,
+  Programmable                        と接続する                                          cgroup/LWT BPF,
+  datapath**                                                                              SOCKMAP,
+                                                                                          switchdev,
+                                                                                          devlink, AF_XDP,
+                                                                                          page_pool
 
-  **Era 3 ---        2019～2022頃      programmable mechanism を protocol / operations /   BTF ecosystem,
-  Programmability                      memory infrastructure に広げる                      struct_ops,
-  becomes                                                                                  SK_LOOKUP, MPTCP,
-  infrastructure**                                                                         BIG TCP, io_uring
-                                                                                           networking, drop
-                                                                                           reason, devlink
-                                                                                           health
+  **Era 3 ---        2019～2022頃     programmable mechanism を protocol / operations /   BTF ecosystem,
+  Programmability                     memory infrastructure に広げる                      struct_ops,
+  becomes                                                                                 SK_LOOKUP, MPTCP,
+  infrastructure**                                                                        BIG TCP, io_uring
+                                                                                          networking, drop
+                                                                                          reason, devlink
+                                                                                          health
 
-  **Era 4 ---        2023～            queue・memory・device・locking scope を明示的       netmem, memory
-  Explicit resource                    object/contract として扱う                          providers, Device
-  / control                                                                                Memory TCP,
-  contracts**                                                                              netdev-genl
-                                                                                           queue/NAPI
-                                                                                           objects, queue
-                                                                                           leasing, per-netns
-                                                                                           RTNL, BPF qdisc,
-                                                                                           YNL
-  -----------------------------------------------------------------------------------------------------------
+  **Era 4 ---        2023～           queue・memory・device・locking scope を明示的       netmem, memory
+  Explicit resource                   object/contract として扱う                          providers, Device
+  / control                                                                               Memory TCP,
+  contracts**                                                                             netdev-genl
+                                                                                          queue/NAPI
+                                                                                          objects, queue
+                                                                                          leasing, per-netns
+                                                                                          RTNL, BPF qdisc,
+                                                                                          YNL
+  ----------------------------------------------------------------------------------------------------------
 
 この区分は release attribution の正本ではない。たとえば page_pool は Era
 2 で利用可能になり、 Era 4 の memory-provider architecture
@@ -651,7 +659,7 @@ v5.0 era (EDT pacing already present since 4.20)
 MPTCP は initial upstream から multi-subflow、userspace path manager、
 Generic Netlink、BPF integration へ進化した。
 
-### Linux 6.0 --- io_uring networking inflection
+### io_uring networking --- submission/completion と zero-copy の拡張
 
 Linux 6.0 is the selected networking milestone for io_uring zero-copy
 send (`IORING_OP_SEND_ZC`) and multishot receive. This closes the
@@ -718,7 +726,13 @@ path の分解も進んだ。 これは 6.13 以降の per-netns RTNL lineage
 
 ------------------------------------------------------------------------
 
-## Linux 6.19 --- TX scheduling と structured Netlink の継続
+## Cross-lineage 2026 inflections --- TX scheduling / NAPI execution / structured Netlink
+
+この節は単一 release の feature list ではなく、同時期に別々の lineage
+で起きた変化を 相互参照するための短い junction
+である。`dev_queue_xmit()` llist 化は PERFORMANCE、 threaded-NAPI busy
+polling は DRIVER/EXECUTION、WireGuard YNL は CONTROL PLANE の各 lineage
+に属する。release attribution は Part VI にのみ置く。
 
 6.19 では `dev_queue_xmit()` の deferred TX path が lockless list
 (`llist`) を使う形へ 再構成され、shared qdisc / multiqueue TX
@@ -928,7 +942,7 @@ https://lwn.net/Articles/469652/
 Driver Framework の観点では、performance policy が個々の driver
 から再利用可能な net core infrastructure へ移り始めたことに意味がある。
 
-## Linux 4.x --- hardware が Linux networking の first-class object になる
+## Offload / device-object contracts --- hardware が Linux networking の first-class object になる
 
 ### switchdev --- Linux 3.19 で始まり 4.x で拡大
 
@@ -1150,7 +1164,7 @@ Its importance grows well beyond the original XDP motivation. By Netdev
 memory-management mechanism, and newer zero-copy features require
 drivers to integrate with it.
 
-## Linux 5.x --- driver management API の構造化と可観測性
+## Operational driver infrastructure --- management API・health・共通 library
 
 ### devlink health
 
@@ -1226,7 +1240,7 @@ Instead of ad-hoc cross-driver glue:
 
 This becomes increasingly important for SmartNIC/IPU/DPU architectures.
 
-## Linux 6.x--7.x --- queue と memory が明示的な framework object になる
+## Explicit queue / memory contracts --- queue・NAPI・memory provider の object 化
 
 ### page_pool の可観測化
 
@@ -1517,30 +1531,30 @@ Observability primitives (parallel / complementary)
 
 ### Primitive が提供する情報と限界
 
-  -----------------------------------------------------------------------------------
-  Primitive               主に提供するもの                 境界 / 注意点
-  ----------------------- -------------------------------- --------------------------
-  BTF                     kernel type / field metadata     runtime event や packet
-                                                           trajectory
-                                                           自体は記録しない
+  -------------------------------------------------------------------------------
+  Primitive           主に提供するもの                 境界 / 注意点
+  ------------------- -------------------------------- --------------------------
+  BTF                 kernel type / field metadata     runtime event や packet
+                                                       trajectory
+                                                       自体は記録しない
 
-  eBPF tracing            attach point での event / state  coverage、attach
-                                                           point、権限、overhead
-                                                           に依存
+  eBPF tracing        attach point での event / state  coverage、attach
+                                                       point、権限、overhead
+                                                       に依存
 
-  `skb_drop_reason`       対応箇所での structured drop     全 drop path が必ず reason
-                          reason                           を付与するわけではない
+  `skb_drop_reason`   対応箇所での structured drop     全 drop path が必ず reason
+                      reason                           を付与するわけではない
 
-  timestamping            特定地点での時刻情報             clock、取得地点、HW/SW
-                                                           timestamp semantics に依存
+  timestamping        特定地点での時刻情報             clock、取得地点、HW/SW
+                                                       timestamp semantics に依存
 
-  netdev-genl             queue / NAPI 等の                可視化できることと自由に
-                          identity、state、configuration   ownership/configuration
-                                                           できることは別
+  netdev-genl         queue / NAPI 等の                可視化できることと自由に
+                      identity、state、configuration   ownership/configuration
+                                                       できることは別
 
-  page_pool introspection pool identity / stats /          packet 単位の end-to-end
-                          diagnostics                      trajectory ではない
-  -----------------------------------------------------------------------------------
+  page_pool           pool identity / stats /          packet 単位の end-to-end
+  introspection       diagnostics                      trajectory ではない
+  -------------------------------------------------------------------------------
 
 したがって cross-layer packet journey は単一 primitive
 の機能ではなく、tool が複数の identifier、event、 timestamp、metadata
@@ -1612,18 +1626,59 @@ evolutionそのものと区別します。
 詳細なconference/source provenanceはAppendixのcase-study
 indexに集約します。
 
-## Part V から Part VI へ --- architecture story から canonical chronology へ
+# Synthesis --- thesis への回帰と未完の仕事
+
+15年間を通じて一貫して観察できるのは、単なる packet/s の増加ではない。
+driver-private / implicit / global だった state と convention の一部が、
+**object / accounting / API / assignment / lifetime / synchronization**
+という kernel 共通 contract として明示されてきたことである。
+
+同時に、従来の system-RAM + `skb` path
+は消えていない。XDP/AF_XDP、offload、 Device Memory TCP、io_uring
+zero-copy などはそれを全面置換するのではなく、 用途と hardware
+capability に応じて **複数の execution / memory-ownership model を共存**
+させる方向へ Linux networking を拡張した。
+
+この変化には未完の領域もある。TX-side queue leasing は RX-side
+と同じ意味で完成しておらず、 per-netns RTNL は global RTNL
+を一括置換したものではない。Rust networking も現時点では PHY/core
+abstraction を中心とする段階で、一般的な high-performance NIC driver
+ecosystem が Rust に移行したことを意味しない。これらは「次の release
+の機能」ではなく、 **explicit contracts
+の適用範囲が今後どこまで広がるか**という継続課題である。
+
+したがって本書の thesis は未来予測ではなく、既存 milestone
+を横断した説明モデルである。 次の Part VI では、この story
+からいったん離れ、各 milestone の release attribution を
+1行1項目で正規化する。
 
 # Part VI --- Canonical release chronology
 
-この表に release attribution と evidence grade を集約する。
+ここだけが **release attribution と evidence grade の正本**である。Part
+I--V の version 表記は story/lineage
+の参照であり、この表を上書きしない。
 
-欠落している kernel release
-は「重要な変更がなかった」という意味ではなく、本書が選んだ architecture
-milestone を割り当てていないことだけを意味します。
+## 採用基準
 
-RFC / review date、subsystem-tree landing、Linus mainline
-merge、released tag は区別します。
+Part VI は release note の網羅表ではない。次のいずれかを満たし、本書の
+architecture story を 長期的に変える milestone を採用する。
+
+1.  6軸（PERFORMANCE / PROGRAMMABILITY / MEMORY / CONTROL PLANE /
+    OBSERVABILITY / DRIVER FRAMEWORK）のいずれかを大きく進める。
+2.  transport/protocol、virtual/overlay、security の cross-cutting
+    domain で、 後続 architecture の前提または代表的転換点になる。
+3.  後続 lineage を理解するために必要な origin / enablement /
+    integration milestone である。
+
+単発の機能追加、数値上限変更、個別 protocol/offload enhancement
+は、それだけでは採用しない。 ただし MPTCP PM limits のように、本文で追う
+lineage の operational range を大きく変えるものは
+例外的に残す。この基準は古い release と新しい release
+に同じように適用する。
+
+## Evidence model
+
+development stage は混同しない。
 
 ``` text
 RFC / review
@@ -1632,267 +1687,293 @@ RFC / review
     ≠ released tag
 ```
 
-Grade の定義は次のとおりであり、この文書自体にも保持する。
-
--   **A**: released milestone で、release/mainline evidence
-    が十分に確認済み。
--   **A-rc**: 現在の未リリース cycle について Linus mainline への merge
-    を確認済み。
--   **B**: release/cycle attribution は強いが、exact commit/tag boundary
-    の一部が未確定。
--   **C**: development boundary または release attribution
-    が引き続き監査対象。
--   **D**: RFC/design evidence のみで、mainline/release fact
-    として扱わない。
+Grade:
 
-C/D は現在の canonical milestone table
-では使用していないが、将来の監査対象を表すため grade scheme
-として定義を残す。
+-   **A** --- released milestone。release/mainline evidence
+    を十分確認済み。
+-   **A-rc** --- final release 前だが Linus mainline merge を確認済み。
+-   **B** --- release/cycle attribution は強いが、exact boundary /
+    composite claim の一部が未確定。
+-   **C** --- development boundary または release attribution が監査中。
+-   **D** --- RFC/design evidence のみ。
 
-**Evidence は3軸で監査する。** Grade は主として release attribution
-の確度を表し、機能があらゆる環境で成立することや、関連 commit
-を全件列挙済みであることを保証しない。これとは独立に、 (1) SHA が正しい
-Git object / subject を指すか、(2) その anchor
-が主張する機能をどの範囲まで代表するか、 (3) その変更が対象の final
-release tag に含まれるか、を確認する。したがって「exact SHA
-がある」だけで feature series 全体や release attribution が自動的に
-Grade A になるわけではない。
-
-**Part VI ↔ Part VII invariant:** Part VI の Evidence / status で
-`exact anchor` または `anchor retained in Part VII` と主張する場合、Part
-VII の exact-anchor inventory
-に対応する完全な40桁SHAが存在しなければならない。Part VII
-にSHAを保持しない milestone は、Part VI では
-`release-generation`、`release`、`series` などの表現に留める。
+Evidence class は次の語彙だけを用いる。
 
-  -----------------------------------------------------------------------------------------------------------
-  Release           正規 milestone             Grade             Evidence / status
-  ----------------- -------------------------- ----------------- --------------------------------------------
-  3.0               namespace FD / setns()     A                 `setns()` and network-namespace
-                    (`CLONE_NEWNET`)                             reassociation documented since Linux 3.0
-                    foundation                                   
-
-  3.3               DQL/BQL; team; net_prio;   A                 release; exact DQL anchor
-                    TCP memcg                                    
-
-  3.5               CoDel / fq_codel           A                 release; CoDel exact anchor retained;
-                                                                 fq_codel release attribution confirmed
-
-  3.6               TSQ; TFO client; IPv4      A                 release-generation; detailed anchors not
-                    route-cache removal                          reproduced in Part VII
+-   **TAG** --- final release containment / authoritative release
+    evidence を確認。
+-   **TAG+ANCHOR** --- TAG に加え、Part VII に完全な40桁 mainline anchor
+    を保持。
+-   **SERIES+TAG** --- relevant series/pull と final release containment
+    を確認。
+-   **SERIES** --- series/pull evidence は強いが exact release boundary
+    の監査を残す。
+-   **GENERATION** --- release-generation attribution は強いが exact
+    origin/integration boundary を残す。
+-   **MAINLINE** --- Linus mainline merge 済み、final tag 未公開。
 
-  3.7               VXLAN; TFO server; IPv6    A                 release verified
-                    NAT                                          
-
-  3.9               TCP/UDP SO_REUSEPORT;      A                 release; SO_REUSEPORT infrastructure anchor
-                    conntrack labels; VM                         retained
-                    sockets                                      
+Grade と Evidence class は別軸である。exact SHA の存在だけで feature
+series 全体を Grade A としない。
 
-  3.11              SO_BUSY_POLL / low-latency A                 release documented
-                    busy polling                                 
+**Part VI ↔ Part VII invariant:** `TAG+ANCHOR` を使う milestone には
+Part VII に完全な40桁 SHA が 存在しなければならない。
 
-  3.12              sch_fq;                    A                 qdisc-based pacing; TCP-internal fallback
-                    sk_pacing_rate-driven                        later
-                    pacing; TSO autosizing                       
-                    generation                                   
+## Canonical milestone table
 
-  3.13              nftables                   A                 release; exact core anchor retained in Part
-                                                                 VII
+  --------------------------------------------------------------------------------------------
+  Release     Milestone                 Axis / domain     Era         Grade       Evidence
+                                                                                  class
+  ----------- ------------------------- ----------------- ----------- ----------- ------------
+  3.0         namespace FD / setns()    CONTROL PLANE     Era 1       A           TAG
 
-  3.14              TCP autocorking            B                 release-generation
+  3.3         DQL/BQL                   PERFORMANCE       Era 1       A           TAG+ANCHOR
 
-  3.15              internal BPF ISA rework    A                 release-generation
-                    toward                                       
-                    eBPF/native-JIT-friendly                     
-                    format                                       
+  3.3         team / net_prio / TCP     CROSS-CUTTING     Era 1       A           TAG
+              memcg                                                               
 
-  3.18              bpf()                      A                 release-generation
-                    syscall/maps/verifier                        
-                    generation; DCTCP;                           
-                    Geneve/FOU                                   
+  3.5         CoDel / fq_codel          PERFORMANCE       Era 1       A           TAG+ANCHOR
 
-  3.19              ipvlan; switchdev origin;  A                 release-generation
-                    SO_ATTACH_BPF                                
+  3.6         TSQ                       PERFORMANCE       Era 1       A           TAG
 
-  4.1               cls_bpf / act_bpf eBPF     B                 early TC/tracing eBPF milestone
-                    support; kprobe BPF                          
+  3.6         TFO client                TRANSPORT         Era 1       A           TAG
 
-  4.3               VRF; LWT; OVS conntrack    A                 series + release
+  3.6         IPv4 route-cache removal  CONTROL PLANE     Era 1       A           TAG
 
-  4.6               devlink                    A                 release + exact origin anchor
+  3.7         VXLAN                     VIRTUAL / OVERLAY Era 1       A           TAG
 
-  4.7               TC BPF direct packet       A                 release milestone
-                    access                                       
+  3.7         TFO server                TRANSPORT         Era 1       A           TAG
 
-  4.8               XDP                        A                 initial series + release
+  3.7         IPv6 NAT                  CONTROL PLANE     Era 1       A           TAG
 
-  4.9               BBR                        A                 release; exact anchor retained
+  3.9         TCP/UDP SO_REUSEPORT      PERFORMANCE       Era 1       A           TAG+ANCHOR
 
-  4.10              cgroup BPF; BPF LWT; IPv6  A                 series + release
-                    Segment Routing                              
+  3.11        SO_BUSY_POLL              PERFORMANCE       Era 1       A           TAG
 
-  4.13              SOCK_OPS; kTLS TX;         A                 release
-                    TCP-internal                                 
-                    pacing/fallback generation                   
+  3.12        sch_fq / TCP pacing / TSO PERFORMANCE       Era 1       A           TAG
+              autosizing generation                                               
 
-  4.14              phylink; SOCKMAP; TCP      A                 release; exact phylink / TCP MSG_ZEROCOPY
-                    MSG_ZEROCOPY; XDP devmap                     anchors retained; devmap documented since
-                                                                 4.14
+  3.13        nftables                  CONTROL PLANE     Era 1       A           TAG+ANCHOR
 
-  4.15              XDP cpumap                 A                 release documented
+  3.14        TCP autocorking           PERFORMANCE       Era 1       B           GENERATION
 
-  4.16              netdevsim; Net DIM         A                 release; DIM exact SHA pending
-                    generation; nftables                         
-                    software flowtable                           
+  3.15        internal BPF ISA rework   PROGRAMMABILITY   Era 1       A           TAG
 
-  4.17              BPF_PROG_TYPE_SK_MSG;      A                 release; origin anchor
-                    sockmap sendmsg/sendfile                     `4f738adba30a7cfc006f605707e7aee847ffefa0`
-                                                                 retained in Part VII
+  3.18        bpf() / maps / verifier   PROGRAMMABILITY   Era 1       A           TAG
+              generation                                                          
 
-  4.18              AF_XDP;                    A                 series + release; page_pool anchor retained
-                    TCP_ZEROCOPY_RECEIVE;                        
-                    refurbished page_pool/XDP                    
-                    memory return; cgroup UDP                    
-                    sendmsg hooks                                
+  3.18        DCTCP                     TRANSPORT         Era 1       A           TAG
 
-  4.19              SO_TXTIME; CAKE            A                 release-generation; detailed anchors not
-                                                                 reproduced in Part VII
+  3.18        Geneve / FOU              VIRTUAL / OVERLAY Era 1       A           TAG
 
-  4.20              TCP EDT pacing; BPF flow   A                 release
-                    dissector; taprio;                           
-                    rtnetlink strict checking                    
+  3.19        switchdev origin          DRIVER FRAMEWORK  Era 2       A           TAG
 
-  5.0               UDP GRO; UDP MSG_ZEROCOPY  A                 release
+  3.19        ipvlan                    VIRTUAL / OVERLAY Era 2       A           TAG
 
-  5.1               devlink health; BPF        A                 release; airtime commit contained in
-                    spinlocks/DCE;                               v5.1-rc1
-                    SO_BINDTOIFINDEX; Y2038                      
-                    timestamps; io_uring                         
-                    substrate; mac80211                          
-                    airtime                                      
-                    accounting/scheduling to                     
-                    TXQs                                         
+  3.19        SO_ATTACH_BPF             PROGRAMMABILITY   Era 2       A           TAG
 
-  5.3               nexthop objects; DIM       A                 release-generation; nexthop core anchor not
-                    generalized into common                      reproduced in Part VII
-                    lib/dim                                      
+  4.1         cls_bpf / act_bpf eBPF    PROGRAMMABILITY   Era 2       B           GENERATION
+              support                                                             
 
-  5.5               mac80211 Airtime Queue     A                 final v5.5; release summaries explicitly
-                    Limits (AQL)                                 identify AQL as a mac80211 feature
+  4.1         kprobe BPF milestone      OBSERVABILITY     Era 2       B           GENERATION
 
-  5.6               MPTCP; WireGuard; BPF      A                 release; exact ethtool anchor retained
-                    struct_ops/TCP CC; ethtool                   
-                    Generic Netlink                              
-
-  5.9               BPF_PROG_TYPE_SK_LOOKUP    A                 exact anchor retained in Part VII
-
-  5.11              auxiliary bus              A                 release + exact origin anchor
+  4.3         VRF / LWT / OVS conntrack VIRTUAL / OVERLAY Era 2       A           SERIES+TAG
 
-  5.12              threaded NAPI              A                 release
-
-  5.15              IPv6 IOAM core; MCTP;      A                 release
-                    bridge per-VLAN multicast                    
-
-  5.17              kfree_skb_reason /         A                 release
-                    structured drop-reason                       
-                    foundation                                   
-
-  5.18              XDP multi-buffer / frags   B                 prerequisite for later AF_XDP multi-buffer
-                    generation                                   
-
-  5.19              IPv6 BIG TCP; drop-reason  A                 release; exact BIG TCP anchors retained
-                    expansion                                    
-
-  6.0               io_uring                   A                 release-generation
-                    IORING_OP_SEND_ZC;                           
-                    multishot receive                            
-
-  6.2               TCP PLB; XFRM/IPsec packet A                 release; exact XFRM anchor retained
-                    offload                                      
-
-  6.3               YNL/YAML Netlink tooling;  A                 YNL origin contained in v6.3-rc1; IPv4 BIG
-                    IPv4 BIG TCP                                 TCP release attribution confirmed
-
-  6.6               AF_XDP multi-buffer; TCX / A                 release
-                    bpf_mprog multi-program                      
-                    attachment                                   
-
-  6.7               netkit; initial TCP-AO     A                 release; netkit anchor retained
-
-  6.8               Rust phylib + Rust Asix    B                 Rust PHY and queue-object anchors exact;
-                    reference PHY; queue/NAPI                    broader NAPI/object generation remains
-                    netdev-genl visibility                       composite
-
-  6.11              virtio-net AF_XDP RX       A                 release-generation; detailed anchors not
-                    zero-copy                                    reproduced in Part VII
-
-  6.12              Device Memory TCP RX       B                 final series verified; implementation SHA
-                                                                 list not reproduced
-
-  6.13              per-netns RTNL             B                 milestone, not completion
-                    infrastructure/migration                     
-                    milestone                                    
-
-  6.15              io_uring ZCRX; further     A                 merge/series evidence
-                    RTNL breakup                                 
-
-  6.16              Device Memory TCP TX; BPF  A                 release/final-series generation; BPF-qdisc
-                    qdisc; DCCP removal                          exact inventory pending
-
-  6.18              AccECN core; UDP RX        B                 release-generation; DIBS is tracked
-                    evolution                                    separately in Part VII/Appendix as a
-                                                                 parallel shared-memory communication
-                                                                 lineage, not promoted to a canonical
-                                                                 packet-networking milestone
-
-  6.19              `dev_queue_xmit()` llist   A                 final `v6.19`; selected architecture
-                    TX scheduling;                               milestones from the 6.19 networking cycle
-                    threaded-NAPI kthread                        
-                    busy-poll extension;                         
-                    WireGuard YNL-described                      
-                    Netlink                                      
-
-  7.0               cake_mq /                  A                 final `v7.0`; AccECN enablement and
-                    multi-queue-aware                            large-buffer ZCRX complete earlier lineages
-                    sch_cake; IPv6 BIG TCP                       
-                    without synthetic HBH                        
-                    jumbo header; AccECN                         
-                    enablement; large RX                         
-                    buffers for memory                           
-                    providers/io_uring ZCRX                      
-
-  7.1               RX HW queue leasing;       A                 final `v7.1`; TX queue leasing remains
-                    dedicated qdisc-drop                         unmerged; qdisc drop context becomes
-                    tracepoint                                   directly observable
-
-  7.2               MPTCP PM limits: subflows  A                 final `v7.2`; MPTCP limit expansion plus
-                    8→64; accepted ADD_ADDR                      aggregation support over PPPoE
-                    8→64; endpoints 8→255;                       
-                    PPPoE GRO/GSO                                
-
-  7.3-rc / mainline BIG TCP over VXLAN/GENEVE; A-rc              net-next-7.3 merged 2026-08-20; final 7.3
-                    RTNL-less FIB-rule                           pending
-                    updates; devmem buffers \>                   
-                    PAGE_SIZE; per-netns                         
-                    netdev-unregistration                        
-                    infrastructure                               
-  -----------------------------------------------------------------------------------------------------------
-
-**Remaining B-grade audit note:** Net DIM (4.16/5.3) and the composite
-6.8 queue/NAPI object milestone remain B intentionally. Their
-release-generation attribution is strong, but this edition does not yet
-reduce each composite claim to a complete origin/expansion anchor set.
-AQL and SK_MSG were re-audited in r14 and promoted to A.
-
-**7.3 status note:** 調査基準日時点では final 7.3 は未リリースのため
-`A-rc` とする。正式リリースを確認した時点で `A` へ更新する。
-
-**MPTCP endpoint-limit note:** endpoint の実効上限は **255**
-である。endpoint ID は8-bitで、ID 0が予約されているためである。
+  4.6         devlink                   DRIVER FRAMEWORK  Era 2       A           TAG+ANCHOR
+
+  4.7         TC BPF direct packet      PROGRAMMABILITY   Era 2       A           TAG
+              access                                                              
+
+  4.8         XDP                       PROGRAMMABILITY   Era 2       A           SERIES+TAG
+
+  4.9         BBR                       TRANSPORT         Era 2       A           TAG+ANCHOR
+
+  4.10        cgroup BPF / BPF LWT      PROGRAMMABILITY   Era 2       A           SERIES+TAG
+
+  4.10        IPv6 Segment Routing      CROSS-CUTTING     Era 2       A           SERIES+TAG
+
+  4.13        SOCK_OPS                  PROGRAMMABILITY   Era 2       A           TAG
+
+  4.13        kTLS TX                   SECURITY /        Era 2       A           TAG
+                                        TRANSPORT                                 
+
+  4.14        phylink                   DRIVER FRAMEWORK  Era 2       A           TAG+ANCHOR
+
+  4.14        SOCKMAP / XDP devmap      PROGRAMMABILITY   Era 2       A           TAG
+
+  4.14        TCP MSG_ZEROCOPY          PERFORMANCE       Era 2       A           TAG+ANCHOR
+
+  4.15        XDP cpumap                PROGRAMMABILITY   Era 2       A           TAG
+
+  4.16        netdevsim                 DRIVER FRAMEWORK  Era 2       A           TAG+ANCHOR
+
+  4.16        Net DIM generation        DRIVER FRAMEWORK  Era 2       B           GENERATION
+
+  4.16        nftables software         PERFORMANCE       Era 2       A           TAG
+              flowtable                                                           
+
+  4.17        BPF_PROG_TYPE_SK_MSG      PROGRAMMABILITY   Era 2       A           TAG+ANCHOR
+
+  4.18        AF_XDP                    MEMORY /          Era 2       A           SERIES+TAG
+                                        PROGRAMMABILITY                           
+
+  4.18        page_pool origin / XDP    MEMORY            Era 2       A           TAG+ANCHOR
+              memory return                                                       
+
+  4.18        TCP_ZEROCOPY_RECEIVE      PERFORMANCE       Era 2       A           TAG
+
+  4.19        SO_TXTIME / CAKE          PERFORMANCE       Era 2       A           TAG
+
+  4.20        TCP EDT / taprio          PERFORMANCE       Era 2       A           TAG
+
+  4.20        BPF flow dissector        PROGRAMMABILITY   Era 2       A           TAG
+
+  5.0         UDP GRO / UDP             PERFORMANCE       Era 3       A           TAG
+              MSG_ZEROCOPY                                                        
+
+  5.1         devlink health            DRIVER FRAMEWORK  Era 3       A           TAG
+
+  5.1         BPF spinlocks / DCE       PROGRAMMABILITY   Era 3       A           TAG
+
+  5.1         mac80211 airtime          PERFORMANCE       Era 3       A           TAG
+              accounting/scheduling                                               
+
+  5.3         nexthop objects           CONTROL PLANE     Era 3       A           TAG
+
+  5.3         DIM generalized into      DRIVER FRAMEWORK  Era 3       B           GENERATION
+              lib/dim                                                             
+
+  5.5         mac80211 AQL              PERFORMANCE       Era 3       A           TAG
+
+  5.6         MPTCP                     TRANSPORT         Era 3       A           TAG
+
+  5.6         WireGuard                 SECURITY /        Era 3       A           TAG
+                                        TRANSPORT                                 
+
+  5.6         BPF struct_ops / TCP CC   PROGRAMMABILITY   Era 3       A           TAG
+
+  5.6         ethtool Generic Netlink   DRIVER FRAMEWORK  Era 3       A           TAG+ANCHOR
+
+  5.9         BPF_PROG_TYPE_SK_LOOKUP   PROGRAMMABILITY   Era 3       A           TAG+ANCHOR
+
+  5.11        auxiliary bus             DRIVER FRAMEWORK  Era 3       A           TAG+ANCHOR
+
+  5.12        threaded NAPI             DRIVER FRAMEWORK  Era 3       A           TAG
+
+  5.17        structured drop-reason    OBSERVABILITY     Era 3       A           TAG
+              foundation                                                          
+
+  5.18        XDP multi-buffer / frags  PROGRAMMABILITY   Era 3       B           GENERATION
+              generation                                                          
+
+  5.19        IPv6 BIG TCP              PERFORMANCE       Era 3       A           TAG+ANCHOR
+
+  5.19        drop-reason expansion     OBSERVABILITY     Era 3       A           TAG
+
+  6.0         io_uring SEND_ZC /        PERFORMANCE       Era 3       A           TAG
+              multishot receive                                                   
+
+  6.2         TCP PLB                   TRANSPORT         Era 4       A           TAG
+
+  6.2         XFRM/IPsec packet offload DRIVER FRAMEWORK  Era 4       A           TAG+ANCHOR
+
+  6.3         YNL / YAML Netlink        CONTROL PLANE     Era 4       A           TAG
+              tooling                                                             
+
+  6.3         IPv4 BIG TCP              PERFORMANCE       Era 4       A           TAG
+
+  6.6         AF_XDP multi-buffer       MEMORY /          Era 4       A           TAG
+                                        PROGRAMMABILITY                           
+
+  6.6         TCX / bpf_mprog           PROGRAMMABILITY   Era 4       A           TAG
+
+  6.7         netkit                    PROGRAMMABILITY / Era 4       A           TAG+ANCHOR
+                                        VIRTUAL                                   
+
+  6.7         TCP-AO                    SECURITY /        Era 4       A           TAG
+                                        TRANSPORT                                 
+
+  6.8         Rust phylib / Asix        DRIVER FRAMEWORK  Era 4       B           GENERATION
+              reference PHY                                                       
+
+  6.8         queue/NAPI netdev-genl    DRIVER FRAMEWORK  Era 4       B           GENERATION
+              visibility                / OBSERVABILITY                           
+
+  6.11        virtio-net AF_XDP RX      MEMORY            Era 4       A           TAG
+              zero-copy                                                           
+
+  6.12        Device Memory TCP RX      MEMORY            Era 4       B           SERIES
+
+  6.13        per-netns RTNL            CONTROL PLANE     Era 4       B           SERIES
+              infrastructure milestone                                            
+
+  6.15        io_uring ZCRX             MEMORY            Era 4       A           SERIES+TAG
+
+  6.15        further RTNL breakup      CONTROL PLANE     Era 4       A           SERIES+TAG
+
+  6.16        Device Memory TCP TX      MEMORY            Era 4       A           SERIES+TAG
+
+  6.16        BPF qdisc                 PROGRAMMABILITY   Era 4       A           SERIES+TAG
+
+  6.18        AccECN core               TRANSPORT         Era 4       B           GENERATION
+
+  6.18        UDP RX evolution          PERFORMANCE       Era 4       B           GENERATION
+
+  6.19        dev_queue_xmit() llist TX PERFORMANCE       Era 4       A           TAG
+              scheduling                                                          
+
+  6.19        threaded-NAPI kthread     DRIVER FRAMEWORK  Era 4       A           TAG
+              busy-poll extension                                                 
+
+  6.19        WireGuard YNL-described   CONTROL PLANE     Era 4       A           TAG
+              Netlink                                                             
+
+  7.0         cake_mq                   PERFORMANCE       Era 4       A           TAG
+
+  7.0         IPv6 BIG TCP without      PERFORMANCE       Era 4       A           TAG
+              synthetic HBH jumbo                                                 
+              header                                                              
+
+  7.0         AccECN enablement         TRANSPORT         Era 4       A           TAG
+
+  7.0         large RX buffers for      MEMORY            Era 4       A           TAG
+              memory providers /                                                  
+              io_uring ZCRX                                                       
+
+  7.1         RX HW queue leasing       MEMORY / DRIVER   Era 4       A           TAG
+                                        FRAMEWORK                                 
+
+  7.1         dedicated qdisc-drop      OBSERVABILITY     Era 4       A           TAG
+              tracepoint                                                          
+
+  7.2         MPTCP PM limit expansion  TRANSPORT         Era 4       A           TAG
+
+  7.2         PPPoE GRO/GSO             PERFORMANCE       Era 4       A           TAG
+
+  7.3-rc      BIG TCP over VXLAN/GENEVE PERFORMANCE       Era 4       A-rc        MAINLINE
+
+  7.3-rc      RTNL-less FIB-rule        CONTROL PLANE     Era 4       A-rc        MAINLINE
+              updates                                                             
+
+  7.3-rc      devmem buffers \>         MEMORY            Era 4       A-rc        MAINLINE
+              PAGE_SIZE                                                           
+
+  7.3-rc      per-netns                 CONTROL PLANE     Era 4       A-rc        MAINLINE
+              netdev-unregistration                                               
+              infrastructure                                                      
+  --------------------------------------------------------------------------------------------
+
+### Snapshot に現れるが chronology の独立 milestone にしていないもの
+
+`netmem`、memory providers、page_pool introspection、BTF、vDPA などは
+architecture story 上重要だが、 この版では origin/enablement/integration
+のどれを canonical milestone とするかを統一できていないため、 無理に
+release row を追加していない。これは「重要でない」という意味ではなく、
+**Part VI の1行1 milestone規則に耐える provenance
+がまだ正規化されていない**という意味である。 Part VII の open items
+として継続監査する。
 
 ## Part VI から Part VII へ --- chronology から provenance へ
 
-Part VI は「いつ」を正規化する。次の Part VII は、その attribution
+Part VI は「いつ」を正規化する。Part VII は、その attribution
 を再監査できるよう exact anchor と unresolved boundary を保持する。
 
 # Part VII --- 正規 provenance ledger
@@ -1906,80 +1987,84 @@ anchor」であり、anchor の存在だけで series 全体を証明しない�
 により Linus mainline への merge を確認済みだが、final release
 が未公開の状態を示す。released milestone の Grade A とは区別する。
 
-## 本版で保持する exact mainline anchor inventory
+## Exact mainline anchor inventory
 
 ここに示すのは代表的な **anchor commit** であり、feature series
 の全commitを列挙するものではない。
 
-### Part IV TODO から確定できた origin / landing anchors
-
 以下は exact commit と release containment を確認できたため、従来の「SHA
 pending」から確定扱いへ移す。
 
-  -------------------------------------------------------------------------------------------------------------------
-  Item                    Exact mainline anchor                                               First containing tag
-  ----------------------- ------------------------------------------------------------------- -----------------------
-  devlink                 `bfcd3a46617209454cfc0947ab093e37fd1e84ef` ---                      v4.6-rc1
-                          `Introduce devlink infrastructure`                                  
+  -------------------------------------------------------------------------------------------------
+  Item           Exact mainline anchor                                               First
+                                                                                     containing tag
+  -------------- ------------------------------------------------------------------- --------------
+  devlink        `bfcd3a46617209454cfc0947ab093e37fd1e84ef` ---                      v4.6-rc1
+                 `Introduce devlink infrastructure`                                  
 
-  netdevsim               `83c9e13aa39aed5cf9a2f8dd69770b7c35ba1281`                          v4.16-rc1
+  netdevsim      `83c9e13aa39aed5cf9a2f8dd69770b7c35ba1281`                          v4.16-rc1
 
-  auxiliary bus           `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` ---                      v5.11-rc1
-                          `Add auxiliary bus support`                                         
+  auxiliary bus  `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` ---                      v5.11-rc1
+                 `Add auxiliary bus support`                                         
 
-  Rust PHY abstractions   `f20fd5449ada3872dcd67aca397f0e27ca2e8ad6` ---                      v6.8-rc1
-                          `rust: core abstractions for network PHY drivers`                   
+  Rust PHY       `f20fd5449ada3872dcd67aca397f0e27ca2e8ad6` ---                      v6.8-rc1
+  abstractions   `rust: core abstractions for network PHY drivers`                   
 
-  netdev-genl queue       `bc877956272f0521fef107838555817112a450dc` ---                      v6.8-rc1
-  object                  `netdev-genl: spec: Extend netdev netlink spec in YAML for queue`   
-  -------------------------------------------------------------------------------------------------------------------
+  netdev-genl    `bc877956272f0521fef107838555817112a450dc` ---                      v6.8-rc1
+  queue object   `netdev-genl: spec: Extend netdev netlink spec in YAML for queue`   
+  -------------------------------------------------------------------------------------------------
 
 Net
 DIMについては、algorithm自体は4.16以前からmlx5e内に存在しており、4.16は「共通libraryへの切り出し」という表現を維持する。本版では、提示されたDIM
 SHAを一次Git objectとして再確認できていないため exact inventory
 への追加は保留する。
 
-  --------------------------------------------------------------------------------------------------------------------------------------------
-  Feature                 Mainline anchor                              Subject / role
-  ----------------------- -------------------------------------------- -----------------------------------------------------------------------
-  DQL                     `75957ba36c05b979701e9ec64b37819adc12f830`   `dql: Dynamic queue limits`
+  -------------------------------------------------------------------------------------------------------------------------------------
+  Feature          Mainline anchor                              Subject / role
+  ---------------- -------------------------------------------- -----------------------------------------------------------------------
+  DQL              `75957ba36c05b979701e9ec64b37819adc12f830`   `dql: Dynamic queue limits`
 
-  CoDel                   `76e3cc126bb223013a6b9a0e2a51238d1ef2e409`   CoDel qdisc core anchor
+  CoDel            `76e3cc126bb223013a6b9a0e2a51238d1ef2e409`   CoDel qdisc core anchor
 
-  SO_REUSEPORT            `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a`   `soreuseport: infrastructure`
-  infrastructure                                                       
+  SO_REUSEPORT     `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a`   `soreuseport: infrastructure`
+  infrastructure                                                
 
-  nftables core           `96518518cc417bb0a8c80b9fb736202e28acdf96`   `netfilter: add nftables` --- core origin anchor
+  nftables core    `96518518cc417bb0a8c80b9fb736202e28acdf96`   `netfilter: add nftables` --- core origin anchor
 
-  nftables set API        `20a69341f2d00cd042e81c82289fba8a13c05a25`   set-API anchor; not the core origin
+  nftables set API `20a69341f2d00cd042e81c82289fba8a13c05a25`   set-API anchor; not the core origin
 
-  BBR                     `0f8782ea14974ce992618b55f0c041ef43ed0b78`   initial BBR mainline anchor
+  BBR              `0f8782ea14974ce992618b55f0c041ef43ed0b78`   initial BBR mainline anchor
 
-  phylink                 `9525ae83959b60c6061fe2f2caabdc8f69a48bc6`   `phylink: add phylink infrastructure`; Linux 4.14
+  phylink          `9525ae83959b60c6061fe2f2caabdc8f69a48bc6`   `phylink: add phylink infrastructure`; Linux 4.14
 
-  TCP MSG_ZEROCOPY        `f214f915e7db99091f1312c48b30928c1e0c90b7`   `tcp: enable MSG_ZEROCOPY`
+  TCP MSG_ZEROCOPY `f214f915e7db99091f1312c48b30928c1e0c90b7`   `tcp: enable MSG_ZEROCOPY`
 
-  page_pool origin        `ff7d6b27f894f1469dc51ccb828b7363ccd9799f`   `page_pool: refurbish version of page_pool code`
+  page_pool origin `ff7d6b27f894f1469dc51ccb828b7363ccd9799f`   `page_pool: refurbish version of page_pool code`
 
-  page_pool/XDP           `60bbf7eeef10dc647430646d7fe5e3d8d132dbec`   mlx5 page_pool/XDP integration anchor
-  integration                                                          
+  page_pool/XDP    `60bbf7eeef10dc647430646d7fe5e3d8d132dbec`   mlx5 page_pool/XDP integration anchor
+  integration                                                   
 
-  ethtool Generic Netlink `2b4a8990b7df55875745a80a609a1ceaaf51f322`   `ethtool: introduce ethtool netlink interface`
+  ethtool Generic  `2b4a8990b7df55875745a80a609a1ceaaf51f322`   `ethtool: introduce ethtool netlink interface`
+  Netlink                                                       
 
-  SK_MSG                  `4f738adba30a7cfc006f605707e7aee847ffefa0`   socket-message verdict / `BPF_PROG_TYPE_SK_MSG`; Linux 4.17
+  SK_MSG           `4f738adba30a7cfc006f605707e7aee847ffefa0`   socket-message verdict / `BPF_PROG_TYPE_SK_MSG`; Linux 4.17
 
-  SK_LOOKUP               `e9ddbb7707ff5891616240026062b8c1e29864ca`   `bpf: Introduce SK_LOOKUP program type with a dedicated attach point`
+  SK_LOOKUP        `e9ddbb7707ff5891616240026062b8c1e29864ca`   `bpf: Introduce SK_LOOKUP program type with a dedicated attach point`
 
-  XFRM packet offload     `d14f28b8c1de668bab863bf5892a49c824cb110d`   `xfrm: add new packet offload flag`
+  XFRM packet      `d14f28b8c1de668bab863bf5892a49c824cb110d`   `xfrm: add new packet offload flag`
+  offload                                                       
 
-  IPv6 BIG TCP / GRO      `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12`   `net: allow gro_max_size to exceed 65536`
+  IPv6 BIG TCP /   `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12`   `net: allow gro_max_size to exceed 65536`
+  GRO                                                           
 
-  IPv6 BIG TCP / GSO      `7c4e983c4f3cf94fcd879730c6caa877e0768a4d`   `net: allow gso_max_size to exceed 65536`
+  IPv6 BIG TCP /   `7c4e983c4f3cf94fcd879730c6caa877e0768a4d`   `net: allow gso_max_size to exceed 65536`
+  GSO                                                           
 
-  netkit                  `35dfaad7188cdc043fde31709c796f5a692ba2bd`   netkit core anchor
+  netkit           `35dfaad7188cdc043fde31709c796f5a692ba2bd`   netkit core anchor
 
-  net-next 7.3 merge      `91ec2035134982b98fab0609a9fd8480e8217dc1`   `Merge tag 'net-next-7.3' ...`
-  --------------------------------------------------------------------------------------------------------------------------------------------
+  net-next 7.3     `91ec2035134982b98fab0609a9fd8480e8217dc1`   `Merge tag 'net-next-7.3' ...`
+  merge                                                         
+  -------------------------------------------------------------------------------------------------------------------------------------
 
 **MPTCP 7.2 limit expansion anchors:** 8-patch series
 のうち上限値を直接引き上げる commit は2つである。
@@ -1994,9 +2079,8 @@ commits」とは数えない。
 
 ## Evidence grades
 
-Grade の正本は Part VI と canonical dataset です。Part VII は
-commit-level anchor と、 まだ解消していない attribution boundary
-のみを記録します。
+Grade の正本は Part VI である。Part VII は commit-level anchor と、
+まだ解消していない attribution boundary のみを記録します。
 
 Appendix は evidence catalog である。そこに現れる日付は RFC
 date、posting date、review base、conference date の場合があり、Part VI
@@ -2043,20 +2127,15 @@ boundary を記録する補助表である。Grade を記載する場合は Part
                                                   generation Linux 7.0
   -----------------------------------------------------------------------
 
-**Queue-leasing release boundary:** initial merge
-`77b9c4a438fc66e2ab004c411056b3fb71a54f2c` と revert
-`8766d61a1d33cb5f15bfdd6ce9832bbe1fc649c2` はともに v7.0 merge window
-内で相殺され、v7.0 release には含まれない。v7.1 の revised RX series
-では `7789c6bb76ac` (`net: Add queue-create operation`) が queue-leasing
-infrastructure の代表的な series anchor であり、final `v7.1`
-に含まれる。以前ここに記載していた
-`15089225889ba4b29f0263757cd66932fa676cb0` は
-`Merge branch 'netkit-support-for-io_uring-zero-copy-and-af_xdp'`
-であり、queue-leasing implementation commit
-として扱うのは誤りだったため撤回した。TX queue leasing は未 merge
-である。
+**Queue-leasing release boundary:** v7.0 merge window の initial merge
+`77b9c4a438fc66e2ab004c411056b3fb71a54f2c` は
+`8766d61a1d33cb5f15bfdd6ce9832bbe1fc649c2` で revert され、v7.0 final
+には含まれない。 v7.1 final には revised RX queue-leasing series
+が含まれる。代表 series anchor `7789c6bb76ac` は短縮 SHA
+しか本版で再確認できていないため **exact 40-digit inventory
+には登録しない**。 TX queue leasing は未 merge である。
 
-### 2026 networking-cycle audit note
+### Recent-cycle selection-policy note
 
 6.19--7.3 の再監査では、全 networking commit を chronology
 に列挙するのではなく、 本書の6軸（performance / programmability / memory
@@ -2149,16 +2228,17 @@ Conference talk は設計意図や当時のproblem
 statementを補足する資料として扱い、 release
 attributionには使用しません。
 
-Conference lineage Canonical destination \| Conference lineage \|
-Canonical destination \| \|---\|---\| \| Netdev: XDP / AF_XDP / TC / BPF
-\| Part III BPF / XDP \| \| Netdev: BIG TCP \| Part III packet
-aggregation \| \| Netdev: Device Memory TCP / zero-copy \| Part III
-packet memory \| \| Netdev 0x19: Diagnosing Page Pool Leaks \| Part IV
-page_pool \| \| Netdev: queue/NAPI/netdev-genl \| Part IV driver
-framework \| \| Netdev: MPTCP / TCP state-of-the-union \| Part III TCP /
-UDP / transport \| \| Kernel Recipes: XDP / BPF / io_uring \| Parts
-III--IV \| \| OVS/OVN Conf: Retis \| Part V case-study note \| \| LPC /
-FOSDEM: pwru and tracing \| Part V case-study note \|
+  Conference lineage                        Canonical destination
+  ----------------------------------------- -----------------------------
+  Netdev: XDP / AF_XDP / TC / BPF           Part III BPF / XDP
+  Netdev: BIG TCP                           Part III packet aggregation
+  Netdev: Device Memory TCP / zero-copy     Part III packet memory
+  Netdev 0x19: Diagnosing Page Pool Leaks   Part IV page_pool
+  Netdev: queue/NAPI/netdev-genl            Part IV driver framework
+  Netdev: MPTCP / TCP state-of-the-union    Part III transport
+  Kernel Recipes: XDP / BPF / io_uring      Parts III--IV
+  OVS/OVN Conf: Retis                       Part V case-study note
+  LPC / FOSDEM: pwru and tracing            Part V case-study note
 
 ## Retis / pwru case-study index
 
@@ -2185,3 +2265,19 @@ subsystem pull / Linus mainline
       ↓ canonical integration
 released tag
 ```
+
+# Changelog / Errata（非正規）
+
+この節は canonical chronology / provenance
+の一部ではない。版間の編集上の変更だけを記録する。
+
+-   **r17:** Part VI を1行1
+    milestoneへ正規化し、Axis/domain・Era・Evidence class を追加。
+    evidence 語彙を統制し、selection policy を Part VI 冒頭へ移動。
+-   **r17:** Part I に axis/contract 対応表と thesis
+    の非適用領域を追加。
+-   **r17:** Part IV の major-version 見出しを architecture-oriented
+    headings に変更。
+-   **r17:** conclusion/synthesis を chronology の前に追加。
+-   **r17:** Part VII から旧版監査経緯を分離し、短縮 SHA を exact
+    inventory として扱わない方針を明記。
