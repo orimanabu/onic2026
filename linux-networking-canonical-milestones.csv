@@ -28,8 +28,7 @@ release,milestones,grade,evidence
 4.19,SO_TXTIME; CAKE,A,release + exact anchors
 4.20,TCP EDT pacing; BPF flow dissector; taprio; rtnetlink strict checking,A,release
 5.0,UDP GRO; UDP MSG_ZEROCOPY,A,release
-5.1,devlink health; BPF spinlocks/DCE; SO_BINDTOIFINDEX; Y2038 timestamps; io_uring substrate,A,release
-5.0–5.1,mac80211 airtime-fairness merge-window milestone,C,exact tag boundary still pending
+5.1,devlink health; BPF spinlocks/DCE; SO_BINDTOIFINDEX; Y2038 timestamps; io_uring substrate; mac80211 airtime accounting/scheduling to TXQs,A,release; airtime commit contained in v5.1-rc1
 5.3,nexthop objects; DIM generalized into common lib/dim,A,release; nexthop exact core anchor
 5.5,mac80211 Airtime Queue Limits (AQL),B,release-generation
 5.6,MPTCP; WireGuard; BPF struct_ops/TCP CC; ethtool Generic Netlink,A,release; exact ethtool anchor
@@ -42,7 +41,7 @@ release,milestones,grade,evidence
 5.19,IPv6 BIG TCP; drop-reason expansion,A,release; exact BIG TCP anchors
 6.0,io_uring IORING_OP_SEND_ZC; multishot receive,A,release-generation
 6.2,TCP PLB; XFRM/IPsec packet offload,A,release; exact XFRM anchor
-6.3,"YNL/YAML Netlink specification/tooling generation (Documentation/netlink/specs, generated C code, tools/net/ynl)",A,first released generation is v6.3
+6.3,"YNL/YAML Netlink specification/tooling generation (Documentation/netlink/specs, generated C code, tools/net/ynl)",A,first released generation is v6.3; origin commit contained in v6.3-rc1
 6.3,IPv4 BIG TCP,A,release; exact commit set
 6.6,AF_XDP multi-buffer; TCX / bpf_mprog multi-program attachment,A,release; TCX/bpf_mprog present in v6.6 sources
 6.7,netkit; initial TCP-AO,A,release
@@ -54,6 +53,6 @@ release,milestones,grade,evidence
 6.16,Device Memory TCP TX; BPF qdisc; DCCP removal,A,final series verified; key BPF-qdisc anchors retained
 6.18,AccECN core; UDP RX evolution; DIBS separate shared-memory lineage,B,release-generation
 7.0,cake_mq / multi-queue-aware sch_cake; IPv6 BIG TCP without synthetic HBH jumbo header,A,net-next-7.0 / v7.0 release generation
-7.1,RX HW queue leasing,A,revised RX queue-leasing merge is contained in v7.1-rc1; TX remains unmerged
-7.2,MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255,A,three limit-expansion commits are contained in v7.2-rc1
+7.1,RX HW queue leasing,A,revised RX implementation contained in v7.1-rc1; initial merge/revert never reached v7.0 release; TX unmerged
+7.2,MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255,A,three limit-expansion commits contained in v7.2-rc1; endpoint max 255 because ID 0 is reserved
 7.3-rc / mainline,BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE,A-rc,net-next-7.3 merged 2026-08-20; final 7.3 pending
