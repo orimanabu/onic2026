@@ -1895,3 +1895,465 @@ Remaining high-priority series:
 7.  AccECN --- exact patch and commit history
 8.  UDP receive optimization --- exact mechanism and commits
 9.  RTNL breakup --- exact conversion series and activation progression
+
+------------------------------------------------------------------------
+
+# 22. Commit-level pass 4 --- conntrack / GC / timeout / flowtable
+
+## 22.1 Scope
+
+Conntrack は 2019--2026 の間に「一度の大規模
+rewrite」が入ったわけではない。 重要な変更は次の軸に分散している。
+
+``` text
+                         nf_conntrack
+                              │
+          ┌───────────────────┼────────────────────┐
+          ▼                   ▼                    ▼
+    lifecycle/timeout     scalability         programmability
+      GC / expiry       hash / netns          BPF kfuncs
+          │                   │                    │
+          └──────────────┬────┴───────────────┬────┘
+                         ▼                    ▼
+                    flowtable             observability
+                 SW/HW fast path       ctnetlink / dump
+```
+
+したがって本資料では、単に `nf_conntrack` に触れた全 commit
+を列挙するのではなく、 entry の寿命・lookup/GC・offload・BPF/API
+に意味のある系列を追う。
+
+------------------------------------------------------------------------
+
+## 22.2 2019 --- bridge conntrack
+
+2019 年には bridge datapath に connection tracking support
+を追加する系列が投稿された。
+
+主要 patch:
+
+-   `netfilter: nf_conntrack: allow to register bridge support`
+-   `netfilter: bridge: add connection tracking system`
+-   `netfilter: nf_conntrack_bridge: add support for IPv6`
+-   `netfilter: nf_conntrack_bridge: register inet conntrack for bridge`
+
+Archive: https://lwn.net/Articles/787195/
+
+主要 source area:
+
+-   `net/bridge/netfilter/nf_conntrack_bridge.c`
+-   `include/net/netfilter/nf_conntrack_bridge.h`
+-   `net/netfilter/nf_conntrack_proto.c`
+
+これは routed IPv4/IPv6 だけでなく bridge datapath でも conntrack を共通
+infrastructure として 使う方向を示す。
+
+------------------------------------------------------------------------
+
+## 22.3 Conntrack timeout model
+
+Current kernel documentation exposes protocol-specific defaults
+including:
+
+``` text
+nf_conntrack_udp_timeout         = 30 seconds
+nf_conntrack_udp_timeout_stream  = 120 seconds
+
+nf_conntrack_tcp_timeout_established = 432000 seconds
+```
+
+また flowtable は独立した aging timeout を持つ。
+
+``` text
+nf_flowtable_tcp_timeout = 30 seconds
+nf_flowtable_udp_timeout = 30 seconds
+```
+
+flowtable entry が age out すると connection は classic conntrack path
+に戻る。
+
+Kernel documentation:
+https://static.lwn.net/kerneldoc/networking/nf_conntrack-sysctl.html
+
+### Important distinction
+
+``` text
+conntrack timeout
+     │
+     └── struct nf_conn の寿命
+
+
+flowtable timeout
+     │
+     └── fast-path/offload entry の寿命
+              │
+              └── age out 後は conntrack に戻る
+```
+
+この二つを混同しない。
+
+------------------------------------------------------------------------
+
+## 22.4 2022 --- BPF can manipulate conntrack lifecycle
+
+2022-07 の v7 series は BPF/XDP/TC 側から conntrack を操作するための
+kfunc を拡張した。
+
+Patch series: https://lwn.net/Articles/902023/
+
+追加対象:
+
+``` text
+bpf_{xdp,skb}_ct_alloc()
+bpf_ct_insert_entry()
+bpf_ct_{set,change}_timeout()
+bpf_ct_{set,change}_status()
+```
+
+### Significance
+
+従来:
+
+``` text
+packet
+  │
+netfilter conntrack
+  │
+nf_conn entry
+```
+
+BPF integration 後:
+
+``` text
+XDP / TC BPF
+      │
+      ├── lookup
+      ├── allocate
+      ├── insert
+      ├── timeout manipulation
+      └── status manipulation
+              │
+              ▼
+         nf_conntrack
+```
+
+つまり BPF datapath が conntrack を単に参照するだけでなく、entry
+lifecycle の一部を programmable にできる方向へ進んだ。
+
+------------------------------------------------------------------------
+
+## 22.5 2022 --- delayed TCP packets and timeout refresh semantics
+
+Florian Westphal の 2022 series は、すでに ACK 済みの非常に遅れた TCP
+packet を conntrack がどう扱うべきかを修正した。
+
+Archive: https://lwn.net/Articles/906188/
+
+重要な設計点は、そのような packet を即 INVALID/drop 対象にするのではなく
+**valid として通す一方、conntrack timeout の延長や state transition
+には使わない** という点。
+
+概念的には:
+
+``` text
+normal valid TCP packet
+        │
+        ├── accept
+        ├── state update
+        └── timeout refresh
+
+
+overly delayed / already-ACKed packet
+        │
+        ├── accept as valid
+        ├── no state transition
+        └── no timeout extension
+```
+
+これは「packet が conntrack entry に match した」ことと 「その packet が
+entry の expiry を延長する」ことが同義ではない好例。
+
+------------------------------------------------------------------------
+
+## 22.6 UDP NEW offload and early-drop interaction
+
+UDP NEW connection を `act_ct`/flow offload へ載せる work では、
+conntrack table pressure 時の **early drop** と offloaded entry
+の関係が問題になった。
+
+Patch series: https://lwn.net/Articles/921995/
+
+系列には以下が含まれる。
+
+-   flowtable: UDP state に応じた timeout fix
+-   unidirectional flowtable rule
+-   `act_ct`: UDP NEW connection offload
+-   `nf_conntrack`: offloaded UDP conn も early drop の候補にする
+
+理由は、offloaded UDP NEW entry を early-drop 対象外のままにすると、
+一方向 UDP packet を大量に送ることで table
+を埋められる可能性があるため。
+
+``` text
+UDP first packet
+      │
+      ▼
+   NEW conntrack
+      │
+      ▼
+   flow offload
+
+table pressure
+      │
+      └── early_drop must still be able to reclaim it
+```
+
+------------------------------------------------------------------------
+
+## 22.7 2024 --- conntrack userspace observability
+
+`libnetfilter_conntrack 1.1.0` では conntrack dump/flush filtering
+が改善され、 ctnetlink event BPF filtering も IPv6/zone matching
+を含めて強化された。
+
+Release: https://lwn.net/Articles/991808/
+
+これは kernel datapath の変更ではないが、大規模 conntrack table を
+userspace から 観測・操作する API evolution として記録する。
+
+------------------------------------------------------------------------
+
+## 22.8 2025 --- per-network-namespace conntrack hash-table RFC
+
+2025-11 の RFC は conntrack hash table を global から per-netns
+に移すことを提案した。
+
+Archive: https://lwn.net/Articles/1045157/
+
+主な系列:
+
+-   empty table では GC worker を schedule しない
+-   hash table auto-sizing を helper 化
+-   `nf_conntrack_hash` を `struct net` 側へ移す
+-   netns ごとに GC worker を起動
+-   conntrack hash table を per-netns 化
+-   lazy allocation
+-   non-init netns から resize を可能にする
+-   NAT bysource hash も per-netns 化
+
+### Motivation
+
+従来:
+
+``` text
+netns A ─┐
+netns B ─┼── global conntrack hash
+netns C ─┘
+```
+
+提案:
+
+``` text
+netns A ── conntrack hash A
+netns B ── conntrack hash B
+netns C ── conntrack hash C
+```
+
+ただし RFC 時点では未解決事項も明記されている。
+
+-   lock array はまだ global
+-   hash secret も global
+-   per-netns memory accounting / memcg integration 未解決
+-   OVS/TC/BPF CT helper testing 不十分
+
+したがって、この文書では **2025 時点では RFC / not yet merged**
+と明示する。
+
+------------------------------------------------------------------------
+
+## 22.9 2026 --- custom conntrack timeout policy lifetime
+
+2026-06 の `cttimeout` series は custom timeout policy の
+lifetime/refcount handling を 整理する。
+
+Patch: https://lwn.net/Articles/1076158/
+
+重要な変更:
+
+-   `struct nf_ct_timeout` に dataplane use を追跡する refcount
+-   conntrack entry が timeout policy を参照している間は object を保持
+-   control-plane refcount を整理
+-   policy object の削除と既存 conntrack 参照の lifetime を分離
+
+元 infrastructure の introduction commit として patch は:
+
+``` text
+50978462300f
+"netfilter: add cttimeout infrastructure for fine timeout tuning"
+```
+
+を `Fixes:` で参照している。
+
+------------------------------------------------------------------------
+
+## 22.10 2026 --- flowtable GC partial-state race
+
+2026-08 の fix は、flow entry が hash table に publish された後、
+hardware-offload setup が完全に終わる前に GC が entry を観測できる狭い
+window を扱う。
+
+Patch: https://lwn.net/Articles/1089361/
+
+新しい `NF_FLOW_CONFIRMED` bit を導入し、
+
+``` text
+flow allocation
+     │
+hash insertion
+     │
+HW setup
+     │
+memory barrier
+     │
+NF_FLOW_CONFIRMED
+     │
+     └── only now GC may act on entry
+```
+
+とする。
+
+これは一般的な conntrack GC そのものではなく **flowtable GC** の race
+だが、 conntrack-backed fast path の lifetime/aging
+を理解するうえで重要。
+
+------------------------------------------------------------------------
+
+## 22.11 2026 --- stale `skb->_nfct` revalidation
+
+TC/clsact/pedit など kernel 内で packet header が変更された場合、 skb
+にすでに付いている conntrack reference と現在の L3/L4 header
+が一致しない可能性がある。
+
+2026-09 series: https://lwn.net/Articles/1094326/
+
+新しい careful lookup は protocol/header を再検証し、不一致なら stale
+reference を捨てて `nf_conntrack_in()` に再 lookup させる。
+
+``` text
+skb has TCP conntrack
+       │
+       ▼
+TC/pedit changes packet → UDP
+       │
+       ▼
+old behavior:
+stale TCP nf_conn may remain attached
+
+new behavior:
+revalidate tuple/protocol
+       │
+       ├── matches → reuse
+       └── mismatch → drop reference + relookup
+```
+
+------------------------------------------------------------------------
+
+# 23. Conntrack GC / expiry model --- conceptual notes
+
+conntrack expiry を考えるとき、少なくとも次を分ける必要がある。
+
+``` text
+1. packet lookup
+       │
+       ▼
+2. existing nf_conn reference acquired
+       │
+       ▼
+3. protocol/state validation
+       │
+       ├── timeout refresh may occur
+       └── refreshしない packet class もある
+       │
+       ▼
+4. expiry/GC machinery
+       │
+       ▼
+5. hash removal / dying state
+       │
+       ▼
+6. final object release after references disappear
+```
+
+したがって、
+
+> `struct nf_conn` への reference を持っている
+
+ことと、
+
+> entry が conntrack hash table から削除されない
+
+ことは同じ保証ではない。
+
+また flowtable を使う場合はさらに:
+
+``` text
+conntrack lifetime
+        │
+        └── flowtable lifetime / aging
+```
+
+という別 layer が加わる。
+
+極端に短い UDP conntrack timeout を設定した検証では、この lifecycle
+boundary を 通常 workload よりはるかに高頻度で踏むため、GC/refresh race
+の観測確率も高くなる。
+
+------------------------------------------------------------------------
+
+# 24. Conntrack-related source map
+
+主な追跡対象:
+
+``` text
+net/netfilter/nf_conntrack_core.c
+net/netfilter/nf_conntrack_proto_tcp.c
+net/netfilter/nf_conntrack_proto_udp.c
+net/netfilter/nf_conntrack_netlink.c
+net/netfilter/nf_conntrack_bpf.c
+
+net/netfilter/nf_flow_table_core.c
+net/netfilter/nf_flow_table_offload.c
+
+include/net/netfilter/nf_conntrack.h
+include/net/netfilter/nf_conntrack_core.h
+include/net/netfilter/nf_flow_table.h
+```
+
+関連 datapath:
+
+``` text
+net/sched/act_ct.c
+net/openvswitch/conntrack.c
+net/bridge/netfilter/nf_conntrack_bridge.c
+```
+
+------------------------------------------------------------------------
+
+# 25. Next pass
+
+次の commit-level pass は以下を優先する。
+
+1.  **BIG TCP follow-up**
+    -   IPv4 BIG TCP
+    -   GRO/GSO metadata evolution
+    -   VXLAN / GENEVE
+2.  **virtio-net / TAP / VM networking**
+    -   XDP
+    -   mergeable buffers
+    -   multiqueue
+    -   zero-copy
+3.  **netkit + KubeVirt/io_uring ZC RX**
+4.  **AccECN exact patch/commit history**
+5.  **UDP receive optimization exact commits**
+6.  **RTNL breakup exact series**
+7.  MPTCP exact milestone/commit map
