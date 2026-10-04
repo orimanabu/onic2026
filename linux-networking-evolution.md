@@ -9449,28 +9449,351 @@ multi-stage integration.
 
 # 90. Updated MPTCP provenance quality
 
-  ----------------------------------------------------------------------------
-  MPTCP item                   Status                  Quality
-  ---------------------------- ----------------------- -----------------------
-  native MPTCP API / Linux 5.6 merged                  A/B
+  ------------------------------------------------------------------------
+  MPTCP item                   Status                Quality
+  ---------------------------- --------------------- ---------------------
+  native MPTCP API / Linux 5.6 merged                A/B
 
-  initial kselftest            merged                  **A**
-  `048d19d444be`                                       
+  initial kselftest            merged                **A**
+  `048d19d444be`                                     
 
-  2020 BPF subflow v3 design   review/design           **A**
-                               provenance              
+  2020 BPF subflow v3 design   review/design         **A**
+                               provenance            
 
-  subflow parent-cgroup        merged separately       **A**
-  `3764b0c5651e3`                                      
+  subflow parent-cgroup        merged separately     **A**
+  `3764b0c5651e3`                                    
 
-  2022 BPF `mptcp_sock` v5     applied to bpf-next     **A landing
-                                                       provenance**
+  2022 BPF `mptcp_sock` v5     applied to bpf-next   **A landing
+                                                     provenance**
 
-  `update_socket_protocol()`   merged                  **A**
+  `update_socket_protocol()`   merged                **A**
 
-  later iterator/kfunc work    evolving                pending exact
-                                                       enumeration
-  ----------------------------------------------------------------------------
+  later iterator/kfunc work    evolving              pending exact
+                                                     enumeration
+  ------------------------------------------------------------------------
 
 The remaining MPTCP task is now mostly mechanical SHA enumeration rather
 than historical interpretation.
+
+------------------------------------------------------------------------
+
+# 91. Provenance verification pass 7 --- exact MPTCP/BPF landing and nexthop correction
+
+## 91.1 2022 MPTCP/BPF `mptcp_sock` --- all seven accepted commits
+
+The final accepted series is:
+
+``` text
+[PATCH bpf-next v5 0/7]
+bpf: mptcp: Support for mptcp_sock
+2022-05-19
+```
+
+Patchwork-bot reported the series applied to `bpf/bpf-next.git` and
+provided the exact commit object for every patch:
+
+``` text
+3bc253c2e652
+bpf: add bpf_skc_to_mptcp_sock_proto
+
+d3294cb1e06d
+selftests/bpf: Enable CONFIG_IKCONFIG_PROC in config
+
+8039d353217c
+selftests/bpf: add MPTCP test base
+
+3bc48b56e345
+selftests/bpf: test bpf_skc_to_mptcp_sock
+
+026622346772
+selftests/bpf: verify token of struct mptcp_sock
+
+ccc090f46900
+selftests/bpf: verify ca_name of struct mptcp_sock
+
+4f90d034bba9
+selftests/bpf: verify first of struct mptcp_sock
+```
+
+The BPF-next pull subsequently lists the same MPTCP selftests,
+independently confirming that the accepted branch entered the BPF pull
+stream.
+
+The primary implementation anchor is therefore:
+
+``` text
+3bc253c2e652
+bpf: add bpf_skc_to_mptcp_sock_proto
+```
+
+while the remaining six commits establish test/config coverage.
+
+### Canonical MPTCP+BPF timeline
+
+``` text
+2020 v3 design series
+        │
+        ├── parent-cgroup part later lands separately
+        │       3764b0c5651e3
+        │
+        ▼
+2022 reworked mptcp_sock series
+        │
+        ▼
+v5 / 7 patches
+        │
+        ├── 3bc253c2e652 implementation
+        └── six test/config commits
+        │
+        ▼
+bpf-next pull
+        │
+        ▼
+later update_socket_protocol()
+0dd061a6a115
+```
+
+**Quality: A.**
+
+------------------------------------------------------------------------
+
+## 91.2 Nexthop-object correction --- v4, not v3, was the applied final series
+
+An earlier section called v3 the final initial series. That is
+incomplete.
+
+Timeline:
+
+``` text
+2019-06-07
+v3 / 20 patches
+
+2019-06-08
+v4 / 20 patches
+
+2019-06-10
+David Miller:
+"Series applied, thanks."
+```
+
+Therefore the canonical landing series is:
+
+``` text
+[PATCH v4 net-next 00/20]
+net: Enable nexthop objects with IPv4 and IPv6 routes
+```
+
+The design text remains the same: David Ahern calls this the final set
+of the initial nexthop-object work and gives the original \~700k-route
+scalability motivation.
+
+The canonical inventory is corrected from:
+
+``` text
+v3 final series
+```
+
+to:
+
+``` text
+v3 late review revision
+v4 accepted/applied final series
+```
+
+### Exact anchors recovered so far
+
+Mainline history gives:
+
+``` text
+493ced1a
+ipv4: Allow routes to use nexthop objects
+```
+
+A later selftest fix identifies:
+
+``` text
+cab14d1087d9
+selftests: Add version of router_multipath.sh using nexthop objects
+```
+
+and uses it as a `Fixes:` target.
+
+The v4 series contains, among others:
+
+``` text
+01/20 nexthops: Add ipv6 helper to walk all fib6_nh in a nexthop struct
+...
+11/20 ipv4: Allow routes to use nexthop objects
+12/20 ipv4: Optimization for fib_info lookup with nexthops
+13/20 ipv6: Allow routes to use nexthop objects
+14/20 nexthops: add support for replace
+...
+17/20 selftests: pmtu: Add support for routing via nexthop objects
+19/20 selftests: Add test with multiple prefixes using single nexthop
+20/20 selftests: Add version of router_multipath.sh using nexthop objects
+```
+
+The full 20-SHA table remains incomplete, but the **accepted revision
+itself is now unambiguous**.
+
+**Quality: A for final-series identity/acceptance; B for complete commit
+enumeration.**
+
+------------------------------------------------------------------------
+
+## 91.3 Nexthop history is larger than the final 20-patch route-integration series
+
+The June 2019 networking pull shows that nexthop support arrived as a
+broader sequence than only the final 20 patches. Earlier commits already
+established:
+
+``` text
+net: nexthop uapi
+net: Initial nexthop code
+nexthop: Add support for IPv4 nexthops
+nexthop: Add support for IPv6 gateways
+nexthop: Add support for lwt encaps
+nexthop: Add support for nexthop groups
+selftests: Add test cases for nexthop objects
+nexthop: Add entry to MAINTAINERS
+```
+
+The final v4/20 series then connects those objects comprehensively into
+IPv4/IPv6 route handling and adds replacement/testing.
+
+So the architecture should be pictured as:
+
+``` text
+nexthop UAPI/object core
+        │
+        ├── IPv4 / IPv6 gateway representation
+        ├── lwt encap
+        └── groups
+        │
+        ▼
+v4 / 20 final initial-integration series
+        │
+        ├── IPv4 routes reference objects
+        ├── IPv6 routes reference objects
+        ├── replace
+        └── route/selftests
+        │
+        ▼
+later resilient groups
+```
+
+This is more accurate than assigning the entire nexthop-object feature
+to one of the final 20 commits.
+
+------------------------------------------------------------------------
+
+# 92. IOAM accepted-series interpretation
+
+The v5 series is:
+
+``` text
+[PATCH net-next v5 0/6]
+Support for the IOAM Pre-allocated Trace with IPv6
+2021-07-20
+```
+
+and Linux networking release history confirms IPv6 IOAM Pre-allocated
+Trace support in the resulting kernel cycle.
+
+The series has six logical pieces:
+
+``` text
+1. IPv6 IOAM UAPI/header definitions
+2. data-plane Pre-allocated Trace processing
+3. Generic Netlink configuration API
+4. IOAM injection via lightweight tunnels
+5. sysctl/documentation
+6. selftests
+```
+
+Exact data-plane commit:
+
+``` text
+9ee11f0fff205b4b3df9750bff5e94f97c71b6a0
+ipv6: ioam: Data plane support for Pre-allocated Trace
+```
+
+Later fixes repeatedly cite this exact object in `Fixes:`.
+
+### Review-history nuance
+
+The earlier v4 series was explicitly challenged as premature because the
+relevant IETF documents were still drafts. v5 later added stronger
+validation, RCU handling, refined sysctls and tests before the July 2021
+landing generation.
+
+This is useful provenance because it shows:
+
+``` text
+Netdev 0x14 / early implementation
+        │
+        ▼
+v4
+technical implementation largely present
+but standards-maturity concern
+        │
+        ▼
+v5
+validation + RCU + API refinement + tests
+        │
+        ▼
+mainline IOAM
+```
+
+The exact remaining five SHA-1s around `9ee11f0fff20` are still being
+treated as pending rather than inferred from tree adjacency.
+
+**Quality: A for data-plane anchor and accepted-generation identity; B
+for complete six-commit enumeration.**
+
+------------------------------------------------------------------------
+
+# 93. Provenance table after pass 7
+
+  -----------------------------------------------------------------------
+  Feature           Landing series    Exact             Quality
+                                      implementation    
+                                      anchor            
+  ----------------- ----------------- ----------------- -----------------
+  MPTCP BPF         2022 v5/7,        `3bc253c2e652`    **A**
+  `mptcp_sock`      applied to                          
+                    bpf-next                            
+
+  MPTCP parent      separate landing  `3764b0c5651e3`   **A**
+  cgroup                                                
+
+  MPTCP protocol    later BPF hook    `0dd061a6a115`    **A**
+  switching                                             
+
+  nexthop route     **v4/20 applied** IPv4 `493ced1a`;  A/B
+  integration                         full set pending  
+
+  nexthop multipath v4/20             `cab14d1087d9`    **A**
+  selftest                                              
+
+  IPv6 IOAM data    v5/6 generation   `9ee11f0fff20`    **A**
+  plane                                                 
+
+  complete IOAM v5  v5/6              five additional   B
+  set                                 SHA pending       
+  -----------------------------------------------------------------------
+
+Corrections from this pass:
+
+``` text
+nexthop:
+v3 final  →  v4 accepted final revision
+
+MPTCP/BPF:
+2020 v3 merge assumption
+    → 2020 design lineage
+    → 2022 reworked v5/7 actual BPF landing
+```
+
+These corrections are now the canonical interpretation used by the
+document.
