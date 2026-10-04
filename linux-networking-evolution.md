@@ -10973,34 +10973,34 @@ Kernel Recipes archive:
 
 # 106. Kernel Recipes → LWN → mainline mapping
 
-  ----------------------------------------------------------------------------------------
-  Kernel                     Year Archive       Change-log lineage  Phase
-  Recipes                         category                          
-  ------------- ----------------- ------------- ------------------- ----------------------
-  XDP closer                 2019 networking    XDP →               design/architecture
-  integration                                   page_pool/AF_XDP →  
-  with network                                  netkit              
-  stack                                                             
+  ------------------------------------------------------------------------------------
+  Kernel                  Year Archive      Change-log lineage  Phase
+  Recipes                      category                         
+  ------------- -------------- ------------ ------------------- ----------------------
+  XDP closer              2019 networking   XDP →               design/architecture
+  integration                               page_pool/AF_XDP →  
+  with network                              netkit              
+  stack                                                         
 
-  BPF at                     2019 networking    BPF networking →    deployment/design
-  Facebook                                      struct_ops/socket   
-                                                hooks/netkit        
+  BPF at                  2019 networking   BPF networking →    deployment/design
+  Facebook                                  struct_ops/socket   
+                                            hooks/netkit        
 
-  Faster IO                  2019 storage       io_uring →          pre-networking
-  through                                       networking TX/RX    foundation
-  io_uring                                                          
+  Faster IO               2019 storage      io_uring →          pre-networking
+  through                                   networking TX/RX    foundation
+  io_uring                                                      
 
-  What's new                 2022 storage       io_uring → ZC       foundation/merge-era
-  with io_uring                                 networking          
+  What's new              2022 storage      io_uring → ZC       foundation/merge-era
+  with io_uring                             networking          
 
-  On the way to              2023 storage       io_uring ZC TX/RX   design/merge-era
-  io_uring                                                          
-  networking                                                        
+  On the way to           2023 storage      io_uring ZC TX/RX   design/merge-era
+  io_uring                                                      
+  networking                                                    
 
-  Netconf 2023               2023 networking    SO_DEVMEM, BIG TCP, multi-lineage workshop
-  Workshop                                      XDP/BPF, IPsec,     
-                                                nftables, TCP/ML    
-  ----------------------------------------------------------------------------------------
+  Netconf 2023            2023 networking   SO_DEVMEM, BIG TCP, multi-lineage workshop
+  Workshop                                  XDP/BPF, IPsec,     
+                                            nftables, TCP/ML    
+  ------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -11067,3 +11067,532 @@ Linux 6.15 ZCRX
 This additional conference layer makes the change log useful not only
 for answering "when was it merged?" but also "where did the
 architectural direction come from?"
+
+------------------------------------------------------------------------
+
+# 108. Kernel Recipes cross-category sweep --- 2019--2026
+
+A second pass searched beyond `Category = networking`, using
+networking-related titles, summaries and live-blog material. This found
+several talks that are directly relevant but classified under
+`security`, `tracing`, or `storage`.
+
+## 108.1 2019 --- Suricata and XDP
+
+``` text
+Speaker:
+Eric Leblond
+
+Archive category:
+security
+
+Date:
+2019-09-27
+```
+
+This is an important **production-use** counterpart to the
+architecture-oriented "XDP closer integration with network stack" talk.
+
+The Kernel Recipes live blog describes Suricata's evolution through:
+
+``` text
+NFQUEUE
+   ↓
+AF_PACKET
+   ↓
+XDP / eBPF bypass
+   ↓
+AF_XDP evaluation
+```
+
+Operational motivations include:
+
+-   packet loss directly reducing IDS visibility;
+-   flow-aware load distribution;
+-   bypassing already-known flows;
+-   keeping BPF maps pinned across Suricata restarts;
+-   using XDP for tunnel decapsulation before load balancing;
+-   experimenting with NIC-offloaded XDP/eBPF;
+-   evaluating AF_XDP to avoid skb allocation.
+
+The live blog also records an important limitation observed at the time:
+AF_XDP did not provide all metadata/features needed by Suricata,
+including the hardware-timestamp use case discussed in the session.
+
+### Change-log relationship
+
+``` text
+XDP architecture
+      │
+      ▼
+production IDS / packet capture
+      │
+      ├── XDP flow bypass
+      ├── hardware XDP offload
+      └── AF_XDP evaluation
+      │
+      ▼
+later AF_XDP improvements
+      ├── multi-buffer
+      ├── metadata/API evolution
+      └── virtio-net zero-copy
+```
+
+This talk is useful because it shows **why** AF_XDP/XDP API completeness
+matters to real applications, rather than only showing kernel
+microbenchmarks.
+
+Kernel Recipes slides:
+`https://archives.kernel-recipes.org/wp-content/uploads/2025/01/eleblond-suricata-xdp.pdf`
+
+------------------------------------------------------------------------
+
+## 108.2 2019 --- The ubiquity but also the necessity of eBPF as a technology to keep the kernel relevant
+
+``` text
+Speaker:
+David Miller
+
+Archive category:
+tracing
+
+Year:
+2019
+```
+
+Despite being categorized as `tracing`, the archive summary describes
+eBPF as a mechanism for allowing users to extend an operating system
+that would otherwise behave as a fixed "black box".
+
+For networking history this provides maintainer-level architectural
+context for:
+
+``` text
+fixed kernel networking policy
+        │
+        ▼
+BPF hook points
+        │
+        ▼
+programmable packet/socket behavior
+        │
+        ├── XDP
+        ├── socket lookup
+        ├── struct_ops
+        ├── MPTCP protocol selection
+        ├── netkit
+        └── BPF qdisc
+```
+
+This belongs beside "BPF at Facebook": one provides production
+deployment evidence, while David Miller's talk provides the
+kernel-maintainer architectural argument.
+
+------------------------------------------------------------------------
+
+## 108.3 2022 --- io_uring: path to zerocopy I/O
+
+``` text
+Speaker:
+Pavel Begunkov
+
+Archive category:
+storage
+
+Year:
+2022
+```
+
+This is more directly relevant to networking than the category suggests.
+
+The Kernel Recipes live blog explicitly discusses network-send zero copy
+and compares the io_uring approach with:
+
+``` text
+MSG_ZEROCOPY
+```
+
+It describes the evolution from an initial storage-like model to a
+notification-based model and the use of io_uring registered buffers.
+
+The talk also discusses future directions:
+
+``` text
+peer-to-peer DMA
+DMA-BUF
+networking-layer p2pdma support
+zero-copy receive
+TCP_ZEROCOPY_RECEIVE-like mmap approach
+zctap / AF_XDP-like provided-buffer approach
+```
+
+### Provenance relationship
+
+This is an unusually useful bridge between the later two major lineages:
+
+``` text
+io_uring zero-copy networking
+                │
+                ├───────────────┐
+                ▼               ▼
+       zero-copy TX       zero-copy RX
+                                │
+                                ▼
+                         page_pool/netmem
+                                │
+                                ▼
+                         io_uring ZCRX
+```
+
+and:
+
+``` text
+DMA-BUF / P2P discussion
+        │
+        ▼
+network memory-provider work
+        │
+        ▼
+Device Memory TCP
+```
+
+The live blog explicitly says zero-copy RX was still future work at this
+point. This is therefore **pre-merge design provenance** for the later
+ZCRX implementation, not evidence that receive zero-copy had already
+landed.
+
+------------------------------------------------------------------------
+
+## 108.4 2022 --- What's new with io_uring
+
+``` text
+Speaker:
+Jens Axboe
+
+Archive category:
+storage
+```
+
+The Kernel Recipes live blog gives more detail than the short archive
+entry.
+
+It describes:
+
+-   the two shared rings;
+-   native io_uring workers;
+-   direct descriptors;
+-   provided buffer pools;
+-   kernel/ring-provided buffers;
+-   reduced locking/syscall overhead.
+
+The buffer-pool work is especially relevant to the later networking
+direction:
+
+``` text
+per-operation userspace buffer
+        ↓
+registered/provided buffers
+        ↓
+shared producer/consumer rings
+        ↓
+network receive buffer management
+        ↓
+io_uring ZCRX
+```
+
+This talk should be treated as **interface/infrastructure provenance**,
+rather than a networking feature by itself.
+
+------------------------------------------------------------------------
+
+## 108.5 2023 --- On the way to io_uring networking
+
+The archive category remains `storage`, but the title and abstract are
+explicitly about networking.
+
+The slides discuss provided-buffer evolution including:
+
+``` text
+IORING_OP_PROVIDE_BUFFERS
+        ↓
+IORING_REGISTER_PBUF_RING
+```
+
+where userspace returns buffers through another shared ring instead of
+submitting a special request for every returned buffer.
+
+### Three-stage Kernel Recipes io_uring lineage
+
+``` text
+2019
+Faster IO through io_uring
+general asynchronous-I/O foundation
+        │
+        ▼
+2022
+What's new with io_uring
+provided buffers / direct descriptors
+        │
+        ├─────────────┐
+        ▼             ▼
+2022             2023
+path to ZC       io_uring networking
+        │             │
+        └──────┬──────┘
+               ▼
+       upstream networking series
+               │
+        ┌──────┴──────┐
+        ▼             ▼
+      ZC TX          ZC RX
+                      │
+                      ▼
+                 Linux 6.15
+```
+
+This is one of the clearest conference-to-mainline lineages in the
+document.
+
+------------------------------------------------------------------------
+
+# 109. Netconf 2023 live-blog expansion
+
+The Kernel Recipes live-blog account adds detail beyond the Netconf
+summary slides.
+
+Topics explicitly reported include:
+
+``` text
+Toke Høiland-Jørgensen
+    XDP
+
+Jesper Dangaard Brouer
+    page_pool / common driver buffer management
+
+Alexandre Ferrieux
+    GRO overhead
+
+Jiri Pirko
+    devlink
+
+Willem de Bruijn
+    complex-code refactoring
+    SO_DEVMEM / direct GPU placement
+
+Daniel Borkmann
+    header/data split
+    BIG TCP
+    zero copy
+    bpf_mprog
+    dependency/order between BPF programs
+
+Eric Dumazet
+    fast-path struct-file layout
+    deferred wakeups
+    UDP accept()
+
+Florian Westphal
+    IPsec
+    PF_KEY aging/deprecation discussion
+    nftables CVE/technical-debt work
+```
+
+The live-blog specifically explains why header/data split matters for
+zero copy: packet data can live separately from the header and be handed
+toward userspace without the same copying path.
+
+It also records page_pool as becoming increasingly important as a
+**common driver buffer management mechanism**.
+
+### Combined architecture view
+
+``` text
+page_pool
+   │
+   ├── common RX-buffer management
+   │
+   ▼
+header/data separation
+   │
+   ▼
+netmem / memory providers
+   │
+   ├─────────────┐
+   ▼             ▼
+SO_DEVMEM     io_uring ZCRX
+   │
+   ▼
+Device Memory TCP
+```
+
+This is a particularly strong conference-level explanation of the
+memory-management lineage already reconstructed from LWN and patches.
+
+------------------------------------------------------------------------
+
+# 110. Coverage by Kernel Recipes year
+
+The archive search results show an important conference-history
+constraint.
+
+``` text
+2019
+rich networking-related program
+
+2020–2021
+no equivalent normal Kernel Recipes program found in the archive sweep
+
+2022
+conference resumes; important io_uring/zero-copy material
+
+2023
+Netconf co-located with Kernel Recipes;
+very strong networking coverage
+
+2024–2026
+no comparable new Kernel Recipes networking document set surfaced in the
+current archive/document-library search
+```
+
+This should not be interpreted as "there was no Linux networking
+development" in those years. It only describes what is currently
+discoverable in the Kernel Recipes archive.
+
+The change log therefore keeps Netdev/LWN/mainline as the primary
+continuous timeline and uses Kernel Recipes as an additional
+conference-provenance source where material exists.
+
+------------------------------------------------------------------------
+
+# 111. Updated Kernel Recipes inventory
+
+  -------------------------------------------------------------------------------
+                   Year Talk / workshop  Archive category Primary relevance
+  --------------------- ---------------- ---------------- -----------------------
+                   2019 XDP closer       networking       XDP/netstack
+                        integration with                  integration, xdp_frame,
+                        network stack                     skb-allocation
+                                                          direction
+
+                   2019 BPF at Facebook  networking       production BPF
+                                                          networking
+
+                   2019 Suricata and XDP security         XDP/AF_XDP production
+                                                          packet capture
+
+                   2019 The ubiquity but tracing          programmable-kernel
+                        also the                          architecture
+                        necessity of                      
+                        eBPF...                           
+
+                   2019 Faster IO        storage          io_uring foundation
+                        through io_uring                  
+
+                   2022 What's new with  storage          buffers, direct
+                        io_uring                          descriptors,
+                                                          infrastructure
+
+                   2022 io_uring: path   storage          network ZC TX, future
+                        to zerocopy I/O                   ZC RX, DMA-BUF/P2P
+
+                   2022 The untold story tracing          BPF
+                        of BPF                            historical/contextual
+                                                          material
+
+                   2023 On the way to    storage          networking-specific
+                        io_uring                          io_uring evolution
+                        networking                        
+
+                   2023 Netconf 2023     networking       page_pool, SO_DEVMEM,
+                        Workshop                          BIG TCP, XDP/BPF,
+                                                          IPsec, nftables
+  -------------------------------------------------------------------------------
+
+## Inclusion policy
+
+Not every BPF or performance talk is automatically included.
+
+A Kernel Recipes item is retained when at least one of these holds:
+
+``` text
+1. it directly discusses Linux networking;
+2. it is a prerequisite/interface that later networking work depends on;
+3. it provides production evidence for a networking API;
+4. it documents design discussion that later appears in an upstream networking series.
+```
+
+Generic tracing/performance/BPF talks without a concrete networking
+connection remain outside the canonical networking inventory.
+
+------------------------------------------------------------------------
+
+# 112. Conference provenance stack after Kernel Recipes sweep
+
+The resulting historical stack is now:
+
+``` text
+Kernel Recipes
+    broad architecture / production use / maintainer workshops
+          │
+          ▼
+Netdev
+    networking-focused design and implementation
+          │
+          ▼
+LWN
+    review, explanation and merge-window reporting
+          │
+          ▼
+lore / patchwork
+    exact review and accepted-series history
+          │
+          ▼
+git.kernel.org
+    canonical mainline objects
+          │
+          ▼
+kernel release
+```
+
+No one source replaces the others.
+
+For example, the zero-copy receive lineage can now be reconstructed as:
+
+``` text
+Kernel Recipes 2022
+future ZC RX / zctap-AF_XDP-style discussion
+        │
+        ▼
+Kernel Recipes 2023
+io_uring networking
+        │
+        ▼
+Netdev 0x17 / 0x18
+ZCRX implementation + BoF
+        │
+        ▼
+LWN RFC/v1...v13 coverage
+        │
+        ▼
+ca0b04ba0b35...
+6.15 merge
+```
+
+and the device-memory lineage as:
+
+``` text
+Kernel Recipes / Netconf 2023
+SO_DEVMEM + direct GPU placement
+        │
+        ▼
+Netdev Device Memory TCP talks
+        │
+        ▼
+LWN / v26 series
+        │
+        ▼
+Linux 6.12 Device Memory TCP RX
+        │
+        ▼
+Linux 6.16 Device Memory TCP TX
+```
