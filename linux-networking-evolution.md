@@ -629,16 +629,22 @@ hardware offload
 nftables + BPF complementary model
 ```
 
-### Datacenter transport
+### Datacenter / high-performance transport milestones
+
+以下は transport / congestion-control / aggregation の**並列 timeline**であり、
+矢印で表すような親子関係・直接依存を意味しない。
 
 ``` text
-TCP Fast Open (3.6/3.7)
-DCTCP (3.18)
-       ↓
-BBR (4.9)
-       ↓
-MPTCP / BIG TCP / AccECN
+TCP Fast Open (3.6/3.7)   — connection establishment
+DCTCP (3.18)              — ECN-based datacenter congestion control
+BBR (4.9)                 — model-based congestion control
+MPTCP (5.6)               — multipath transport
+BIG TCP (5.19 / 6.3 ...)  — larger internal GRO/GSO aggregation
+AccECN (6.18 → 7.0)       — richer ECN feedback
 ```
+
+これらは高性能 transport という広い問題領域では関連するが、DCTCP → BBR →
+MPTCP/BIG TCP/AccECN という技術的 lineage ではない。
 
 ------------------------------------------------------------------------
 
@@ -736,14 +742,14 @@ feature series 全体や release attribution が自動的に Grade A になる�
 | 4.14 | phylink; SOCKMAP; TCP MSG_ZEROCOPY; XDP devmap | A | release; exact phylink / TCP MSG_ZEROCOPY anchors retained; devmap documented since 4.14 |
 | 4.15 | XDP cpumap | A | release documented |
 | 4.16 | netdevsim; Net DIM generation; nftables software flowtable | A | release; DIM exact SHA pending |
-| 4.17 | BPF_PROG_TYPE_SK_MSG; sockmap sendmsg/sendfile | B | final-series generation |
+| 4.17 | BPF_PROG_TYPE_SK_MSG; sockmap sendmsg/sendfile | A | release; origin anchor `4f738adba30a7cfc006f605707e7aee847ffefa0` retained in Part VII |
 | 4.18 | AF_XDP; TCP_ZEROCOPY_RECEIVE; refurbished page_pool/XDP memory return; cgroup UDP sendmsg hooks | A | series + release; page_pool anchor retained |
 | 4.19 | SO_TXTIME; CAKE | A | release-generation; detailed anchors not reproduced in Part VII |
 | 4.20 | TCP EDT pacing; BPF flow dissector; taprio; rtnetlink strict checking | A | release |
 | 5.0 | UDP GRO; UDP MSG_ZEROCOPY | A | release |
 | 5.1 | devlink health; BPF spinlocks/DCE; SO_BINDTOIFINDEX; Y2038 timestamps; io_uring substrate; mac80211 airtime accounting/scheduling to TXQs | A | release; airtime commit contained in v5.1-rc1 |
 | 5.3 | nexthop objects; DIM generalized into common lib/dim | A | release-generation; nexthop core anchor not reproduced in Part VII |
-| 5.5 | mac80211 Airtime Queue Limits (AQL) | B | release-generation |
+| 5.5 | mac80211 Airtime Queue Limits (AQL) | A | final v5.5; release summaries explicitly identify AQL as a mac80211 feature |
 | 5.6 | MPTCP; WireGuard; BPF struct_ops/TCP CC; ethtool Generic Netlink | A | release; exact ethtool anchor retained |
 | 5.9 | BPF_PROG_TYPE_SK_LOOKUP | A | exact anchor retained in Part VII |
 | 5.11 | auxiliary bus | A | release + exact origin anchor |
@@ -763,12 +769,14 @@ feature series 全体や release attribution が自動的に Grade A になる�
 | 6.13 | per-netns RTNL infrastructure/migration milestone | B | milestone, not completion |
 | 6.15 | io_uring ZCRX; further RTNL breakup | A | merge/series evidence |
 | 6.16 | Device Memory TCP TX; BPF qdisc; DCCP removal | A | release/final-series generation; BPF-qdisc exact inventory pending |
-| 6.18 | AccECN core; UDP RX evolution; DIBS separate shared-memory lineage | B | release-generation |
+| 6.18 | AccECN core; UDP RX evolution | B | release-generation; DIBS is tracked separately in Part III/Appendix as a parallel shared-memory communication lineage, not promoted to a canonical packet-networking milestone |
 | 6.19 | `dev_queue_xmit()` llist TX scheduling; threaded-NAPI kthread busy-poll extension; WireGuard YNL-described Netlink | A | final `v6.19`; selected architecture milestones from the 6.19 networking cycle |
 | 7.0 | cake_mq / multi-queue-aware sch_cake; IPv6 BIG TCP without synthetic HBH jumbo header; AccECN enablement; large RX buffers for memory providers/io_uring ZCRX | A | final `v7.0`; AccECN enablement and large-buffer ZCRX complete earlier lineages |
 | 7.1 | RX HW queue leasing; dedicated qdisc-drop tracepoint | A | final `v7.1`; TX queue leasing remains unmerged; qdisc drop context becomes directly observable |
 | 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255; PPPoE GRO/GSO | A | final `v7.2`; MPTCP limit expansion plus aggregation support over PPPoE |
 | 7.3-rc / mainline | BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE; per-netns netdev-unregistration infrastructure | A-rc | net-next-7.3 merged 2026-08-20; final 7.3 pending |
+
+**Remaining B-grade audit note:** Net DIM (4.16/5.3) and the composite 6.8 queue/NAPI object milestone remain B intentionally. Their release-generation attribution is strong, but this edition does not yet reduce each composite claim to a complete origin/expansion anchor set. AQL and SK_MSG were re-audited in r14 and promoted to A.
 
 **7.3 status note:** 調査基準日時点では final 7.3 は未リリースのため `A-rc` とする。正式リリースを確認した時点で `A` へ更新する。
 
@@ -908,7 +916,8 @@ page_pool → netmem → Device Memory TCP / memory providers
 
 はRX/TX packet-memory
 ownershipのlineageである。一方、DIBSはshared-memory
-transport側の別lineageとして扱い、この矢印へ直接接続しない。
+transport側の別lineageとして扱い、この矢印へ直接接続しない。さらに、本書の wired/host packet-networking の
+canonical milestone 選定基準では Part II の主 milestone から外し、parallel lineage としてここで保持する。
 
 ------------------------------------------------------------------------
 
@@ -1190,7 +1199,7 @@ release attribution はすべて Part II と一致させる。
 | 4.8 | XDP | driver RX path gains a programmable pre-skb execution point |
 | 4.14 | phylink | common MAC/PHY/PCS/SFP link-management state machine |
 | 4.16 | netdevsim | common offload APIs become testable without physical hardware |
-| 4.18 | refurbished page_pool/XDP memory return | RX allocation/recycling begins moving into common memory infrastructure |
+| 4.18 | refurbished page_pool/XDP memory return | a reusable common RX/XDP page-recycling infrastructure becomes available |
 | 5.1 | devlink health | common reporting/recovery model for device health |
 | 5.6 | ethtool Generic Netlink | driver management ABI becomes structured/extensible |
 | 5.11 | auxiliary bus | complex devices can expose independently bound subfunctions |
@@ -2034,6 +2043,7 @@ Net DIMについては、algorithm自体は4.16以前からmlx5e内に存在し�
 | page_pool origin | `ff7d6b27f894f1469dc51ccb828b7363ccd9799f` | `page_pool: refurbish version of page_pool code` |
 | page_pool/XDP integration | `60bbf7eeef10dc647430646d7fe5e3d8d132dbec` | mlx5 page_pool/XDP integration anchor |
 | ethtool Generic Netlink | `2b4a8990b7df55875745a80a609a1ceaaf51f322` | `ethtool: introduce ethtool netlink interface` |
+| SK_MSG | `4f738adba30a7cfc006f605707e7aee847ffefa0` | socket-message verdict / `BPF_PROG_TYPE_SK_MSG`; Linux 4.17 |
 | SK_LOOKUP | `e9ddbb7707ff5891616240026062b8c1e29864ca` | `bpf: Introduce SK_LOOKUP program type with a dedicated attach point` |
 | XFRM packet offload | `d14f28b8c1de668bab863bf5892a49c824cb110d` | `xfrm: add new packet offload flag` |
 | IPv6 BIG TCP / GRO | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | `net: allow gro_max_size to exceed 65536` |
