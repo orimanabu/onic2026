@@ -7,7 +7,7 @@ title: Linux Networking Evolution
 > **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras, Parts III–V the lineages / driver-framework / observability story. Part VI is the only normative release chronology, Part VII the provenance ledger, and Appendix material is supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02  
-**構成改訂:** 2026-10-04（r23）
+**構成改訂:** 2026-10-04（r24）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
@@ -553,12 +553,14 @@ RTNL は:
 
 ``` text
 global RTNL
- ⇒ unlocked operations
- ⇒ RCU readers
- ⇒ per-netns RTNL
- ⇒ subsystem locks/refcounts
- ⇒ RTNL-less FIB rule updates (7.3-rc/mainline)
+ → unlocked operations
+ → RCU readers
+ → per-netns RTNL
+ → subsystem locks/refcounts
+ → RTNL-less FIB rule updates (7.3-rc/mainline)
 ```
+
+この `→` は direct extension を意味せず、global RTNL dependency を縮小する複数の locking / refactoring techniques が同じ設計方向に進んだことを示す。
 
 7.3向けnetworking pullでは `RTM_NEWRULE` / `RTM_DELRULE` のFIB rule変更が RTNL-lock-less化され、further RTNL-dependency reductionやlock-less GET準備と 同じ「global RTNL依存を減らす」流れとしてmainlineへ入った。
 
@@ -1436,6 +1438,7 @@ released tag
 ```
 
 # Changelog / Errata（非正規）
+- **r24:** RTNL の progression を `⇒` から `→` に変更。一つの feature の direct extension ではなく、global RTNL dependency を縮小する複数の locking/refactoring techniques の lineage として扱う。BIG TCP など direct extension が明確な系列の `⇒` は維持。
 
 - **r23:** WireGuard 5.6 を `SECURITY / VIRTUAL / OVERLAY` とし、`evidence grade` の残語を `Evidence class` へ修正。netmem / memory providers の Part VI 未収載が意図的な open provenance であることを明記。
 - **r23:** XDP frags と USENIX subsection の配置を修正し、io_uring networking を Packet memory の直後へ移動。Era 1 の重複 queueing 図を削減。
