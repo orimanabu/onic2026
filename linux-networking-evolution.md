@@ -404,7 +404,7 @@ in-kernel virtual machine
 
 ------------------------------------------------------------------------
 
-### 1.10 v3.14--v3.17 --- BPF transformation
+### 1.10 v3.15--v3.17 --- BPF transformation
 
 classic BPFはsocket packet filterを中心とした小さなVMだった。
 
@@ -697,7 +697,7 @@ Grade は `A / A-rc / B / C / D` を用い、定義もこの表を生成する c
 | 5.19 | IPv6 BIG TCP; drop-reason expansion | A | release; exact BIG TCP anchors |
 | 6.0 | io_uring IORING_OP_SEND_ZC; multishot receive | A | release-generation |
 | 6.2 | TCP PLB; XFRM/IPsec packet offload | A | release; exact XFRM anchor |
-| 6.2–6.3 | YNL/YAML Netlink specification/tooling generation | C | rollout boundary still under exact audit |
+| 6.3 | YNL/YAML Netlink specification/tooling generation (`Documentation/netlink/specs`, generated C code, `tools/net/ynl`) | A | first released generation is v6.3 |
 | 6.3 | IPv4 BIG TCP | A | release; exact commit set |
 | 6.6 | AF_XDP multi-buffer; TCX / bpf_mprog multi-program attachment | A | release; TCX/bpf_mprog present in v6.6 sources |
 | 6.7 | netkit; initial TCP-AO | A | release |
@@ -708,9 +708,9 @@ Grade は `A / A-rc / B / C / D` を用い、定義もこの表を生成する c
 | 6.15 | io_uring ZCRX; further RTNL breakup | A | exact merge/series evidence |
 | 6.16 | Device Memory TCP TX; BPF qdisc; DCCP removal | A | final series verified; key BPF-qdisc anchors retained |
 | 6.18 | AccECN core; UDP RX evolution; DIBS separate shared-memory lineage | B | release-generation |
-| 7.0 | cake_mq / multi-queue-aware sch_cake | A | net-next-7.0 pull; release generation verified |
-| 7.1 | RX HW queue leasing | A | net-next-7.1 mainline pull confirms HW queue leasing; TX remains unmerged |
-| 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255 | B | merged series and cycle consistent; exact per-commit tag-containment audit retained |
+| 7.0 | cake_mq / multi-queue-aware sch_cake; IPv6 BIG TCP without synthetic HBH jumbo header | A | net-next-7.0 / v7.0 release generation |
+| 7.1 | RX HW queue leasing | A | revised RX queue-leasing merge is contained in v7.1-rc1; TX remains unmerged |
+| 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255 | A | three limit-expansion commits are contained in v7.2-rc1 |
 | 7.3-rc / mainline | BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE | A-rc | net-next-7.3 merged 2026-08-20; final 7.3 pending |
 
 ## Dominant-theme eras
@@ -780,7 +780,7 @@ IPv6 BIG TCP (5.19)
   ↓
 IPv4 BIG TCP (6.3)
   ↓
-IPv6 BIG TCP without synthetic HBH jumbo header (development prerequisite; exact released-version attribution not asserted here)
+IPv6 BIG TCP without synthetic HBH jumbo header (Linux 7.0)
   ↓
 BIG TCP over VXLAN / GENEVE (7.3-rc/mainline)
 ```
@@ -935,7 +935,7 @@ v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、2026 の netkit queue leasing は 
 v5.0 (EDT pacing already present since 4.20)
   ├─ BPF congestion control
   ├─ MPTCP (5.6)
-  ├─ TCP zero-copy RX
+  ├─ TCP zero-copy RX (`TCP_ZEROCOPY_RECEIVE`, 4.18)
   ├─ BIG TCP (5.19)
   ├─ TCP-AO/security
   ├─ Device Memory TCP
@@ -1682,7 +1682,7 @@ async I/O             conventional     →      io_uring ZC TX/RX
 ## Evolution map
 
 ``` text
-                    Linux v5.0
+                    Linux 5.x
                         │
         ┌───────────────┼────────────────┐
         │               │                │
@@ -1754,7 +1754,7 @@ series.
 | BBR | `0f8782ea14974ce992618b55f0c041ef43ed0b78` | initial BBR mainline anchor |
 | phylink | `9525ae83959b60c6061fe2f2caabdc8f69a48bc6` | `phylink: add phylink infrastructure`; Linux 4.14 |
 | TCP MSG_ZEROCOPY | `f214f915e7db99091f1312c48b30928c1e0c90b7` | `tcp: enable MSG_ZEROCOPY` |
-| page_pool origin | `ff7d6b27f8944cf4b20740b67e4c9f0ef5bc226f` | `page_pool: refurbish version of page_pool code` |
+| page_pool origin | `ff7d6b27f894f1469dc51cccb828c7bf1aeb64bc` | `page_pool: refurbish version of page_pool code` |
 | page_pool/XDP integration | `60bbf7eeef10dc647430646d7fe5e3d8d132dbec` | mlx5 page_pool/XDP integration anchor |
 | ethtool Generic Netlink | `2b4a8990b7df55875745a80a609a1ceaaf51f322` | `ethtool: introduce ethtool netlink interface` |
 | SK_LOOKUP | `e9ddbb7707ff5891616240026062b8c1e29864ca` | `bpf: Introduce SK_LOOKUP program type with a dedicated attach point`;  |
@@ -1775,16 +1775,16 @@ The appendix is an evidence catalog. Dates found there may be RFC dates, posting
 
 ## Open attribution items and evidence grade
 
-The BIG TCP no-synthetic-HBH work is retained as a development prerequisite in the feature lineage, but this edition does not assign it a released version until tag containment is audited.
+The BIG TCP no-synthetic-HBH change is attributed to Linux 7.0; it is a prerequisite in the later tunnel-BIG-TCP lineage.
 
   --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   Item                                 Grade                   Current treatment
   ------------------------------------ ----------------------- -------------------------------------------------------------------------------------------------------------------------------------
-  queue leasing                        B                       RX side is merged; TX queue leasing remains PoC/design in the cited 2026 discussion; Linux 7.1 attribution confirmed by the `net-next-7.1` mainline pull
+  queue leasing                        A                       RX side is merged; TX queue leasing remains PoC/design in the cited 2026 discussion; Linux 7.1 attribution confirmed; revised merge is contained in v7.1-rc1
 
   devmem buffers \> `PAGE_SIZE`        A for 7.3 mainline-rc   explicitly listed in the `net-next-7.3` pull merged to Linus mainline
 
-  MPTCP max subflows 8 → 64            B                       2026 merge series verified; exact released-tag containment should be pinned before using it as a 7.2-specific anchor
+  MPTCP max subflows 8 → 64            A                       v7.2-rc1 containment confirmed for the three limit-expansion commits
 
   YNL initial rollout boundary         C                       treated as a 6.2--6.3 generation pending exact origin/tag audit
 
