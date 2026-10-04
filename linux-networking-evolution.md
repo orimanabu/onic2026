@@ -1,13 +1,12 @@
 # Linux Networking Evolution --- Linux v3.0 から 7.x まで
 
-> **Clean canonical edition.** Part II is the only normative release
-> chronology. Part III explains feature lineages, Part IV the
-> driver-framework axis, Part V observability, Part VI synthesis, and
-> Part VII unresolved provenance. Appendix material is supporting
-> evidence, not an alternate release map.
+> **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras,
+> Parts III--V the lineages / driver-framework / observability story. Part VI is the only
+> normative release chronology, Part VII the provenance ledger, and Appendix material is
+> supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02\
-**構成改訂:** 2026-10-04（r13: relation/evidence semantics audit）
+**構成改訂:** 2026-10-04（r15: architecture-story restructuring）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel
 networking がどのように進化したかを読む順序**に再構成した版である。
@@ -19,43 +18,41 @@ security protocol の網羅的な歴史は対象外とし、mac80211 は queue m
 ## この文書の読み方
 
 > **Canonicalization rule:** release attribution と evidence grade を決定する唯一の正本は
-> **Part II** とする。Part III--VI は Part II の release 番号を説明・lineage のために
-> 参照してよいが、独立した attribution や grade を定義しない。Part VII は exact
+> **Part VI** とする。Part I--V は architecture thesis / era / lineage / framework / observability のために
+> release 番号を参照してよいが、独立した attribution や grade を定義しない。Part VII は exact
 > commit / unresolved boundary、Appendix は supporting evidence を保持する。
 
-本文は次の流れで構成する。
+本版では、まず結論と architecture map を示し、その後に根拠を深掘りする。
 
 ``` text
-Part I    foundations
-          Linux v3.xを中心に、modern networkingの前提を形成
+Part I    executive thesis / architecture map
+          15年間で「何が変わったか」を先に示す
 
-Part II   canonical release chronology
-          v3.0 → current mainline / release-candidate state
+Part II   four architecture eras
+          kernel major version ではなく、主問題の変化で時代を区切る
 
-Part III  thematic feature lineages
-          aggregation / memory / XDP / BPF /
+Part III  long-term lineages
+          v3.x foundations / aggregation / memory / XDP / BPF /
           virtual networking / transport / control plane
 
 Part IV   Network Device Driver Framework Evolution
-          BQL / switchdev / devlink / phylink / page_pool /
-          netdev-genl / Rust driver abstractions
+          driver-private mechanism が common contract へ移る過程
 
 Part V    observability / explainability
-          eBPF + BTF → skb_drop_reason → queue/NAPI/page_pool observability
+          複雑化した datapath / ownership / offload を運用可能にする evidence layer
 
-Part VI   synthesis
-          release間比較と全体architecture map
+Part VI   canonical release chronology
+          v3.0 → current mainline / release-candidate state
 
 Part VII  canonical provenance ledger
-          未解決のrelease/commit attribution
+          exact anchors / unresolved attribution
 
 Appendix  evidence catalog
-          LWN / upstream commits / conference provenance
+          research / documentation / conference provenance
 ```
 
-重要な方針は、release chronology と feature lineage を分離すること。
-まず年代順に「何がいつ形成されたか」を読み、その後で同じ技術を
-長期lineageとして横断的に追う。
+読み方は **thesis → map → era → lineage → chronology → provenance** を基本とする。
+「いつ入ったか」だけを調べたい場合は Part VI へ直接進んでよい。
 
 ------------------------------------------------------------------------
 
@@ -94,9 +91,133 @@ released kernel
 The arrows describe the usual path, not a guarantee that every project
 passes through each stage in exactly this form.
 
-# Part I --- Foundations: Linux v3.x
+# Part I --- Executive thesis: Linux networking は何が変わったのか
 
-## Linux v3.x --- scalability, virtualization, programmability の誕生
+Linux networking の15年間の変化は、単純な「高速化」でも、従来の `skb` path の置き換えでもない。
+従来の **CPU が system RAM 上の skb を処理するモデルを現在も広く維持しながら**、
+AF_XDP、device memory、io_uring zero-copy、programmable/offloaded path など、
+複数の execution / memory-ownership model を workload と hardware capability に応じて
+**共存させられる architecture へ拡張した**ことが大きな変化である。
+
+その変化は6つの軸で並行して進んだ。
+
+``` text
+PERFORMANCE       queueing / pacing / aggregation / zero-copy
+PROGRAMMABILITY   BPF / XDP / socket / protocol / qdisc extension points
+MEMORY            page_pool / netmem / memory providers / device memory
+CONTROL PLANE     Netlink object model / YNL / RTNL scope reduction
+OBSERVABILITY     typed tracing / drop reason / queue-NAPI-memory identity
+DRIVER FRAMEWORK  switchdev / devlink / phylink / DIM / common driver contracts
+```
+
+これらのさらに上位にある横断的な傾向を、本書では **explicit resource / control contracts** と捉える。
+すなわち driver-private、implicit、global だった仕組みを、kernel 共通の object、API、accounting、
+assignment、lifetime、synchronization contract として明示する方向である。
+
+`ownership` はこの流れの重要な一部だが、すべてを ownership だけで説明しない。たとえば BQL は
+主に byte accounting / backpressure、per-netns RTNL は synchronization scope の問題である。
+一方 page_pool / AF_XDP / memory providers / queue leasing では、buffer や queue を誰が管理・割り当てるかという
+ownership が中心問題になる。
+
+## Architecture evolution map
+
+``` text
+                    private / implicit / global
+                              │
+          ┌───────────────────┼────────────────────┐
+          │                   │                    │
+      queue state         packet execution      memory lifetime
+      BQL / pacing        BPF / XDP / TC        page_pool / netmem
+          │                   │                    │
+          ├──────────────┬────┴──────────────┬─────┤
+          │              │                   │     │
+     device control   queue/NAPI objects   memory providers
+   switchdev/devlink     netdev-genl       AF_XDP / devmem
+          │              │                   │
+          └──────────────┼───────────────────┘
+                         ▼
+              explicit common contracts
+                         │
+          programmable / assignable / observable
+          （capability は API ごとに異なる）
+```
+
+この図の矢印は個々の機能の直接的な派生関係を表さない。異なる subsystem が、
+**暗黙的な状態を明示的な contract にする**という共通方向へ進んだことを示す。
+
+## Snapshot: v5.0 と 2026 を比較する
+
+``` text
+                     v5.0                    2026
+
+packet memory        early page_pool  →      page_pool maturation / memory providers
+fast path            XDP/AF_XDP       →      AF_XDP MB / netkit / queue lease
+aggregation          GRO/GSO          →      BIG TCP / tunnel BIG TCP
+BPF                   packet/socket    →      struct_ops/netkit/BPF qdisc
+virtual networking   veth/virtio      →      vDPA/AF_XDP ZC/netkit
+control locking      global RTNL      →      per-netns/fine-grained
+Netlink API           hand-written     →      YNL-described
+memory path          NIC→RAM          →      NIC→RAM or device memory
+async I/O             conventional     →      io_uring ZC TX/RX
+```
+
+
+## 15年間を圧縮すると
+
+1. queueing と backpressure を明示的に制御するようになった。
+2. datapath / socket / protocol / qdisc に programmable extension point が増えた。
+3. hardware offload と device-wide resource を kernel object model から扱うようになった。
+4. packet memory の allocation / recycle / placement / ownership が共通 infrastructure へ抽象化された。
+5. global な control / locking dependency を段階的に細粒度化した。
+6. 複雑化した path を運用するため、型・理由・identity・timestamp を観測可能にした。
+
+以下の Part II--V はこの thesis を architecture の観点から説明し、Part VI--VII が
+release attribution と provenance を検証可能な形で保持する。
+
+------------------------------------------------------------------------
+
+# Part II --- Four architecture eras
+
+ここでの era は kernel major version の境界ではなく、**networking architecture が主に解こうとした問題**で区切る。
+境界は重なり、ある era で始まった仕組みは後続 era でも継続して発展する。
+
+| Era | おおよその期間 | 主問題 | 代表的な milestone |
+|---|---|---|---|
+| **Era 1 — Queue & scalability foundation** | ～2014頃 | queue backlog、multicore、namespace、overlay、filtering の基礎 | BQL, CoDel/fq_codel, TSQ, pacing, namespace/setns, VXLAN, nftables, eBPF foundation |
+| **Era 2 — Programmable datapath** | 2015～2018頃 | packet path を安全に拡張し、hardware/offload と接続する | TC BPF, XDP, cgroup/LWT BPF, SOCKMAP, switchdev, devlink, AF_XDP, page_pool |
+| **Era 3 — Programmability becomes infrastructure** | 2019～2022頃 | programmable mechanism を protocol / operations / memory infrastructure に広げる | BTF ecosystem, struct_ops, SK_LOOKUP, MPTCP, BIG TCP, io_uring networking, drop reason, devlink health |
+| **Era 4 — Explicit resource / ownership architecture** | 2023～ | queue・memory・device・locking scope を明示的 object/contract として扱う | netmem, memory providers, Device Memory TCP, netdev-genl queue/NAPI objects, queue leasing, per-netns RTNL, BPF qdisc, YNL |
+
+この区分は release attribution の正本ではない。たとえば page_pool は Era 2 で利用可能になり、
+Era 4 の memory-provider architecture の重要な基礎になる。per-netns RTNL も一度に完成した機能ではなく、
+複数 release にわたる migration である。正確な release は Part VI を参照する。
+
+## Era 間で変わった設計上の問い
+
+``` text
+How much should we queue?
+        ↓
+Where can we program the datapath?
+        ↓
+How do those mechanisms become reusable infrastructure?
+        ↓
+Who owns / assigns / observes queues, memory and device resources,
+and how narrowly can control-plane synchronization be scoped?
+```
+
+この矢印も feature dependency ではなく、時代ごとの**支配的な設計課題の変化**を表す。
+
+------------------------------------------------------------------------
+
+# Part III --- Long-term lineages
+
+Part III では release 順ではなく、同じ設計課題が長期間にどう変化したかを追う。
+図の矢印は、明示しない限り「直接の親子関係」を意味しない。dependency / extension / parallel development /
+shared design problem を区別する。release attribution の正本は Part VI である。
+
+## Historical deep dive --- Linux v3.x foundations
+
+### Linux v3.x --- scalability, virtualization, programmability の誕生
 
 ``` text
 3.0   setns() / namespace FD
@@ -135,7 +256,7 @@ passes through each stage in exactly this form.
 
 ------------------------------------------------------------------------
 
-### 1.1 v3.0 --- namespace control becomes practical
+#### 1.1 v3.0 --- namespace control becomes practical
 
 v3.0でnamespace file descriptorと`setns()`がmainline化した。
 
@@ -167,7 +288,7 @@ CNI / Kubernetes networking
 
 ------------------------------------------------------------------------
 
-### 1.2 2011--2012 DQL/BQL development → Linux v3.3 mainline
+#### 1.2 2011--2012 DQL/BQL development → Linux v3.3 mainline
 
 BQL (Byte Queue Limits) はNIC TX queueへ過剰なdataを押し込まないよう、
 driver queueの適正なbyte量を動的に制御する。
@@ -204,7 +325,7 @@ BBR / EDT
 
 ------------------------------------------------------------------------
 
-### 1.3 v3.3 --- networking cgroups and interface aggregation
+#### 1.3 v3.3 --- networking cgroups and interface aggregation
 
 v3.3では:
 
@@ -228,7 +349,7 @@ modelを提供した。
 
 ------------------------------------------------------------------------
 
-### 1.4 v3.5 --- CoDel / fq_codel
+#### 1.4 v3.5 --- CoDel / fq_codel
 
 bufferbloat対策はdevice queueだけでは不十分。
 
@@ -255,11 +376,11 @@ flows
 
 ------------------------------------------------------------------------
 
-### 1.5 v3.6 --- TCP Small Queues, TFO, route-cache removal
+#### 1.5 v3.6 --- TCP Small Queues, TFO, route-cache removal
 
 v3.6はv3.x networkingの大きなmilestone。
 
-### TCP Small Queues (TSQ)
+#### TCP Small Queues (TSQ)
 
 BQLがdevice queueを制御するのに対してTSQは**per TCP socket**で
 qdisc/deviceへ溜められるdata量を抑える。
@@ -286,12 +407,12 @@ driver/NIC : BQL
 
 という複数layerへ広がった。
 
-### TCP Fast Open client
+#### TCP Fast Open client
 
 TCP handshake中にapplication dataを送るTFO client supportが入った。
 server supportは次のv3.7。
 
-### IPv4 route cache removal
+#### IPv4 route cache removal
 
 従来のIPv4 route cacheはtraffic
 pattern依存のperformanceとDoS問題を持ち、 v3.6で長年のroute-cache
@@ -305,14 +426,14 @@ FIB lookup + scalable caching strategies
 
 現在のLinux routing scalabilityを理解する重要なarchitecture change。
 
-### netfilter namespace work
+#### netfilter namespace work
 
 多数のnetfilter modulesがnetwork namespaceに対応し、 container
 isolationへの準備が進んだ。
 
 ------------------------------------------------------------------------
 
-### 1.6 v3.7 --- VXLAN
+#### 1.6 v3.7 --- VXLAN
 
 v3.7でVXLANがmainline化。
 
@@ -341,7 +462,7 @@ cloud virtual networking
 
 ------------------------------------------------------------------------
 
-### 1.7 v3.9 --- multicore server socket scaling
+#### 1.7 v3.9 --- multicore server socket scaling
 
 `SO_REUSEPORT` がTCP/UDPへ導入された。
 
@@ -372,7 +493,7 @@ programmable socket dispatch
 
 ------------------------------------------------------------------------
 
-### 1.8 v3.12 --- TCP pacing / FQ lineage
+#### 1.8 v3.12 --- TCP pacing / FQ lineage
 
 v3.x前半の:
 
@@ -407,7 +528,7 @@ infrastructureを 利用する。
 
 ------------------------------------------------------------------------
 
-### 1.9 v3.13 --- nftables
+#### 1.9 v3.13 --- nftables
 
 v3.13でnftablesがmainline化。
 
@@ -437,7 +558,7 @@ planeを考える上でv3.x最大級のmilestoneの一つ。
 
 ------------------------------------------------------------------------
 
-### 1.10 v3.15--v3.17 --- BPF transformation
+#### 1.10 v3.15--v3.17 --- BPF transformation
 
 classic BPFはsocket packet filterを中心とした小さなVMだった。
 
@@ -458,7 +579,7 @@ BPF、struct_ops、netkitはない。
 
 ------------------------------------------------------------------------
 
-### 1.11 v3.18 --- eBPF core API arrives
+#### 1.11 v3.18 --- eBPF core API arrives
 
 v3.18で`bpf()` syscallがmainline化。
 
@@ -484,7 +605,7 @@ bpf()
 
 への決定的なarchitecture change。
 
-### DCTCP
+#### DCTCP
 
 Data Center TCP congestion controlもv3.18で導入された。
 
@@ -500,14 +621,14 @@ cwnd adjustment
 
 後のdatacenter transport/AccECN lineageの重要な前史。
 
-### Geneve and Foo-over-UDP
+#### Geneve and Foo-over-UDP
 
 GeneveとFoo-over-UDPも入り、overlay/tunnel infrastructureが
 VXLANだけでなくより一般的に発展した。
 
 ------------------------------------------------------------------------
 
-### 1.12 v3.19 --- eBPF meets networking again
+#### 1.12 v3.19 --- eBPF meets networking again
 
 v3.18でloadできるようになったeBPF
 programを、v3.19ではsocketへattach可能に なった。
@@ -533,7 +654,7 @@ socket eBPF
 
 へ続く。
 
-### ipvlan
+#### ipvlan
 
 v3.19では`ipvlan`もmainline化。
 
@@ -551,9 +672,9 @@ networkingの重要なbuilding blockとなる。
 
 ------------------------------------------------------------------------
 
-### 1.13 v3.xを追加したことで見える長期lineage
+#### 1.13 v3.xを追加したことで見える長期lineage
 
-### Latency / bufferbloat / pacing
+#### Latency / bufferbloat / pacing
 
 ``` text
 BQL (3.3)
@@ -573,7 +694,7 @@ EDT (4.20)
 
 これはLinux TX performance史で最も重要な一本のlineage。
 
-### Cloud virtual networking
+#### Cloud virtual networking
 
 ``` text
 netns + setns (3.0)
@@ -589,7 +710,7 @@ BPF LWT / SRv6
 OVS/OVN / Kubernetes / UDN
 ```
 
-### Programmability
+#### Programmability
 
 ``` text
 classic BPF
@@ -615,7 +736,7 @@ AF_XDP
 struct_ops / SK_LOOKUP / netkit
 ```
 
-### Firewall
+#### Firewall
 
 ``` text
 iptables family
@@ -629,7 +750,7 @@ hardware offload
 nftables + BPF complementary model
 ```
 
-### Datacenter / high-performance transport milestones
+#### Datacenter / high-performance transport milestones
 
 以下は transport / congestion-control / aggregation の**並列 timeline**であり、
 矢印で表すような親子関係・直接依存を意味しない。
@@ -648,193 +769,9 @@ MPTCP/BIG TCP/AccECN という技術的 lineage ではない。
 
 ------------------------------------------------------------------------
 
-### 1.14 世代モデルの正本
-
-世代区分（3.x / 4.x / 5.x / 6.x--7.x）は Part II の **Dominant-theme
-eras** を正本とします。 Part I では、3.x がその後の世代へ渡した
-foundation の説明に限定します。
-
-## Part I から Part II へ --- foundations から chronology へ
-
-Part I では architecture の基礎を整理した。Part II では主要 milestone の
-release attribution
-を正本として固定する。後続の章で詳しく説明しても、この表の release
-attribution を上書きしない。
-
-## 以降の章の読み方
-
-``` text
-                         Part II
-                  canonical chronology
-                         │
-          ┌──────────────┼──────────────┐
-          ↓              ↓              ↓
-       Part III       Part IV        Part V
-       lineages       drivers     observability
-          └──────────────┼──────────────┘
-                         ↓
-                       Part VI
-                       synthesis
-                         ↓
-                       Part VII
-                      provenance
-```
-
-# Part II --- 正規 release chronology
-
-この表に release attribution と evidence grade を集約する。
-
-欠落している kernel release
-は「重要な変更がなかった」という意味ではなく、本書が選んだ architecture
-milestone を割り当てていないことだけを意味します。
-
-RFC / review date、subsystem-tree landing、Linus mainline
-merge、released tag は区別します。
-
-``` text
-RFC / review
-    ≠ subsystem tree / net-next
-    ≠ Linus mainline
-    ≠ released tag
-```
-
-Grade の定義は次のとおりであり、この文書自体にも保持する。
-
-- **A**: released milestone で、release/mainline evidence が十分に確認済み。
-- **A-rc**: 現在の未リリース cycle について Linus mainline への merge を確認済み。
-- **B**: release/cycle attribution は強いが、exact commit/tag boundary の一部が未確定。
-- **C**: development boundary または release attribution が引き続き監査対象。
-- **D**: RFC/design evidence のみで、mainline/release fact として扱わない。
-
-C/D は現在の canonical milestone table では使用していないが、将来の監査対象を表すため grade scheme として定義を残す。
-
-**Evidence は3軸で監査する。** Grade は主として release attribution の確度を表し、機能があらゆる環境で成立することや、関連 commit を全件列挙済みであることを保証しない。これとは独立に、
-(1) SHA が正しい Git object / subject を指すか、(2) その anchor が主張する機能をどの範囲まで代表するか、
-(3) その変更が対象の final release tag に含まれるか、を確認する。したがって「exact SHA がある」だけで
-feature series 全体や release attribution が自動的に Grade A になるわけではない。
-
-**Part II ↔ Part VII invariant:** Part II の Evidence / status で `exact anchor` または `anchor retained in Part VII` と主張する場合、Part VII の exact-anchor inventory に対応する完全な40桁SHAが存在しなければならない。Part VII にSHAを保持しない milestone は、Part II では `release-generation`、`release`、`series` などの表現に留める。
 
 
-| Release | 正規 milestone | Grade | Evidence / status |
-|---|---|---|---|
-| 3.0 | namespace FD / setns() (`CLONE_NEWNET`) foundation | A | `setns()` and network-namespace reassociation documented since Linux 3.0 |
-| 3.3 | DQL/BQL; team; net_prio; TCP memcg | A | release; exact DQL anchor |
-| 3.5 | CoDel / fq_codel | A | release; CoDel exact anchor retained; fq_codel release attribution confirmed |
-| 3.6 | TSQ; TFO client; IPv4 route-cache removal | A | release-generation; detailed anchors not reproduced in Part VII |
-| 3.7 | VXLAN; TFO server; IPv6 NAT | A | release verified |
-| 3.9 | TCP/UDP SO_REUSEPORT; conntrack labels; VM sockets | A | release; SO_REUSEPORT infrastructure anchor retained |
-| 3.11 | SO_BUSY_POLL / low-latency busy polling | A | release documented |
-| 3.12 | sch_fq; sk_pacing_rate-driven pacing; TSO autosizing generation | A | qdisc-based pacing; TCP-internal fallback later |
-| 3.13 | nftables | A | release; exact core anchor retained in Part VII |
-| 3.14 | TCP autocorking | B | release-generation |
-| 3.15 | internal BPF ISA rework toward eBPF/native-JIT-friendly format | A | release-generation |
-| 3.18 | bpf() syscall/maps/verifier generation; DCTCP; Geneve/FOU | A | release-generation |
-| 3.19 | ipvlan; switchdev origin; SO_ATTACH_BPF | A | release-generation |
-| 4.1 | cls_bpf / act_bpf eBPF support; kprobe BPF | B | early TC/tracing eBPF milestone |
-| 4.3 | VRF; LWT; OVS conntrack | A | series + release |
-| 4.6 | devlink | A | release + exact origin anchor |
-| 4.7 | TC BPF direct packet access | A | release milestone |
-| 4.8 | XDP | A | initial series + release |
-| 4.9 | BBR | A | release; exact anchor retained |
-| 4.10 | cgroup BPF; BPF LWT; IPv6 Segment Routing | A | series + release |
-| 4.13 | SOCK_OPS; kTLS TX; TCP-internal pacing/fallback generation | A | release |
-| 4.14 | phylink; SOCKMAP; TCP MSG_ZEROCOPY; XDP devmap | A | release; exact phylink / TCP MSG_ZEROCOPY anchors retained; devmap documented since 4.14 |
-| 4.15 | XDP cpumap | A | release documented |
-| 4.16 | netdevsim; Net DIM generation; nftables software flowtable | A | release; DIM exact SHA pending |
-| 4.17 | BPF_PROG_TYPE_SK_MSG; sockmap sendmsg/sendfile | A | release; origin anchor `4f738adba30a7cfc006f605707e7aee847ffefa0` retained in Part VII |
-| 4.18 | AF_XDP; TCP_ZEROCOPY_RECEIVE; refurbished page_pool/XDP memory return; cgroup UDP sendmsg hooks | A | series + release; page_pool anchor retained |
-| 4.19 | SO_TXTIME; CAKE | A | release-generation; detailed anchors not reproduced in Part VII |
-| 4.20 | TCP EDT pacing; BPF flow dissector; taprio; rtnetlink strict checking | A | release |
-| 5.0 | UDP GRO; UDP MSG_ZEROCOPY | A | release |
-| 5.1 | devlink health; BPF spinlocks/DCE; SO_BINDTOIFINDEX; Y2038 timestamps; io_uring substrate; mac80211 airtime accounting/scheduling to TXQs | A | release; airtime commit contained in v5.1-rc1 |
-| 5.3 | nexthop objects; DIM generalized into common lib/dim | A | release-generation; nexthop core anchor not reproduced in Part VII |
-| 5.5 | mac80211 Airtime Queue Limits (AQL) | A | final v5.5; release summaries explicitly identify AQL as a mac80211 feature |
-| 5.6 | MPTCP; WireGuard; BPF struct_ops/TCP CC; ethtool Generic Netlink | A | release; exact ethtool anchor retained |
-| 5.9 | BPF_PROG_TYPE_SK_LOOKUP | A | exact anchor retained in Part VII |
-| 5.11 | auxiliary bus | A | release + exact origin anchor |
-| 5.12 | threaded NAPI | A | release |
-| 5.15 | IPv6 IOAM core; MCTP; bridge per-VLAN multicast | A | release |
-| 5.17 | kfree_skb_reason / structured drop-reason foundation | A | release |
-| 5.18 | XDP multi-buffer / frags generation | B | prerequisite for later AF_XDP multi-buffer |
-| 5.19 | IPv6 BIG TCP; drop-reason expansion | A | release; exact BIG TCP anchors retained |
-| 6.0 | io_uring IORING_OP_SEND_ZC; multishot receive | A | release-generation |
-| 6.2 | TCP PLB; XFRM/IPsec packet offload | A | release; exact XFRM anchor retained |
-| 6.3 | YNL/YAML Netlink tooling; IPv4 BIG TCP | A | YNL origin contained in v6.3-rc1; IPv4 BIG TCP release attribution confirmed |
-| 6.6 | AF_XDP multi-buffer; TCX / bpf_mprog multi-program attachment | A | release |
-| 6.7 | netkit; initial TCP-AO | A | release; netkit anchor retained |
-| 6.8 | Rust phylib + Rust Asix reference PHY; queue/NAPI netdev-genl visibility | B | Rust PHY and queue-object anchors exact; broader NAPI/object generation remains composite |
-| 6.11 | virtio-net AF_XDP RX zero-copy | A | release-generation; detailed anchors not reproduced in Part VII |
-| 6.12 | Device Memory TCP RX | B | final series verified; implementation SHA list not reproduced |
-| 6.13 | per-netns RTNL infrastructure/migration milestone | B | milestone, not completion |
-| 6.15 | io_uring ZCRX; further RTNL breakup | A | merge/series evidence |
-| 6.16 | Device Memory TCP TX; BPF qdisc; DCCP removal | A | release/final-series generation; BPF-qdisc exact inventory pending |
-| 6.18 | AccECN core; UDP RX evolution | B | release-generation; DIBS is tracked separately in Part III/Appendix as a parallel shared-memory communication lineage, not promoted to a canonical packet-networking milestone |
-| 6.19 | `dev_queue_xmit()` llist TX scheduling; threaded-NAPI kthread busy-poll extension; WireGuard YNL-described Netlink | A | final `v6.19`; selected architecture milestones from the 6.19 networking cycle |
-| 7.0 | cake_mq / multi-queue-aware sch_cake; IPv6 BIG TCP without synthetic HBH jumbo header; AccECN enablement; large RX buffers for memory providers/io_uring ZCRX | A | final `v7.0`; AccECN enablement and large-buffer ZCRX complete earlier lineages |
-| 7.1 | RX HW queue leasing; dedicated qdisc-drop tracepoint | A | final `v7.1`; TX queue leasing remains unmerged; qdisc drop context becomes directly observable |
-| 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255; PPPoE GRO/GSO | A | final `v7.2`; MPTCP limit expansion plus aggregation support over PPPoE |
-| 7.3-rc / mainline | BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE; per-netns netdev-unregistration infrastructure | A-rc | net-next-7.3 merged 2026-08-20; final 7.3 pending |
-
-**Remaining B-grade audit note:** Net DIM (4.16/5.3) and the composite 6.8 queue/NAPI object milestone remain B intentionally. Their release-generation attribution is strong, but this edition does not yet reduce each composite claim to a complete origin/expansion anchor set. AQL and SK_MSG were re-audited in r14 and promoted to A.
-
-**7.3 status note:** 調査基準日時点では final 7.3 は未リリースのため `A-rc` とする。正式リリースを確認した時点で `A` へ更新する。
-
-**MPTCP endpoint-limit note:** endpoint の実効上限は **255** である。endpoint ID は8-bitで、ID 0が予約されているためである。
-
-## 各世代を支配したテーマ
-
-``` text
-Linux 3.x
-  scalability + virtualization + programmability foundations
-
-Linux 4.x
-  programmable fast-path formation
-  + hardware-control models
-  + early zero-copy / packet-memory foundations
-
-Linux 5.x
-  programmability expansion
-  + operationalization
-  + packet-memory infrastructure maturation
-
-Linux 6.x–7.x
-  memory-provider / queue-ownership architecture
-  + finer-grained control and locking
-```
-
-これは各時代を特徴づける説明上の区分であり、機能の起源を示す境界ではない。たとえば
-queue control は Linux 4.x より前から始まり、packet-memory の取り組みも
-6.x の memory-provider 世代より前から存在する。
-
-## 6つの architecture 軸
-
-以降では、この chronology を相互に関係する6つの architecture
-軸から読む。
-
-``` text
-PERFORMANCE
-PROGRAMMABILITY
-MEMORY
-CONTROL PLANE
-OBSERVABILITY
-DRIVER FRAMEWORK
-```
-
-1つの機能が複数の軸に属することもある。たとえば `page_pool` は memory
-mechanism であると同時に driver-framework contract
-でもあり、`netdev-genl` は control plane と observability の双方の
-infrastructure である。
-
-## Part II から Part III へ --- chronology から lineage へ
-
-release table
-が答えるのは「いつか」である。次章以降では「ある仕組みがどのように次の仕組みへつながったか」を扱うため、release
-table を繰り返さず architecture ごとに milestone をまとめる。
-
-# Part III --- Long-term feature lineages
-
-Part III では、Part II の milestone が**どの設計課題を共有し、どこで依存・拡張・並行発展するか**を説明する。release ごとの provenance
+Part VII では、Part VI の milestone が**どの設計課題を共有し、どこで依存・拡張・並行発展するか**を説明する。release ごとの provenance
 は繰り返さない。driver-specific な仕組みは Part IV、tracing/tooling
 の詳細は Part V で扱う。
 
@@ -917,7 +854,7 @@ page_pool → netmem → Device Memory TCP / memory providers
 はRX/TX packet-memory
 ownershipのlineageである。一方、DIBSはshared-memory
 transport側の別lineageとして扱い、この矢印へ直接接続しない。さらに、本書の wired/host packet-networking の
-canonical milestone 選定基準では Part II の主 milestone から外し、parallel lineage としてここで保持する。
+canonical milestone 選定基準では Part VI の主 milestone から外し、parallel lineage としてここで保持する。
 
 ------------------------------------------------------------------------
 
@@ -1002,7 +939,7 @@ eTran (NSDI 2025):
 
 mTCP は Linux kernel TCP processing の CPU cost に対して user-level TCP stack を採った。一方 Electrode と DINT は、kernel bypass の security / isolation / maintainability 上の trade-off を避けながら、XDP/eBPF により frequent path を kernel 内で処理する。eTran はさらに TCP/DCTCP や Homa のような transport design を eBPF ベースの extensible kernel transport として扱う。この研究史は、**kernel を単に迂回するのではなく、kernel の ownership / protection model を保ったまま fast path や protocol behavior を programmable にする**という方向を補強する。
 
-これらは upstream Linux release milestone ではないため Part II には追加せず、architecture の動機を説明する research evidence として扱う。
+これらは upstream Linux release milestone ではないため Part VI には追加せず、architecture の動機を説明する research evidence として扱う。
 
 ## Virtual networking --- veth/virtio → netkit/queue ownership
 
@@ -1172,7 +1109,7 @@ ownership/lifetime の効率化にある。
 
 ------------------------------------------------------------------------
 
-## Part III から Part IV へ --- feature lineage から driver contract へ
+## Part VII から Part IV へ --- feature lineage から driver contract へ
 
 前章では networking mechanism を end-to-end の lineage
 として追った。Part IV では視点を変え、個々の driver の責務のうち何が共通
@@ -1187,9 +1124,9 @@ III にも登場するが、ここでは feature 全体の歴史ではなく、*
 
 ## Driver Framework の正規 chronology
 
-これは Part II の release map を Driver Framework
+これは Part VI の release map を Driver Framework
 の観点から投影したものであり、独立した第2の chronology ではない。以下の
-release attribution はすべて Part II と一致させる。
+release attribution はすべて Part VI と一致させる。
 
 | Release | Driver-framework milestone | Architectural effect |
 |---|---|---|
@@ -1678,7 +1615,7 @@ providers」です。ここでは重複した図を再掲しません。
 
 ### Context: Linux 6.1 --- Rust が kernel に入る
 
-> これは networking milestone として Part II に採用した項目ではなく、6.8 の Rust PHY
+> これは networking milestone として Part VI に採用した項目ではなく、6.8 の Rust PHY
 > milestone を理解するための kernel-wide contextual reference である。
 
 Linux 6.1 introduces the initial Rust-for-Linux support. This does not
@@ -1814,7 +1751,7 @@ Kernel Recipes is especially useful for architecture:
 2026  compile-time enforcement of driver lifecycle rules (Rust driver-core/device model; not networking-specific)
 ```
 
-## Part IV から Part V へ --- mechanism から observability へ
+## Part IV から Part V へ --- common contracts から operability へ
 
 fast path、memory ownership、offload は、operator/developer が kernel
 の動作を理解できて初めて運用可能になる。Part V
@@ -1823,7 +1760,7 @@ fast path、memory ownership、offload は、operator/developer が kernel
 
 # Part V --- Observability / Explainability
 
-Part V は **kernel 側の observability primitive の進化**に限定します。
+Part V は **kernel 側の observability primitive の進化**に限定します。Observability は独立した軸であると同時に、programmable / offloaded / zero-copy path が増えて複雑化した networking を **operationally explainable にする evidence layer** と位置付けます。
 Retis / pwru はこれらを利用する case study であり、kernel release
 chronology そのものではないため Appendix に移します。
 
@@ -1889,7 +1826,7 @@ context、queue identityをuserspace-visible objectとして関連付ける
 ことで、zero-copy / memory-provider時代の問題を説明しやすくなります。ただし、readable な identity / stats と、
 userspace が queue や NAPI の ownership/configuration を変更できる control-plane capability は区別する。
 
-この軸を Part II の確定 milestone に対応させると、次の流れになる。
+この軸を Part VI の確定 milestone に対応させると、代表的な observability milestone の**時系列**は次のようになる。これは機能間の依存関係を示す図ではない。
 
 ``` text
 5.17  kfree_skb_reason / structured drop-reason foundation
@@ -1905,7 +1842,7 @@ userspace が queue や NAPI の ownership/configuration を変更できる cont
 counter だけでは説明しにくかった「どの queue / poller で問題が起きているか」を
 userspace から関連付ける基盤になる。page_pool 側でも pool identity、allocation /
 recycle information、leak diagnostics が整備され、packet-memory ownership 自体が
-観測対象へ移っている。ここでの release attribution は Part II の値を参照する。
+観測対象へ移っている。ここでの release attribution は Part VI の値を参照する。
 
 ## Tool の case study
 
@@ -1920,89 +1857,115 @@ evolutionそのものと区別します。
 詳細なconference/source provenanceはAppendixのcase-study
 indexに集約します。
 
-## Part V から Part VI へ --- evidence から synthesis へ
+## Part V から Part VI へ --- architecture story から canonical chronology へ
 
-# Part VI --- Synthesis: v3.x → 7.x を一つの進化として見る
+# Part VI --- Canonical release chronology
 
-## v5.0 と 2026 を比較する
+この表に release attribution と evidence grade を集約する。
 
-``` text
-                     v5.0                    2026
+欠落している kernel release
+は「重要な変更がなかった」という意味ではなく、本書が選んだ architecture
+milestone を割り当てていないことだけを意味します。
 
-packet memory        early page_pool  →      page_pool maturation / memory providers
-fast path            XDP/AF_XDP       →      AF_XDP MB / netkit / queue lease
-aggregation          GRO/GSO          →      BIG TCP / tunnel BIG TCP
-BPF                   packet/socket    →      struct_ops/netkit/BPF qdisc
-virtual networking   veth/virtio      →      vDPA/AF_XDP ZC/netkit
-control locking      global RTNL      →      per-netns/fine-grained
-Netlink API           hand-written     →      YNL-described
-memory path          NIC→RAM          →      NIC→RAM or device memory
-async I/O             conventional     →      io_uring ZC TX/RX
-```
-
-最大の変化は、従来の **「CPU が system RAM 上の skb を処理するモデル」自体を置き換えたことではなく**、
-そのモデルを現在も広く維持しながら、AF_XDP、device memory、io_uring zero-copy、programmable/offloaded path など
-**複数の処理・memory-ownership model を用途と hardware capability に応じて共存させる方向へ拡張したこと**にある。
-
-------------------------------------------------------------------------
-
-## Evolution map
+RFC / review date、subsystem-tree landing、Linus mainline
+merge、released tag は区別します。
 
 ``` text
-                    Linux 5.x
-                        │
-        ┌───────────────┼────────────────┐
-        │               │                │
-        ▼               ▼                ▼
-      XDP/BPF         GRO/GSO       page_pool (already present)
-        │               │                │
-        ▼               ▼                ▼
-   struct_ops        BIG TCP       netmem / memory providers
-   SK_LOOKUP             │                │
-        │                │                │
-        ▼                │          ┌─────┴─────┐
-     netkit              │          ▼           ▼
-        │                │      Devmem TCP   io_uring ZCRX
-  queue leasing          │          │           │
-        └────────────┬───┴──────────┴───────────┘
-                     ▼
-              hybrid / zero-copy
-                     │
-             ┌───────┴────────┐
-             ▼                ▼
-          container           VM
-       BPF/netkit/CNI   virtio/vDPA/AF_XDP
+RFC / review
+    ≠ subsystem tree / net-next
+    ≠ Linus mainline
+    ≠ released tag
 ```
 
-control plane:
+Grade の定義は次のとおりであり、この文書自体にも保持する。
 
-``` text
-global RTNL ─────────────→ per-netns / fine-grained locking
-ad-hoc Netlink ──────────→ YNL-described APIs
-single network model ────→ multi-network / VM-aware networking
-```
+- **A**: released milestone で、release/mainline evidence が十分に確認済み。
+- **A-rc**: 現在の未リリース cycle について Linus mainline への merge を確認済み。
+- **B**: release/cycle attribution は強いが、exact commit/tag boundary の一部が未確定。
+- **C**: development boundary または release attribution が引き続き監査対象。
+- **D**: RFC/design evidence のみで、mainline/release fact として扱わない。
 
-------------------------------------------------------------------------
+C/D は現在の canonical milestone table では使用していないが、将来の監査対象を表すため grade scheme として定義を残す。
 
-## 読み方
+**Evidence は3軸で監査する。** Grade は主として release attribution の確度を表し、機能があらゆる環境で成立することや、関連 commit を全件列挙済みであることを保証しない。これとは独立に、
+(1) SHA が正しい Git object / subject を指すか、(2) その anchor が主張する機能をどの範囲まで代表するか、
+(3) その変更が対象の final release tag に含まれるか、を確認する。したがって「exact SHA がある」だけで
+feature series 全体や release attribution が自動的に Grade A になるわけではない。
 
-推奨順序:
+**Part VI ↔ Part VII invariant:** Part VI の Evidence / status で `exact anchor` または `anchor retained in Part VII` と主張する場合、Part VII の exact-anchor inventory に対応する完全な40桁SHAが存在しなければならない。Part VII にSHAを保持しない milestone は、Part VI では `release-generation`、`release`、`series` などの表現に留める。
 
-1.  Part IIでrelease attributionを確認する。
-2.  Part III--Vでfeature / driver / observabilityのlineageを読む。
-3.  Part VIIで未解決のattribution境界を確認する。
-4.  Appendixは一次資料・conference・commit
-    provenanceを検証するときに参照する。
 
-Appendixは旧release chronologyのコピーではなく、non-normativeなevidence
-catalogである。
+| Release | 正規 milestone | Grade | Evidence / status |
+|---|---|---|---|
+| 3.0 | namespace FD / setns() (`CLONE_NEWNET`) foundation | A | `setns()` and network-namespace reassociation documented since Linux 3.0 |
+| 3.3 | DQL/BQL; team; net_prio; TCP memcg | A | release; exact DQL anchor |
+| 3.5 | CoDel / fq_codel | A | release; CoDel exact anchor retained; fq_codel release attribution confirmed |
+| 3.6 | TSQ; TFO client; IPv4 route-cache removal | A | release-generation; detailed anchors not reproduced in Part VII |
+| 3.7 | VXLAN; TFO server; IPv6 NAT | A | release verified |
+| 3.9 | TCP/UDP SO_REUSEPORT; conntrack labels; VM sockets | A | release; SO_REUSEPORT infrastructure anchor retained |
+| 3.11 | SO_BUSY_POLL / low-latency busy polling | A | release documented |
+| 3.12 | sch_fq; sk_pacing_rate-driven pacing; TSO autosizing generation | A | qdisc-based pacing; TCP-internal fallback later |
+| 3.13 | nftables | A | release; exact core anchor retained in Part VII |
+| 3.14 | TCP autocorking | B | release-generation |
+| 3.15 | internal BPF ISA rework toward eBPF/native-JIT-friendly format | A | release-generation |
+| 3.18 | bpf() syscall/maps/verifier generation; DCTCP; Geneve/FOU | A | release-generation |
+| 3.19 | ipvlan; switchdev origin; SO_ATTACH_BPF | A | release-generation |
+| 4.1 | cls_bpf / act_bpf eBPF support; kprobe BPF | B | early TC/tracing eBPF milestone |
+| 4.3 | VRF; LWT; OVS conntrack | A | series + release |
+| 4.6 | devlink | A | release + exact origin anchor |
+| 4.7 | TC BPF direct packet access | A | release milestone |
+| 4.8 | XDP | A | initial series + release |
+| 4.9 | BBR | A | release; exact anchor retained |
+| 4.10 | cgroup BPF; BPF LWT; IPv6 Segment Routing | A | series + release |
+| 4.13 | SOCK_OPS; kTLS TX; TCP-internal pacing/fallback generation | A | release |
+| 4.14 | phylink; SOCKMAP; TCP MSG_ZEROCOPY; XDP devmap | A | release; exact phylink / TCP MSG_ZEROCOPY anchors retained; devmap documented since 4.14 |
+| 4.15 | XDP cpumap | A | release documented |
+| 4.16 | netdevsim; Net DIM generation; nftables software flowtable | A | release; DIM exact SHA pending |
+| 4.17 | BPF_PROG_TYPE_SK_MSG; sockmap sendmsg/sendfile | A | release; origin anchor `4f738adba30a7cfc006f605707e7aee847ffefa0` retained in Part VII |
+| 4.18 | AF_XDP; TCP_ZEROCOPY_RECEIVE; refurbished page_pool/XDP memory return; cgroup UDP sendmsg hooks | A | series + release; page_pool anchor retained |
+| 4.19 | SO_TXTIME; CAKE | A | release-generation; detailed anchors not reproduced in Part VII |
+| 4.20 | TCP EDT pacing; BPF flow dissector; taprio; rtnetlink strict checking | A | release |
+| 5.0 | UDP GRO; UDP MSG_ZEROCOPY | A | release |
+| 5.1 | devlink health; BPF spinlocks/DCE; SO_BINDTOIFINDEX; Y2038 timestamps; io_uring substrate; mac80211 airtime accounting/scheduling to TXQs | A | release; airtime commit contained in v5.1-rc1 |
+| 5.3 | nexthop objects; DIM generalized into common lib/dim | A | release-generation; nexthop core anchor not reproduced in Part VII |
+| 5.5 | mac80211 Airtime Queue Limits (AQL) | A | final v5.5; release summaries explicitly identify AQL as a mac80211 feature |
+| 5.6 | MPTCP; WireGuard; BPF struct_ops/TCP CC; ethtool Generic Netlink | A | release; exact ethtool anchor retained |
+| 5.9 | BPF_PROG_TYPE_SK_LOOKUP | A | exact anchor retained in Part VII |
+| 5.11 | auxiliary bus | A | release + exact origin anchor |
+| 5.12 | threaded NAPI | A | release |
+| 5.15 | IPv6 IOAM core; MCTP; bridge per-VLAN multicast | A | release |
+| 5.17 | kfree_skb_reason / structured drop-reason foundation | A | release |
+| 5.18 | XDP multi-buffer / frags generation | B | prerequisite for later AF_XDP multi-buffer |
+| 5.19 | IPv6 BIG TCP; drop-reason expansion | A | release; exact BIG TCP anchors retained |
+| 6.0 | io_uring IORING_OP_SEND_ZC; multishot receive | A | release-generation |
+| 6.2 | TCP PLB; XFRM/IPsec packet offload | A | release; exact XFRM anchor retained |
+| 6.3 | YNL/YAML Netlink tooling; IPv4 BIG TCP | A | YNL origin contained in v6.3-rc1; IPv4 BIG TCP release attribution confirmed |
+| 6.6 | AF_XDP multi-buffer; TCX / bpf_mprog multi-program attachment | A | release |
+| 6.7 | netkit; initial TCP-AO | A | release; netkit anchor retained |
+| 6.8 | Rust phylib + Rust Asix reference PHY; queue/NAPI netdev-genl visibility | B | Rust PHY and queue-object anchors exact; broader NAPI/object generation remains composite |
+| 6.11 | virtio-net AF_XDP RX zero-copy | A | release-generation; detailed anchors not reproduced in Part VII |
+| 6.12 | Device Memory TCP RX | B | final series verified; implementation SHA list not reproduced |
+| 6.13 | per-netns RTNL infrastructure/migration milestone | B | milestone, not completion |
+| 6.15 | io_uring ZCRX; further RTNL breakup | A | merge/series evidence |
+| 6.16 | Device Memory TCP TX; BPF qdisc; DCCP removal | A | release/final-series generation; BPF-qdisc exact inventory pending |
+| 6.18 | AccECN core; UDP RX evolution | B | release-generation; DIBS is tracked separately in Part VII/Appendix as a parallel shared-memory communication lineage, not promoted to a canonical packet-networking milestone |
+| 6.19 | `dev_queue_xmit()` llist TX scheduling; threaded-NAPI kthread busy-poll extension; WireGuard YNL-described Netlink | A | final `v6.19`; selected architecture milestones from the 6.19 networking cycle |
+| 7.0 | cake_mq / multi-queue-aware sch_cake; IPv6 BIG TCP without synthetic HBH jumbo header; AccECN enablement; large RX buffers for memory providers/io_uring ZCRX | A | final `v7.0`; AccECN enablement and large-buffer ZCRX complete earlier lineages |
+| 7.1 | RX HW queue leasing; dedicated qdisc-drop tracepoint | A | final `v7.1`; TX queue leasing remains unmerged; qdisc drop context becomes directly observable |
+| 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255; PPPoE GRO/GSO | A | final `v7.2`; MPTCP limit expansion plus aggregation support over PPPoE |
+| 7.3-rc / mainline | BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE; per-netns netdev-unregistration infrastructure | A-rc | net-next-7.3 merged 2026-08-20; final 7.3 pending |
 
-------------------------------------------------------------------------
+**Remaining B-grade audit note:** Net DIM (4.16/5.3) and the composite 6.8 queue/NAPI object milestone remain B intentionally. Their release-generation attribution is strong, but this edition does not yet reduce each composite claim to a complete origin/expansion anchor set. AQL and SK_MSG were re-audited in r14 and promoted to A.
 
-## Transition: synthesis → provenance
+**7.3 status note:** 調査基準日時点では final 7.3 は未リリースのため `A-rc` とする。正式リリースを確認した時点で `A` へ更新する。
 
-The synthesis is intentionally compact. Part VII records the attribution
-boundaries that remain important for verification or future re-audit.
+**MPTCP endpoint-limit note:** endpoint の実効上限は **255** である。endpoint ID は8-bitで、ID 0が予約されているためである。
+
+
+## Part VI から Part VII へ --- chronology から provenance へ
+
+Part VI は「いつ」を正規化する。次の Part VII は、その attribution を再監査できるよう exact anchor と
+unresolved boundary を保持する。
 
 # Part VII --- 正規 provenance ledger
 
@@ -2060,15 +2023,15 @@ Net DIMについては、algorithm自体は4.16以前からmlx5e内に存在し�
 
 ## Evidence grades
 
-Grade の正本は Part II と canonical dataset です。Part VII は
+Grade の正本は Part VI と canonical dataset です。Part VII は
 commit-level anchor と、 まだ解消していない attribution boundary
 のみを記録します。
 
-Appendix は evidence catalog である。そこに現れる日付は RFC date、posting date、review base、conference date の場合があり、Part II に明記されない限り release attribution として読まない。
+Appendix は evidence catalog である。そこに現れる日付は RFC date、posting date、review base、conference date の場合があり、Part VI に明記されない限り release attribution として読まない。
 
 ## Open attribution items and evidence grade
 
-以下は Part II の Grade を再定義する表ではなく、未解決の attribution boundary を記録する補助表である。Grade を記載する場合は Part II と完全に一致させる。
+以下は Part VI の Grade を再定義する表ではなく、未解決の attribution boundary を記録する補助表である。Grade を記載する場合は Part VI と完全に一致させる。
 
 | Item | Canonical Grade | Current treatment |
 |---|---|---|
@@ -2084,7 +2047,7 @@ Appendix は evidence catalog である。そこに現れる日付は RFC date�
 
 6.19--7.3 の再監査では、全 networking commit を chronology に列挙するのではなく、
 本書の6軸（performance / programmability / memory / control plane / observability / driver framework）
-の長期 lineage を変える項目だけを Part II に採用した。したがって TLS RFC 8449、ICMP RFC 5837、
+の長期 lineage を変える項目だけを Part VI に採用した。したがって TLS RFC 8449、ICMP RFC 5837、
 UDP-Lite removal、個別 XFRM message、TCP-AO crypto-library refactor、個別 tunnel/offload enhancement などは
 有用な変更だが、本版では canonical architecture milestone には昇格させていない。
 
@@ -2107,22 +2070,22 @@ attribution や lineage を再定義しない。
 - **NSDI 2024 — DINT** — kernel-bypass-like performance と kernel stack の security/isolation/maintainability の両立を狙う。
 - **NSDI 2025 — eTran** — eBPF によって kernel transport を extensible にし、TCP/DCTCP と Homa を実装。
 
-これらは Part II / Part VII の canonical release/commit evidence と混同しない。
+これらは Part VI / Part VII の canonical release/commit evidence と混同しない。
 
 
 ## Kernel documentation / primary-source index
 
 | Source topic | Canonical destination | What it supports |
 |---|---|---|
-| NAPI / `SO_BUSY_POLL` | Part II 3.11; Part IV | busy polling and NAPI execution model |
-| BPF DEVMAP | Part II 4.14; Part III XDP | XDP redirect via devmap |
-| BPF CPUMAP | Part II 4.15; Part III XDP | XDP redirect to remote CPU |
-| nftables flowtable | Part II 4.16; Part III netfilter | software flowtable fast path; later HW-offload evolution |
-| TCX / `bpf_mprog` | Part II 6.6; Part III BPF | link-based TC attachment and multi-program ordering |
-| Device Memory TCP / memory providers | Part II 6.12/6.16; Part III memory | RX/TX device-memory zero-copy evolution |
-| io_uring ZCRX | Part II 6.15; Part III io_uring | queue-bound zero-copy receive |
-| `net-next-7.1` | Part II 7.1 | RX HW queue leasing |
-| `net-next-7.3` | Part II 7.3-rc | tunnel BIG TCP, RTNL-less FIB rules, >PAGE_SIZE devmem buffers |
+| NAPI / `SO_BUSY_POLL` | Part VI 3.11; Part IV | busy polling and NAPI execution model |
+| BPF DEVMAP | Part VI 4.14; Part VII XDP | XDP redirect via devmap |
+| BPF CPUMAP | Part VI 4.15; Part VII XDP | XDP redirect to remote CPU |
+| nftables flowtable | Part VI 4.16; Part VII netfilter | software flowtable fast path; later HW-offload evolution |
+| TCX / `bpf_mprog` | Part VI 6.6; Part VII BPF | link-based TC attachment and multi-program ordering |
+| Device Memory TCP / memory providers | Part VI 6.12/6.16; Part VII memory | RX/TX device-memory zero-copy evolution |
+| io_uring ZCRX | Part VI 6.15; Part VII io_uring | queue-bound zero-copy receive |
+| `net-next-7.1` | Part VI 7.1 | RX HW queue leasing |
+| `net-next-7.3` | Part VI 7.3-rc | tunnel BIG TCP, RTNL-less FIB rules, >PAGE_SIZE devmem buffers |
 
 ## Exact anchor index
 
@@ -2138,12 +2101,12 @@ attributionには使用しません。
   Conference lineage                        Canonical destination
 | Conference lineage | Canonical destination |
 |---|---|
-| Netdev: XDP / AF_XDP / TC / BPF | Part III programmability |
-| Netdev: BIG TCP | Part III packet aggregation |
-| Netdev: Device Memory TCP / zero-copy | Part III packet memory |
+| Netdev: XDP / AF_XDP / TC / BPF | Part VII programmability |
+| Netdev: BIG TCP | Part VII packet aggregation |
+| Netdev: Device Memory TCP / zero-copy | Part VII packet memory |
 | Netdev 0x19: Diagnosing Page Pool Leaks | Part IV page_pool |
 | Netdev: queue/NAPI/netdev-genl | Part IV driver framework |
-| Netdev: MPTCP / TCP state-of-the-union | Part III transport |
+| Netdev: MPTCP / TCP state-of-the-union | Part VII transport |
 | Kernel Recipes: XDP / BPF / io_uring | Parts III--IV |
 | OVS/OVN Conf: Retis | Part V case-study note |
 | LPC / FOSDEM: pwru and tracing | Part V case-study note |
