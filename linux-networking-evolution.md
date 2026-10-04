@@ -2960,3 +2960,542 @@ page_pool
 5.  BIG TCP follow-up の exact mainline commits
 6.  virtio-net AF_XDP work の merged-vs-RFC status を release 単位で確定
 7.  netkit queue leasing の individual mainline commits
+
+------------------------------------------------------------------------
+
+# 33. Commit-level pass 6 --- AccECN, UDP RX, RTNL, MPTCP/BPF
+
+## 33.1 AccECN core --- Linux 6.18
+
+**Feature:** Accurate Explicit Congestion Notification (AccECN)\
+**Core merge:** Linux 6.18\
+**Protocol:** RFC 9768\
+**Subsystem:** TCP / ECN / congestion-control feedback\
+**Primary development lineage:** Ilpo Järvinen's earlier AccECN work,
+later upstreamed/reworked by Chia-Yu Chang and reviewers.
+
+### Why AccECN exists
+
+Classic RFC3168 ECN mainly tells the sender that congestion was
+encountered. AccECN carries more detailed congestion-marking feedback,
+allowing the sender/congestion-control algorithm to estimate how much CE
+marking occurred.
+
+``` text
+RFC3168 ECN
+
+network CE marks
+      │
+      ▼
+receiver
+      │ ECE/CWR semantics
+      ▼
+sender
+      │
+      └── congestion happened
+
+
+AccECN
+
+network CE marks
+      │
+      ▼
+receiver
+      │
+      ├── ACE field
+      └── AccECN option / counters
+              │
+              ▼
+sender obtains richer CE feedback
+```
+
+This matters particularly for modern congestion-control/AQM work where
+the *amount* of congestion signaling is useful, not merely a binary
+indication.
+
+### Long review history
+
+The upstream protocol series went through unusually many revisions.
+
+Selected milestones:
+
+-   2025-03: v2 --- missing preparation patch restored
+-   2025-04: v4/v5 --- 32-bit ARM alignment fixes
+-   2025-05-14: v7 / 15 patches
+    -   https://lwn.net/Articles/1021315/
+-   2025-06-10: v8
+    -   https://lwn.net/Articles/1024740/
+-   2025-07-03: v10
+    -   introduced separate `include/net/tcp_ecn.h`
+    -   added sysctl documentation and additional negotiation cleanup
+    -   https://lwn.net/Articles/1028208/
+-   2025-07-18: v13
+    -   lookup/table and option-processing refinements
+    -   https://lwn.net/Articles/1030805/
+-   2025-09-06: v16 / 14 patches
+    -   https://lwn.net/Articles/1037055/
+
+### v16 core contents
+
+The v16 cover letter describes the series as covering:
+
+-   Accurate ECN core
+-   AccECN negotiation
+-   AccECN TCP options
+-   failure handling
+
+Important patch subjects in the development series include:
+
+``` text
+tcp: reorganize SYN ECN code
+tcp: AccECN core
+tcp: accecn: AccECN negotiation
+tcp: accecn: add AccECN rx byte counters
+tcp: accecn: AccECN needs to know delivered bytes
+tcp: sack option handling improvements
+tcp: accecn: AccECN option
+tcp: accecn: AccECN option send control
+tcp: accecn: AccECN option failure handling
+```
+
+Affected areas include:
+
+-   `include/linux/tcp.h`
+-   `include/net/tcp.h`
+-   `include/net/tcp_ecn.h`
+-   `include/uapi/linux/tcp.h`
+-   `net/ipv4/tcp.c`
+-   `net/ipv4/tcp_input.c`
+-   `net/ipv4/tcp_output.c`
+-   `net/ipv4/tcp_minisocks.c`
+-   syncookies
+-   TCP sysctls/documentation
+
+### Merge
+
+LWN's Linux 6.18 merge-window coverage explicitly records that AccECN
+was merged.
+
+-   https://lwn.net/Articles/1040203/
+
+### Important: 6.18 is not the end of the series
+
+AccECN core merge did not mean all integration work was complete.
+
+2025-09 onward, a separate **case handling** series added:
+
+-   exceptional RFC9768 handling
+-   identifiers for congestion-control modules
+-   `ecn_delta` in `rate_sample`
+-   ACE counter preservation
+-   fallback/persistence behavior
+
+Example:
+
+-   2025-10 v4: https://lwn.net/Articles/1041621/
+-   2026-01 v7: https://lwn.net/Articles/1052707/
+
+### 2026 --- GRO/GSO / virtio offload integration
+
+AccECN changes the meaning of TCP flag bits used in ACE signaling.
+Existing RFC3168 ECN offload assumptions can therefore corrupt AccECN
+signaling if applied blindly.
+
+2026 series:
+
+-   `[PATCH ...] ECN offload handling for AccECN`
+-   https://lwn.net/Articles/1056942/
+
+Affected code includes:
+
+-   `drivers/net/virtio_net.c`
+-   mlx5 RX
+-   hns3 RX
+-   `include/linux/skbuff.h`
+-   `include/linux/virtio_net.h`
+-   UAPI virtio-net header
+
+This is particularly relevant to VM networking: AccECN must survive
+GRO/GSO and virtio metadata transport without CWR/ACE corruption.
+
+### Correct classification
+
+``` text
+6.18
+AccECN protocol core
+       │
+       ▼
+case handling / CC integration
+       │
+       ▼
+GRO/GSO + driver/virtio offload correctness
+       │
+       ▼
+continued 2026 integration
+```
+
+Therefore this document does **not** label Linux 6.18 as "AccECN
+completed"; it is the mainline core milestone.
+
+------------------------------------------------------------------------
+
+# 34. UDP receive performance --- Linux 6.18
+
+LWN's 6.18 merge-window summary reports a **47% UDP receive performance
+improvement** according to Eric Dumazet's measurements.
+
+-   https://lwn.net/Articles/1040203/
+
+A follow-up comment on the LWN article provides an important benchmark
+qualification: the measurement used **120-byte packets under high
+network load**.
+
+-   https://lwn.net/Articles/1041072/
+
+Therefore the change log records this as:
+
+``` text
+reported improvement: ~47%
+workload: high network load
+packet size: 120 bytes
+scope: benchmark result, not universal UDP throughput improvement
+```
+
+### Why this qualification matters
+
+Small-packet UDP receive is primarily a packet-rate/CPU-cost workload:
+
+``` text
+large packets:
+bandwidth / memory movement often dominates
+
+small 120-byte packets:
+packet rate
+   │
+   ├── skb allocation/free
+   ├── socket lookup
+   ├── queueing
+   ├── locking
+   └── per-packet accounting
+          │
+          ▼
+       CPU cost dominates
+```
+
+Thus a large percentage improvement in this test should not be
+extrapolated to jumbo frames, low-rate UDP, or application-limited
+workloads.
+
+### Commit verification status
+
+The 6.18 release-level performance claim is verified. Search did not
+produce a sufficiently authoritative mapping from the 47% figure to one
+single commit; this document therefore does not invent an "UDP 47%
+commit". The optimization may span multiple receive-path changes and is
+kept at release/series level until the exact net-next pull/commits are
+identified.
+
+------------------------------------------------------------------------
+
+# 35. RTNL scalability --- exact series landmarks
+
+## 35.1 Problem
+
+Classic RTNL is a broad global serialization mechanism.
+
+``` text
+netns A operation ─┐
+netns B operation ─┼── rtnl_lock()
+netns C operation ─┘
+                         │
+                         ▼
+                    serialization
+```
+
+The modern work proceeds along **two complementary directions**:
+
+1.  make RTNL smaller/per-netns;
+2.  remove RTNL from read/dump paths where a narrower synchronization
+    mechanism is enough.
+
+------------------------------------------------------------------------
+
+## 35.2 RTNL-less qdisc dumps --- 2024
+
+Eric Dumazet posted:
+
+-   `[PATCH net-next 00/14] net_sched: first series for RTNL-less qdisc dumps`
+-   2024-04-15
+-   https://lwn.net/Articles/969889/
+
+The cover letter states the medium-term goal directly:
+
+``` text
+tc qdisc show
+```
+
+should no longer need to acquire RTNL.
+
+The first series converted 14 qdisc dump implementations to
+lockless/narrower-lock operation, including `fq`, `cake`, `cbs`, and
+others.
+
+This illustrates that RTNL breakup is not just:
+
+``` text
+one global lock → one lock per netns
+```
+
+but also:
+
+``` text
+operation previously under RTNL
+          │
+          ▼
+identify actual protected state
+          │
+          ▼
+use local locking / RCU / lockless dump
+          │
+          ▼
+remove RTNL dependency
+```
+
+------------------------------------------------------------------------
+
+## 35.3 Linux 6.13 --- per-network-namespace RTNL
+
+LWN confirms that Linux 6.13 contains work turning RTNL into a
+per-network-namespace lock.
+
+-   https://lwn.net/Articles/998990/
+
+Important limitation:
+
+-   disabled by default at this stage;
+-   enabled through `DEBUG_NET_SMALL_RTNL`;
+-   considered regression-prone;
+-   explicitly described as one step in a longer process.
+
+Architecture:
+
+``` text
+before
+
+netns A ─┐
+netns B ─┼── global RTNL
+netns C ─┘
+
+
+direction in 6.13
+
+netns A ─── RTNL(A)
+netns B ─── RTNL(B)
+netns C ─── RTNL(C)
+```
+
+This is particularly relevant to Kubernetes/OpenShift hosts where
+independent netns operations are common.
+
+------------------------------------------------------------------------
+
+## 35.4 Link creation and namespace semantics
+
+Xiao Liang's 2024 v5 series:
+
+-   `[PATCH net-next v5 0/5] net: Improve netns handling in RTNL and ip_tunnel`
+-   https://lwn.net/Articles/1001477/
+
+changes link creation so that a device intended for another namespace is
+created directly in the target namespace rather than created in one
+namespace and moved afterward.
+
+Example motivation:
+
+``` text
+ip link add netns ns1 link-netns ns2 tun0 type gre ...
+```
+
+The new design passes both source and link namespaces into `newlink()`
+callbacks.
+
+This matters for finer-grained RTNL because "which namespace's lock
+protects creation?" must be well-defined.
+
+------------------------------------------------------------------------
+
+# 36. MPTCP + BPF --- exact development landmarks
+
+## 36.1 Problem: enabling MPTCP for unmodified applications
+
+An application normally opts into MPTCP with:
+
+``` c
+socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP)
+```
+
+`mptcpize` used `LD_PRELOAD` to make legacy applications use MPTCP, but
+that approach has limitations:
+
+-   applications not using libc, such as some Go binaries;
+-   environments where changing launch environment is difficult;
+-   per-cgroup/per-netns policy is awkward.
+
+Geliang Tang's BPF series therefore moved protocol selection into the
+kernel/BPF policy path.
+
+------------------------------------------------------------------------
+
+## 36.2 2023 --- `update_socket_protocol()` / "Force to MPTCP"
+
+Important revision:
+
+-   `[PATCH bpf-next v8 0/4] bpf: Force to MPTCP`
+-   2023-08-03
+-   https://lwn.net/Articles/940312/
+
+Later revision:
+
+-   v14, 2023-08-16
+-   https://lwn.net/Articles/941738/
+
+The key design change arrived around v6:
+
+``` text
+update_socket_protocol()
+```
+
+allowing a BPF hook during socket creation to change:
+
+``` text
+IPPROTO_TCP / protocol 0
+          │
+          ▼
+      IPPROTO_MPTCP
+```
+
+Conceptually:
+
+``` text
+application
+ socket(AF_INET, SOCK_STREAM, 0)
+          │
+          ▼
+BPF socket-create policy
+          │
+          ├── keep TCP
+          └── switch to MPTCP
+                    │
+                    ▼
+                MPTCP socket
+```
+
+This avoids requiring the application binary to know about MPTCP.
+
+------------------------------------------------------------------------
+
+## 36.3 MPTCP subflow visibility from BPF
+
+Later work expands BPF from protocol selection to **inspection/iteration
+of MPTCP subflows**.
+
+Series:
+
+-   `bpf: Add mptcp_subflow bpf_iter support`
+-   https://lwn.net/Articles/997541/
+
+The series adds:
+
+-   common MPTCP kfunc registration;
+-   `mptcp_subflow` BPF iterator;
+-   acquire/release helpers for MPTCP socket lifetime;
+-   multi-endpoint selftests.
+
+Affected code:
+
+-   `net/mptcp/bpf.c`
+-   BPF MPTCP selftests
+
+A later 2025 iteration similarly describes registering basic MPTCP
+kfuncs and adding the subflow iterator:
+
+-   https://lwn.net/Articles/1014990/
+
+### Evolution
+
+``` text
+MPTCP protocol implementation
+          │
+          ▼
+userspace path-manager/control APIs
+          │
+          ▼
+BPF: choose TCP vs MPTCP
+          │
+          ▼
+BPF: inspect/iterate MPTCP subflows
+          │
+          ▼
+richer programmable MPTCP policy
+```
+
+This is the more useful way to classify "MPTCP+BPF" than assigning the
+whole feature to a single release.
+
+------------------------------------------------------------------------
+
+# 37. Cross-feature interaction: AccECN × virtio × BPF × MPTCP
+
+The separate series increasingly meet in common metadata and
+virtual-network paths.
+
+``` text
+TCP connection
+     │
+     ├── MPTCP?
+     │      └── BPF policy / subflows
+     │
+     ├── AccECN?
+     │      └── ACE / TCP option / CC feedback
+     │
+     ▼
+GRO/GSO
+     │
+virtio-net metadata
+     │
+     ▼
+VM / container datapath
+```
+
+A modern virtual networking stack therefore cannot treat:
+
+-   TCP flags,
+-   ECN metadata,
+-   GSO metadata,
+-   MPTCP protocol choice,
+-   BPF policy
+
+as unrelated concerns.
+
+The 2026 AccECN virtio/offload series is a concrete example: existing
+RFC3168-oriented offload metadata had to be updated because the same TCP
+flag bits participate in AccECN signaling.
+
+------------------------------------------------------------------------
+
+# 38. Next pass
+
+Remaining high-priority items:
+
+1.  identify exact mainline commits for BIG TCP IPv4 / tunnel
+    follow-ups;
+2.  resolve virtio-net AF_XDP series into **merged vs RFC/not-merged**
+    release status;
+3.  netkit queue-leasing individual commits;
+4.  RTNL per-netns individual commits and when the feature becomes
+    generally enabled;
+5.  AccECN individual mainline hashes;
+6.  exact UDP 6.18 receive-path commit set;
+7.  complete MPTCP release-by-release milestone table;
+8.  audit the 2019--2026 LWN article list for omissions after these
+    thematic passes.
