@@ -7,7 +7,7 @@
 > evidence, not an alternate release map.
 
 **調査基準日:** 2026-10-02\
-**構成改訂:** 2026-10-04
+**構成改訂:** 2026-10-04（r13: relation/evidence semantics audit）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel
 networking がどのように進化したかを読む順序**に再構成した版である。
@@ -377,13 +377,21 @@ programmable socket dispatch
 v3.x前半の:
 
 ``` text
-BQL     fq_codel     TSQ
- │          │          │
- └──────┬───┴────┬─────┘
-        ▼        ▼
- queue residency / latency control
-        │
-        └── complements ──► pacing / time-based TX
+Linux TX latency / queue management
+
+TCP socket layer:
+  TSQ · TCP pacing · BBR
+          │  packet admission / pacing / congestion control
+          ▼
+qdisc / scheduling layer:
+  fq_codel · sch_fq · EDT · CAKE
+          │  queueing / scheduling / AQM
+          ▼
+driver / NIC queue layer:
+  BQL · TX queue management
+
+※ 縦方向は packet が通るレイヤー配置を示す。
+  「上の機構が下の機構を生み出した」という実装上の派生関係を示す矢印ではない。
 ```
 
 これらは一本道の依存関係ではない。BQL は driver TX queue、fq_codel は qdisc、
@@ -391,9 +399,8 @@ TSQ は per-socket backlog を主に制御し、異なるレイヤーで同じ�
 設計課題に取り組む。pacing/FQ はさらに packet を **いつ送るか** を制御する別の軸である。
 
 BBR は congestion-control algorithm、EDT は time-based scheduling primitive であり、
-後者を BBR 専用の後継機構とは扱わない。
-
-へつながる。
+後者を BBR 専用の後継機構とは扱わない。これらは異なるレイヤーの制御を組み合わせて
+TX queue residency と latency を抑える、補完的な機構群として読む。
 
 またTSO auto sizingやTCP autocorkingもこの時代のTSQ/pacing
 infrastructureを 利用する。
@@ -695,7 +702,7 @@ Grade の定義は次のとおりであり、この文書自体にも保持す�
 
 C/D は現在の canonical milestone table では使用していないが、将来の監査対象を表すため grade scheme として定義を残す。
 
-**Evidence は3軸で監査する。** Grade は主として release attribution の確度を表す。これとは独立に、
+**Evidence は3軸で監査する。** Grade は主として release attribution の確度を表し、機能があらゆる環境で成立することや、関連 commit を全件列挙済みであることを保証しない。これとは独立に、
 (1) SHA が正しい Git object / subject を指すか、(2) その anchor が主張する機能をどの範囲まで代表するか、
 (3) その変更が対象の final release tag に含まれるか、を確認する。したがって「exact SHA がある」だけで
 feature series 全体や release attribution が自動的に Grade A になるわけではない。
@@ -945,29 +952,26 @@ one packet
 
 ## BPF --- packet filter から stack extension へ
 
-``` text
-v5.0: XDP / TC / cgroup BPF
-          ↓
-5.x: socket hooks / SYN-cookie integration
-          ↓
-5.6: struct_ops → tcp_congestion_ops
-          ↓
-5.9: SK_LOOKUP
-          ↓
-6.x: MPTCP / defrag / timestamp / netkit / BPF qdisc
-```
-
-つまり:
+BPF の発展は一本道ではなく、attachment point と適用範囲が複数方向へ増えたものとして捉える。
 
 ``` text
-packet programmability
- → socket programmability
- → protocol algorithm programmability
- → virtual-device programmability
- → queue/datapath programmability
+                     BPF core / verifier / maps
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+ packet / datapath        socket / lookup       protocol algorithms
+ XDP, TC                  cgroup hooks,         struct_ops / TCP CC
+                         SK_LOOKUP
+        │                                           │
+        └──────────────┐                 ┌──────────┘
+                       ▼                 ▼
+                 virtual devices / queue control
+                 netkit · BPF qdisc · related hooks
 ```
 
-へ拡大した。
+ここで下段は上段の単純な後継ではない。5.x～6.x にかけて **適用範囲と attachment point が
+独立・並行して追加された**結果として、packet、socket、protocol algorithm、virtual device、
+queue/datapath まで programmability の対象が広がった、と読む。
 
 ------------------------------------------------------------------------
 
@@ -1595,12 +1599,16 @@ NAPI
  └─ thread / CPU relationship
 ```
 
-This is a conceptual shift from "the driver owns opaque rings" toward
-"queues and memory are objects negotiated among driver, kernel and
-userspace".
+This is a conceptual shift from "the driver owns opaque rings" toward explicit
+queue / NAPI / memory objects with stable identities and API-defined properties.
 
-It directly connects to Device Memory TCP, io_uring ZCRX and
-queue-leasing work elsewhere in this document.
+ただし **可視化・設定・割り当て・ownership は同義ではない**。API ごとに許される操作は異なり、
+ある object を userspace から列挙・参照できても、その lifetime や ownership を userspace が自由に
+変更できるとは限らない。netdev-genl の read/configuration API、memory-provider registration、
+queue-leasing のような assignment mechanism は、それぞれ capability と permission boundary を個別に読む必要がある。
+
+This connects conceptually to Device Memory TCP, io_uring ZCRX and queue-leasing work elsewhere in this document,
+but does not imply that one generic API grants all of those control operations.
 
 ### page_pool → netmem → memory providers
 
@@ -1817,19 +1825,17 @@ capture から、 kernel 内部の typed event と packet-lifecycle metadata
 を相関できる方向へ進化しました。
 
 ``` text
-interface counters / tcpdump
-        ↓
-tracepoints / perf / kprobes
-        ↓
-eBPF tracing + BTF
-        ↓
-structured networking metadata
-        ↓
-drop reason / timestamp / queue-NAPI-page_pool identity
-        ↓
-correlation across layers
-        ↓
-packet-journey reconstruction (tool/inference goal)
+Observability primitives (parallel / complementary)
+
+  tracepoints / perf / kprobes ─┐
+  eBPF tracing + BTF ────────────┼─► tool-side correlation ─► higher-level inference
+  structured drop reasons ───────┤
+  timestamping ──────────────────┤
+  queue / NAPI identity ─────────┤
+  page_pool stats/diagnostics ───┘
+
+※ 左側の primitive は一本道に「進化」した関係ではない。異なる種類の evidence を並行して提供する。
+  packet-journey reconstruction は、それらを相関する tool / analysis 側の目標である。
 ```
 
 ### Primitive が提供する情報と限界
