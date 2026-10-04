@@ -1,24 +1,15 @@
 # Linux Networking Evolution --- Linux v3.0 から 7.x まで
 
-> **Clean canonical edition.** Part II is the only normative release
-> chronology. Part III explains feature lineages, Part IV the
-> driver-framework axis, Part V observability, Part VI synthesis, and
-> Part VII unresolved provenance. Appendix material is supporting
-> evidence, not an alternate release map.
+> **Clean canonical edition.** Part II is the only normative release chronology. Part III explains feature lineages, Part IV the driver-framework axis, Part V observability, Part VI synthesis, and Part VII unresolved provenance. Appendix material is supporting evidence, not an alternate release map.
 
 **調査基準日:** 2026-10-02\
 **構成改訂:** 2026-10-03
 
-この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel
-networking がどのように進化したかを読む順序**に再構成した版である。
+この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
 ## この文書の読み方
 
-> **Canonicalization note (2026-10-03):** Release chronology is
-> authoritative only in **Part II**. Development-series dates and
-> mainline release dates are intentionally separated. The document uses
-> one six-axis architecture model. Appendix material is
-> provenance/research history and is non-normative.
+> **Canonicalization note (2026-10-03):** Release chronology is authoritative only in **Part II**. Development-series dates and mainline release dates are intentionally separated. The document uses one six-axis architecture model. Appendix material is provenance/research history and is non-normative.
 
 本文は次の流れで構成する。
 
@@ -50,9 +41,7 @@ Appendix  evidence catalog
           LWN / upstream commits / conference provenance
 ```
 
-重要な方針は、release chronology と feature lineage を分離すること。
-まず年代順に「何がいつ形成されたか」を読み、その後で同じ技術を
-長期lineageとして横断的に追う。
+重要な方針は、release chronology と feature lineage を分離すること。 まず年代順に「何がいつ形成されたか」を読み、その後で同じ技術を 長期lineageとして横断的に追う。
 
 ------------------------------------------------------------------------
 
@@ -60,43 +49,25 @@ Appendix  evidence catalog
 
 This document uses the following terms consistently:
 
-  ---------------------------------------------------------------------
+  --------------------------------------------------------------------------------------------------------------------------------------------------------
   Term                               Meaning
-  ---------------------------------- ----------------------------------
-  **design / RFC**                   proposal or architecture under
-                                     discussion; no merge is implied
+  ---------------------------------- ---------------------------------------------------------------------------------------------------------------------
+  **design / RFC**                   proposal or architecture under discussion; no merge is implied
 
-  **series**                         a posted patch series;
-                                     `final series` means the latest
-                                     merge-near revision identified by
-                                     this research
+  **series**                         a posted patch series; `final series` means the latest merge-near revision identified by this research
 
-  **landing**                        acceptance into the relevant
-                                     subsystem tree or `net-next`; this
-                                     is not automatically a released
-                                     kernel
+  **landing**                        acceptance into the relevant subsystem tree or `net-next`; this is not automatically a released kernel
 
-  **mainline anchor**                a verified commit in Linus's
-                                     mainline history that anchors part
-                                     of a feature
+  **mainline anchor**                a verified commit in Linus's mainline history that anchors part of a feature
 
-  **release**                        a feature is present in a released
-                                     mainline kernel version
+  **release**                        a feature is present in a released mainline kernel version
 
-  **generation**                     a release-era milestone spanning
-                                     multiple commits or incremental
-                                     follow-ups; not necessarily a
-                                     single origin commit
+  **generation**                     a release-era milestone spanning multiple commits or incremental follow-ups; not necessarily a single origin commit
 
-  **development**                    accepted, merged into a
-                                     development tree, or posted for a
-                                     future cycle, but not treated here
-                                     as a released baseline
-  ---------------------------------------------------------------------
+  **development**                    accepted, merged into a development tree, or posted for a future cycle, but not treated here as a released baseline
+  --------------------------------------------------------------------------------------------------------------------------------------------------------
 
-A mainline anchor can be a core/origin commit, an integration commit, or
-a protocol-specific enablement commit. The text names the anchor type
-when that distinction matters.
+A mainline anchor can be a core/origin commit, an integration commit, or a protocol-specific enablement commit. The text names the anchor type when that distinction matters.
 
 ### Provenance ladder
 
@@ -112,8 +83,7 @@ mainline commit
 released kernel
 ```
 
-The arrows describe the usual path, not a guarantee that every project
-passes through each stage in exactly this form.
+The arrows describe the usual path, not a guarantee that every project passes through each stage in exactly this form.
 
 # Part I --- Foundations: Linux v3.x → v5.1
 
@@ -166,9 +136,7 @@ setns()
 another namespace
 ```
 
-network namespace自体は以前から存在したが、namespaceをFDとして扱い
-processを既存namespaceへ移動できることは、後のcontainer runtimeにとって
-非常に重要なcontrol primitiveである。
+network namespace自体は以前から存在したが、namespaceをFDとして扱い processを既存namespaceへ移動できることは、後のcontainer runtimeにとって 非常に重要なcontrol primitiveである。
 
 この資料では:
 
@@ -188,8 +156,7 @@ CNI / Kubernetes networking
 
 ### 1.2 2011--2012 DQL/BQL development → Linux v3.3 mainline
 
-BQL (Byte Queue Limits) はNIC TX queueへ過剰なdataを押し込まないよう、
-driver queueの適正なbyte量を動的に制御する。
+BQL (Byte Queue Limits) はNIC TX queueへ過剰なdataを押し込まないよう、 driver queueの適正なbyte量を動的に制御する。
 
 ``` text
 before:
@@ -239,11 +206,9 @@ process/cgroup
 network priority / TCP memory accounting
 ```
 
-という、workload identityとnetwork resource controlを結びつける流れが
-すでに始まっている。
+という、workload identityとnetwork resource controlを結びつける流れが すでに始まっている。
 
-`team`はbondingとは別のuserspace-controlled link aggregation
-modelを提供した。
+`team`はbondingとは別のuserspace-controlled link aggregation modelを提供した。
 
 ------------------------------------------------------------------------
 
@@ -259,8 +224,7 @@ CoDel/fq_codel
  = qdisc queue
 ```
 
-CoDelはqueue delayを観測してAQMを行い、fq_codelはflow queueingとCoDelを
-組み合わせる。
+CoDelはqueue delayを観測してAQMを行い、fq_codelはflow queueingとCoDelを 組み合わせる。
 
 ``` text
 flows
@@ -269,8 +233,7 @@ flows
  └─ flow C queue ─┘
 ```
 
-後のLinux/router/container hostにおけるlow-latency queue managementの
-重要な基礎。
+後のLinux/router/container hostにおけるlow-latency queue managementの 重要な基礎。
 
 ------------------------------------------------------------------------
 
@@ -280,8 +243,7 @@ v3.6はv3.x networkingの大きなmilestone。
 
 ### TCP Small Queues (TSQ)
 
-BQLがdevice queueを制御するのに対してTSQは**per TCP socket**で
-qdisc/deviceへ溜められるdata量を抑える。
+BQLがdevice queueを制御するのに対してTSQは**per TCP socket**で qdisc/deviceへ溜められるdata量を抑える。
 
 ``` text
 TCP socket
@@ -307,14 +269,11 @@ driver/NIC : BQL
 
 ### TCP Fast Open client
 
-TCP handshake中にapplication dataを送るTFO client supportが入った。
-server supportは次のv3.7。
+TCP handshake中にapplication dataを送るTFO client supportが入った。 server supportは次のv3.7。
 
 ### IPv4 route cache removal
 
-従来のIPv4 route cacheはtraffic
-pattern依存のperformanceとDoS問題を持ち、 v3.6で長年のroute-cache
-removal workが完了した。
+従来のIPv4 route cacheはtraffic pattern依存のperformanceとDoS問題を持ち、 v3.6で長年のroute-cache removal workが完了した。
 
 ``` text
 route cache
@@ -326,8 +285,7 @@ FIB lookup + scalable caching strategies
 
 ### netfilter namespace work
 
-多数のnetfilter modulesがnetwork namespaceに対応し、 container
-isolationへの準備が進んだ。
+多数のnetfilter modulesがnetwork namespaceに対応し、 container isolationへの準備が進んだ。
 
 ------------------------------------------------------------------------
 
@@ -372,8 +330,7 @@ port :443
   └─ worker/socket CPU3
 ```
 
-single acceptor/dispatcher bottleneckを減らし、 multicore network server
-scalabilityを改善するAPI。
+single acceptor/dispatcher bottleneckを減らし、 multicore network server scalabilityを改善するAPI。
 
 後の:
 
@@ -399,8 +356,7 @@ v3.x前半の:
 BQL → fq_codel → TSQ
 ```
 
-でqueueを短くする仕組みが整った後、TCP packetを**いつ送るか**を制御する
-pacing/FQ方向が発達する。
+でqueueを短くする仕組みが整った後、TCP packetを**いつ送るか**を制御する pacing/FQ方向が発達する。
 
 この流れは後に:
 
@@ -416,8 +372,7 @@ EDT
 
 へつながる。
 
-またTSO auto sizingやTCP autocorkingもこの時代のTSQ/pacing
-infrastructureを 利用する。
+またTSO auto sizingやTCP autocorkingもこの時代のTSQ/pacing infrastructureを 利用する。
 
 ------------------------------------------------------------------------
 
@@ -446,8 +401,7 @@ in-kernel virtual machine
 
 へ移行する長期projectのmainline起点。
 
-現在のLinux firewall/control
-planeを考える上でv3.x最大級のmilestoneの一つ。
+現在のLinux firewall/control planeを考える上でv3.x最大級のmilestoneの一つ。
 
 ------------------------------------------------------------------------
 
@@ -455,8 +409,7 @@ planeを考える上でv3.x最大級のmilestoneの一つ。
 
 classic BPFはsocket packet filterを中心とした小さなVMだった。
 
-この時期、Alexei StarovoitovらのworkによってBPF instruction
-set/interpreterが より一般的な64-bit register machineへ再設計される。
+この時期、Alexei StarovoitovらのworkによってBPF instruction set/interpreterが より一般的な64-bit register machineへ再設計される。
 
 ``` text
 classic BPF
@@ -467,8 +420,7 @@ extended BPF ISA
 general in-kernel programmable VM
 ```
 
-この転換がなければ後のXDP、TC BPF、cgroup
-BPF、struct_ops、netkitはない。
+この転換がなければ後のXDP、TC BPF、cgroup BPF、struct_ops、netkitはない。
 
 ------------------------------------------------------------------------
 
@@ -516,15 +468,13 @@ cwnd adjustment
 
 ### Geneve and Foo-over-UDP
 
-GeneveとFoo-over-UDPも入り、overlay/tunnel infrastructureが
-VXLANだけでなくより一般的に発展した。
+GeneveとFoo-over-UDPも入り、overlay/tunnel infrastructureが VXLANだけでなくより一般的に発展した。
 
 ------------------------------------------------------------------------
 
 ### 1.12 v3.19 --- eBPF meets networking again
 
-v3.18でloadできるようになったeBPF
-programを、v3.19ではsocketへattach可能に なった。
+v3.18でloadできるようになったeBPF programを、v3.19ではsocketへattach可能に なった。
 
 ``` text
 bpf()
@@ -560,8 +510,7 @@ ipvlan
  └─ container/netns C
 ```
 
-macvlanとは異なるmultiplexing modelを提供し、 container
-networkingの重要なbuilding blockとなる。
+macvlanとは異なるmultiplexing modelを提供し、 container networkingの重要なbuilding blockとなる。
 
 ------------------------------------------------------------------------
 
@@ -656,8 +605,7 @@ MPTCP / BIG TCP / AccECN
 
 ### 1.14 Revised generation model
 
-v3.xを含めると、Linux networking
-evolutionは4世代に分けると分かりやすい。
+v3.xを含めると、Linux networking evolutionは4世代に分けると分かりやすい。
 
 ``` text
 Linux 3.x — SCALABILITY + VIRTUALIZATION + PROGRAMMABILITY BIRTH
@@ -665,14 +613,15 @@ BQL / fq_codel / TSQ
 VXLAN / SO_REUSEPORT / nftables
 eBPF / DCTCP / ipvlan
 
-Linux 4.x — PROGRAMMABLE FAST PATH
+Linux 4.x — PROGRAMMABLE FAST PATH + PACKET-MEMORY FOUNDATION
 XDP / cgroup BPF / SOCK_OPS
 BBR / kTLS / AF_XDP
 VRF / LWT / devlink
+refurbished page_pool / XDP memory-return generation (4.18)
 
-Linux 5.x — EXPANSION
+Linux 5.x — EXPANSION + OPERATIONALIZATION
 MPTCP / struct_ops / SK_LOOKUP
-page_pool / BIG TCP
+page_pool adoption/maturation / BIG TCP
 
 Linux 6.x–7.x — MEMORY + QUEUE OWNERSHIP
 netmem / Device Memory TCP
@@ -682,18 +631,13 @@ per-netns RTNL
 
 したがって、この資料の大きな結論は:
 
-> **modern Linux networkingはv4.xから突然始まったのではない。v3.xで
-> scalability、buffer management、overlay virtualization、firewall VM、
-> eBPFという基礎が形成され、v4.xでそれらがprogrammable fast
-> pathへ統合された。**
+> **modern Linux networkingはv4.xから突然始まったのではない。v3.xで scalability、buffer management、overlay virtualization、firewall VM、 eBPFという基礎が形成され、v4.xでそれらがprogrammable fast pathへ統合された。**
 
 ------------------------------------------------------------------------
 
 ## From foundations to the modern datapath
 
-Part I intentionally stops the detailed narrative at the point where the
-main architectural building blocks are visible. The exact
-release-by-release attribution from Linux 4.x onward belongs to Part II.
+Part I intentionally stops the detailed narrative at the point where the main architectural building blocks are visible. The exact release-by-release attribution from Linux 4.x onward belongs to Part II.
 
 The transition can be summarized as:
 
@@ -711,14 +655,11 @@ Linux 6.x–7.x
   explicit queue/NAPI/memory ownership + memory providers + finer-grained locking
 ```
 
-This is a dominant-theme model, not a claim that each mechanism
-originated only in the listed major version.
+This is a dominant-theme model, not a claim that each mechanism originated only in the listed major version.
 
 ## Transition: foundations → chronology
 
-Part I established the architectural foundations. Part II now fixes
-their release attribution. Later chapters may explain a milestone in
-more depth, but they do not override this table.
+Part I established the architectural foundations. Part II now fixes their release attribution. Later chapters may explain a milestone in more depth, but they do not override this table.
 
 ## How to read the rest of this document
 
@@ -741,9 +682,9 @@ more depth, but they do not override this table.
 
 # Part II --- Canonical release chronology
 
-This is the **single normative release map**. RFC dates, review bases,
-subsystem-tree landing and released kernel versions are deliberately
-kept separate:
+This is the **single normative release map of selected architectural milestones**. It is intentionally not a row for every kernel release. A missing release means only that this document does not assign one of its selected milestones to that release.
+
+RFC dates, review bases, subsystem-tree landing and released kernel versions are deliberately kept separate:
 
 ``` text
 RFC / review date
@@ -753,176 +694,109 @@ subsystem-tree / net-next landing
 released mainline version
 ```
 
-The table below is the canonical chronology used by all later lineage
-chapters.
+  ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Release                 Selected canonical milestones                                                                                            Evidence
+  ----------------------- ------------------------------------------------------------------------------------------------------------------------ --------------------------------------------------------------
+  3.0                     namespace / `setns()`-era foundation                                                                                     release-generation
 
-  -------------------------------------------------------------------------
-  Release              Canonical networking        Provenance status
-                       milestones                  
-  -------------------- --------------------------- ------------------------
-  3.0                  namespace / `setns()`-era   release generation
-                       foundation                  retained
+  3.3                     DQL/BQL; team; `net_prio`; TCP memcg                                                                                     release + exact DQL anchor
 
-  3.3                  DQL/BQL mainline            corrected canonical
-                       generation; team;           release
-                       `net_prio`; TCP memcg       
+  3.5                     CoDel / fq_codel                                                                                                         release + exact anchors
 
-  3.5                  CoDel / fq_codel            exact anchors retained
+  3.6                     TSQ; TFO client; IPv4 route-cache removal                                                                                release + exact anchors
 
-  3.6                  TSQ; TFO client; IPv4       exact/release evidence
-                       route-cache removal         retained
+  3.7                     VXLAN; TFO server; IPv6 NAT                                                                                              release verified
 
-  3.7                  VXLAN; TFO server; IPv6 NAT release verified
+  3.9                     TCP/UDP `SO_REUSEPORT`; conntrack labels; VM sockets                                                                     release; exact SO_REUSEPORT infrastructure anchor
 
-  3.9                  TCP/UDP `SO_REUSEPORT`;     exact infrastructure
-                       socket scaling              anchor + release
-                                                   verified
+  3.12                    `sch_fq`; TCP pacing; TSO autosizing generation                                                                          release-generation
 
-  3.13                 nftables                    exact anchor retained
+  3.13                    nftables                                                                                                                 release + exact anchor
 
-  3.14                 TCP autocorking; continuing release-generation
-                       BPF transition              milestone
+  3.14                    TCP autocorking; continuing BPF transition                                                                               release-generation
 
-  3.18                 `bpf()`                     exact anchors retained
-                       syscall/maps/verifier       
-                       generation; DCTCP;          
-                       Geneve/FOU                  
+  3.18                    `bpf()` syscall/maps/verifier generation; DCTCP; Geneve/FOU                                                              release + exact anchors
 
-  3.19                 ipvlan; initial switchdev   3.19 origin; later 4.x
-                       generation                  work is expansion
+  3.19                    ipvlan; switchdev origin; `SO_ATTACH_BPF`                                                                                release-generation
 
-  4.3                  VRF; LWT; OVS conntrack     series + release
-                                                   verified
+  4.3                     VRF; LWT; OVS conntrack                                                                                                  series + release
 
-  4.6                  devlink                     release origin verified
+  4.6                     devlink                                                                                                                  release origin
 
-  4.7                  TC BPF direct packet access series + release
-                                                   verified
+  4.7                     TC BPF direct packet access                                                                                              series + release
 
-  4.8                  XDP                         initial series/release
-                                                   verified
+  4.8                     XDP                                                                                                                      initial series + release
 
-  4.9                  BBR                         exact anchor retained
+  4.9                     BBR                                                                                                                      release + exact anchor
 
-  4.10                 cgroup BPF; BPF LWT; IPv6   series + release
-                       Segment Routing             verified
+  4.10                    cgroup BPF; BPF LWT; IPv6 Segment Routing                                                                                series + release
 
-  4.13                 `SOCK_OPS`; kTLS TX;        phylink exact anchor
-                       phylink infrastructure      retained
+  4.13                    `SOCK_OPS`; kTLS TX; phylink infrastructure                                                                              release; exact phylink anchor
 
-  4.14                 SOCKMAP; TCP `MSG_ZEROCOPY` TCP zero-copy exact
-                                                   enablement anchor
-                                                   retained
+  4.14                    SOCKMAP; TCP `MSG_ZEROCOPY`                                                                                              release; exact TCP enablement anchor
 
-  4.16                 netdevsim                   release verified
+  4.16                    netdevsim                                                                                                                release
 
-  4.17                 `BPF_PROG_TYPE_SK_MSG`;     final-series generation
-                       sockmap sendmsg/sendfile    verified
-                       path                        
+  4.17                    `BPF_PROG_TYPE_SK_MSG`; sockmap sendmsg/sendfile                                                                         final-series generation
 
-  4.18                 AF_XDP;                     series/release
-                       `TCP_ZEROCOPY_RECEIVE`;     generation verified
-                       refurbished page_pool/XDP   
-                       memory-return generation;   
-                       cgroup UDP sendmsg hooks    
+  4.18                    AF_XDP; `TCP_ZEROCOPY_RECEIVE`; refurbished page_pool/XDP memory return; cgroup UDP sendmsg hooks                        series + release
 
-  4.19                 `SO_TXTIME` / time-based    exact/release evidence
-                       TX; CAKE                    retained
+  4.19                    `SO_TXTIME`; CAKE                                                                                                        release + exact anchors
 
-  4.20                 TCP EDT pacing; BPF flow    release verified
-                       dissector; taprio;          
-                       rtnetlink strict checking   
+  4.20                    TCP EDT pacing; BPF flow dissector; taprio; rtnetlink strict checking                                                    release
 
-  5.0                  UDP GRO; UDP `MSG_ZEROCOPY` corrected canonical
-                                                   release
+  5.0                     UDP GRO; UDP `MSG_ZEROCOPY`                                                                                              release
 
-  5.1                  devlink health; BPF         release verified
-                       spinlocks/DCE;              
-                       `SO_BINDTOIFINDEX`;         
-                       Y2038-safe timestamps;      
-                       mac80211 airtime fairness;  
-                       io_uring substrate          
+  5.1                     devlink health; BPF spinlocks/DCE; `SO_BINDTOIFINDEX`; Y2038 timestamps; mac80211 airtime fairness; io_uring substrate   release
 
-  5.3                  nexthop objects             canonical release;
-                                                   final-revision detail
-                                                   remains provenance item
+  5.3                     nexthop objects                                                                                                          release; exact core anchor
 
-  5.5                  mac80211 Airtime Queue      release generation
-                       Limits (AQL)                
+  5.5                     mac80211 Airtime Queue Limits (AQL)                                                                                      release-generation
 
-  5.6                  MPTCP; WireGuard; BPF       ethtool exact core
-                       `struct_ops`/TCP CC;        anchor retained
-                       ethtool Generic Netlink     
-                       groundwork                  
+  5.6                     MPTCP; WireGuard; BPF `struct_ops`/TCP CC; ethtool Generic Netlink groundwork                                            release; exact ethtool core anchor
 
-  5.9                  `BPF_PROG_TYPE_SK_LOOKUP` / exact program-type
-                       per-netns socket lookup     anchor retained
+  5.9                     `BPF_PROG_TYPE_SK_LOOKUP`                                                                                                release + exact anchor
 
-  5.11                 auxiliary bus               release +
-                                                   final-series/tag
-                                                   evidence
+  5.11                    auxiliary bus                                                                                                            release + final-series/tag evidence
 
-  5.12                 threaded NAPI               release verified
+  5.12                    threaded NAPI                                                                                                            release
 
-  5.15                 IPv6 IOAM; MCTP; bridge     release verified
-                       per-VLAN multicast          
+  5.15                    IPv6 IOAM core; MCTP; bridge per-VLAN multicast                                                                          release
 
-  5.17                 `kfree_skb_reason()` /      release verified
-                       structured skb drop-reason  
-                       foundation                  
+  5.17                    `kfree_skb_reason()` / structured drop-reason foundation                                                                 release
 
-  5.19                 IPv6 BIG TCP; drop-reason   release verified
-                       expansion; MPTCP evolution  
+  5.19                    IPv6 BIG TCP; drop-reason expansion                                                                                      release; exact BIG TCP anchors
 
-  6.2                  TCP PLB; XFRM/IPsec packet  XFRM exact anchor
-                       offload                     retained
+  6.2--6.3                YNL/YAML Netlink specification/tooling generation; exact boundary spans early rollout                                    release-generation; boundary kept explicit
 
-  6.3                  IPv4 BIG TCP; YNL           exact BIG TCP commit set
-                                                   retained
+  6.2                     TCP PLB; XFRM/IPsec packet offload                                                                                       release; exact XFRM anchor
 
-  6.6                  AF_XDP multi-buffer         exact/release evidence
-                                                   retained
+  6.3                     IPv4 BIG TCP                                                                                                             release; exact commit set
 
-  6.7                  netkit; initial TCP-AO      release verified
-                       mainline support            
+  6.6                     AF_XDP multi-buffer                                                                                                      release + exact anchors
 
-  6.8                  Rust phylib abstractions +  release/final-series +
-                       Rust Asix reference PHY;    documentation milestone
-                       queue/NAPI netdev-genl      
-                       object visibility           
+  6.7                     netkit; initial TCP-AO                                                                                                   release
 
-  6.11                 virtio-net AF_XDP RX        exact anchors retained
-                       zero-copy                   
+  6.8                     Rust phylib + Rust Asix reference PHY; queue/NAPI netdev-genl object visibility                                          release/final-series + docs
 
-  6.12                 Device Memory TCP RX        final-series/exact
-                                                   commit set retained
+  6.11                    virtio-net AF_XDP RX zero-copy                                                                                           release + exact anchors
 
-  6.13                 per-netns RTNL              milestone, **not
-                       infrastructure/migration    completion**
-                       milestone                   
+  6.12                    Device Memory TCP RX                                                                                                     final-series + exact commit set
 
-  6.15                 io_uring ZCRX; further RTNL exact merge/series
-                       breakup                     evidence retained
+  6.13                    per-netns RTNL infrastructure/migration milestone                                                                        milestone, **not completion**
 
-  6.16                 Device Memory TCP TX; BPF   exact/series evidence
-                       qdisc; DCCP removal         retained
+  6.15                    io_uring ZCRX; further RTNL breakup                                                                                      exact merge/series evidence
 
-  6.18                 AccECN core; UDP RX         DIBS explicitly separate
-                       evolution; DIBS as a        from page_pool/netmem
-                       separate shared-memory      
-                       lineage                     
+  6.16                    Device Memory TCP TX; BPF qdisc; DCCP removal                                                                            exact/series evidence
 
-  7.0--7.2             released 7.x evolution:     released branch;
-                       AccECN policy/defaults,     subfeature attribution
-                       queue/memory-provider work, continues
-                       protocol/API cleanup        
+  6.18                    AccECN core; UDP RX evolution; DIBS as a separate shared-memory lineage                                                  release-generation
 
-  7.3-rc / mainline RT BIG TCP over VXLAN/GENEVE;  merged into Linus's
-  \>P                  NL-less FIB rule updates; m ainline via
-                       AGE_SIZE devmem RX buffers  net-next-7.3\` on
-                       \` 20 fi                    26-08-20; not yet a nal
-                                                   7.3 release
-  -------------------------------------------------------------------------
+  7.0--7.2                released 7.x evolution; RX queue-leasing generation; MPTCP in-kernel PM limit expansion                                  released branch; subfeature tag containment noted separately
+
+  7.3-rc / mainline       BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers \> `PAGE_SIZE`                                     `net-next-7.3` merged 2026-08-20; final 7.3 release pending
+  ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+For the last row, the authoritative networking pull explicitly lists all three items above. The merge into Linus's tree is `91ec2035134982b98fab0609a9fd8480e8217dc1` (`Merge tag 'net-next-7.3' ...`).
 
 ## Dominant-theme eras
 
@@ -945,14 +819,11 @@ Linux 6.x–7.x
   + finer-grained control and locking
 ```
 
-These are descriptive eras, not origin boundaries. For example, queue
-control starts well before Linux 4.x, and packet-memory work begins
-before the 6.x memory-provider generation.
+These are descriptive eras, not origin boundaries. For example, queue control starts well before Linux 4.x, and packet-memory work begins before the 6.x memory-provider generation.
 
 ## Six architectural axes
 
-The remainder of the document reads the chronology through six
-interacting axes:
+The remainder of the document reads the chronology through six interacting axes:
 
 ``` text
 PERFORMANCE
@@ -963,27 +834,19 @@ OBSERVABILITY
 DRIVER FRAMEWORK
 ```
 
-A feature may belong to more than one axis. `page_pool`, for example, is
-both a memory mechanism and a driver-framework contract; `netdev-genl`
-is both control-plane and observability infrastructure.
+A feature may belong to more than one axis. `page_pool`, for example, is both a memory mechanism and a driver-framework contract; `netdev-genl` is both control-plane and observability infrastructure.
 
 ## Transition: chronology → lineages
 
-A release table answers *when*. The next chapters answer *how one
-mechanism led to another*. They therefore group milestones by
-architecture rather than repeating the release table.
+A release table answers *when*. The next chapters answer *how one mechanism led to another*. They therefore group milestones by architecture rather than repeating the release table.
 
 # Part III --- Long-term feature lineages
 
-Part III explains **why** milestones in Part II form a lineage. It
-intentionally does not repeat release-by-release provenance.
-Driver-specific mechanics belong to Part IV, while tracing/tooling
-details belong to Part V.
+Part III explains **why** milestones in Part II form a lineage. It intentionally does not repeat release-by-release provenance. Driver-specific mechanics belong to Part IV, while tracing/tooling details belong to Part V.
 
 ## Packet aggregation --- GRO/GSO → BIG TCP
 
-v5.0 ですでに GRO/GSO/TSO は成熟していたが、高速 NIC では per-packet
-metadata processing が支配的になる。
+v5.0 ですでに GRO/GSO/TSO は成熟していたが、高速 NIC では per-packet metadata processing が支配的になる。
 
 ``` text
 wire packets
@@ -993,8 +856,7 @@ large skb
 wire packets
 ```
 
-v5.19 BIG TCP は kernel internal GRO/GSO aggregate の 64KiB
-制約を緩和した。
+v5.19 BIG TCP は kernel internal GRO/GSO aggregate の 64KiB 制約を緩和した。
 
 ``` text
 GRO/GSO
@@ -1008,8 +870,7 @@ IPv6 BIG TCP without synthetic HBH jumbo header
 BIG TCP over VXLAN / GENEVE (7.3-rc/mainline)
 ```
 
-BIG TCP は wire MTU を巨大化する機能ではなく、 **kernel 内部の
-packet-processing unit を大きくする機能**として理解する。
+BIG TCP は wire MTU を巨大化する機能ではなく、 **kernel 内部の packet-processing unit を大きくする機能**として理解する。
 
 ------------------------------------------------------------------------
 
@@ -1025,8 +886,7 @@ NIC → recycled page → stack ─┐
       └──────────────────────┘
 ```
 
-その後、device memory を扱うため `struct page`
-前提を弱める必要が生じる。
+その後、device memory を扱うため `struct page` 前提を弱める必要が生じる。
 
 ``` text
 network memory
@@ -1054,16 +914,13 @@ v6.16 では TX 側も mainline に入る。
 page_pool → netmem → Device Memory TCP / memory providers
 ```
 
-はRX/TX packet-memory
-ownershipのlineageである。一方、DIBSはshared-memory
-transport側の別lineageとして扱い、この矢印へ直接接続しない。
+はRX/TX packet-memory ownershipのlineageである。一方、DIBSはshared-memory transport側の別lineageとして扱い、この矢印へ直接接続しない。
 
 ------------------------------------------------------------------------
 
 ## XDP / AF_XDP
 
-v5.0 時点で XDP/AF_XDP は存在した。その後の本質は周辺 infrastructure
-の成熟。
+v5.0 時点で XDP/AF_XDP は存在した。その後の本質は周辺 infrastructure の成熟。
 
 ``` text
 XDP
@@ -1144,11 +1001,10 @@ virtio-net
 └─ AF_XDP zero-copy
 
 container:
-veth → netkit → BPF-native datapath → queue leasing
+veth → netkit → BPF-native datapath → RX queue leasing
 ```
 
-v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、2026 の netkit queue leasing
-は 「full kernel bypass」よりも、
+v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、2026 の netkit queue leasing は 「full kernel bypass」よりも、
 
 **kernel が ownership/control を保持し、data movement を最小化する**
 
@@ -1161,7 +1017,7 @@ v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、2026 の netkit queue leasing
 ### TCP
 
 ``` text
-v5.0 EDT pacing
+v5.0 (EDT pacing already present since 4.20)
   ├─ BPF congestion control
   ├─ MPTCP (5.6)
   ├─ TCP zero-copy RX
@@ -1172,14 +1028,11 @@ v5.0 EDT pacing
   └─ AccECN
 ```
 
-MPTCP は initial upstream から multi-subflow、userspace path manager、
-Generic Netlink、BPF integration へ進化した。
+MPTCP は initial upstream から multi-subflow、userspace path manager、 Generic Netlink、BPF integration へ進化した。
 
 ### UDP
 
-v5.0 自体が `MSG_ZEROCOPY` と GRO の節目。その後は GRO/GSO、
-tunnel/encapsulation、high packet-rate RX、receive-buffer scaling
-が進む。 QUIC や overlay networking の基盤として UDP の重要性も増した。
+v5.0 自体が `MSG_ZEROCOPY` と GRO の節目。その後は GRO/GSO、 tunnel/encapsulation、high packet-rate RX、receive-buffer scaling が進む。 QUIC や overlay networking の基盤として UDP の重要性も増した。
 
 ------------------------------------------------------------------------
 
@@ -1223,10 +1076,7 @@ global RTNL
  → RTNL-less FIB rule updates (7.3-rc/mainline)
 ```
 
-7.3向けnetworking pullでは `RTM_NEWRULE` / `RTM_DELRULE` のFIB
-rule変更が RTNL-lock-less化され、per-netns netdev
-unregistrationやlock-less GET準備と 同じ「global
-RTNL依存を減らす」流れとしてmainlineへ入った。
+7.3向けnetworking pullでは `RTM_NEWRULE` / `RTM_DELRULE` のFIB rule変更が RTNL-lock-less化され、per-netns netdev unregistrationやlock-less GET準備と 同じ「global RTNL依存を減らす」流れとしてmainlineへ入った。
 
 ------------------------------------------------------------------------
 
@@ -1244,9 +1094,7 @@ hardware offload
 
 一方で BPF と nftables は単純な新旧置換ではない。
 
-conntrack では performance だけでなく lifetime/GC、per-netns
-scalability、 hardware flow offload race、BPF kfunc access
-が重要なテーマとなった。
+conntrack では performance だけでなく lifetime/GC、per-netns scalability、 hardware flow offload race、BPF kfunc access が重要なテーマとなった。
 
 ------------------------------------------------------------------------
 
@@ -1264,91 +1112,51 @@ zero-copy RX (6.15)
 memory-provider / device-memory integration
 ```
 
-目標は syscall reduction だけではなく、 NICからuserspaceまでの buffer
-ownership/lifetime の効率化にある。
+目標は syscall reduction だけではなく、 NICからuserspaceまでの buffer ownership/lifetime の効率化にある。
 
 ------------------------------------------------------------------------
 
 ## Transition: feature lineages → driver contracts
 
-The previous chapter followed networking mechanisms end-to-end. Part IV
-changes viewpoint: it asks which responsibilities moved from individual
-drivers into common networking-core frameworks.
+The previous chapter followed networking mechanisms end-to-end. Part IV changes viewpoint: it asks which responsibilities moved from individual drivers into common networking-core frameworks.
 
 # Part IV --- Network Device Driver Framework Evolution
 
-This chapter focuses on the contract between networking core and
-drivers. Where page_pool, AF_XDP, Device Memory TCP or io_uring also
-appear in Part III, this chapter discusses only their **driver-facing
-queue/memory ownership role**, not the complete feature history.
+This chapter focuses on the contract between networking core and drivers. Where page_pool, AF_XDP, Device Memory TCP or io_uring also appear in Part III, this chapter discusses only their **driver-facing queue/memory ownership role**, not the complete feature history.
 
 ## Canonical Driver Framework chronology
 
-This is the Driver Framework projection of the Part II release map. It
-is not a second independent chronology; every release below must agree
-with Part II.
+This is the Driver Framework projection of the Part II release map. It is not a second independent chronology; every release below must agree with Part II.
 
-  -----------------------------------------------------------------------
-  Release                 Driver-framework        Architectural effect
-                          milestone               
-  ----------------------- ----------------------- -----------------------
-  3.3                     DQL/BQL                 common queue-pressure
-                                                  control replaces
-                                                  driver-local queue
-                                                  sizing policy
+  -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Release                 Driver-framework milestone                                              Architectural effect
+  ----------------------- ----------------------------------------------------------------------- -----------------------------------------------------------------------------
+  3.3                     DQL/BQL                                                                 common queue-pressure control replaces driver-local queue sizing policy
 
-  3.19                    switchdev origin        Linux forwarding
-                                                  objects begin to drive
-                                                  switch-ASIC offload
+  3.19                    switchdev origin                                                        Linux forwarding objects begin to drive switch-ASIC offload
 
-  4.6                     devlink                 device/ASIC-wide
-                                                  resources and control
-                                                  separated from one
-                                                  `net_device`
+  4.6                     devlink                                                                 device/ASIC-wide resources and control separated from one `net_device`
 
-  4.8                     XDP                     driver RX path gains a
-                                                  programmable pre-skb
-                                                  execution point
+  4.8                     XDP                                                                     driver RX path gains a programmable pre-skb execution point
 
-  4.13                    phylink                 common MAC/PHY/PCS/SFP
-                                                  link-management state
-                                                  machine
+  4.13                    phylink                                                                 common MAC/PHY/PCS/SFP link-management state machine
 
-  4.16                    netdevsim               common offload APIs
-                                                  become testable without
-                                                  physical hardware
+  4.16                    netdevsim                                                               common offload APIs become testable without physical hardware
 
-  4.18                    refurbished             RX allocation/recycling
-                          page_pool/XDP memory    begins moving into
-                          return                  common memory
-                                                  infrastructure
+  4.18                    refurbished page_pool/XDP memory return                                 RX allocation/recycling begins moving into common memory infrastructure
 
-  5.1                     devlink health          common
-                                                  reporting/recovery
-                                                  model for device health
+  5.1                     devlink health                                                          common reporting/recovery model for device health
 
-  5.6                     ethtool Generic Netlink driver management ABI
-                                                  becomes
-                                                  structured/extensible
+  5.6                     ethtool Generic Netlink                                                 driver management ABI becomes structured/extensible
 
-  5.11                    auxiliary bus           complex devices can
-                                                  expose independently
-                                                  bound subfunctions
+  5.11                    auxiliary bus                                                           complex devices can expose independently bound subfunctions
 
-  5.12                    threaded NAPI           NAPI execution model
-                                                  becomes more explicitly
-                                                  configurable
+  5.12                    threaded NAPI                                                           NAPI execution model becomes more explicitly configurable
 
-  6.8                     Rust phylib +           safe driver abstraction
-                          queue/NAPI netdev-genl  and explicit netdev
-                          objects                 objects develop in
-                                                  parallel
+  6.8                     Rust phylib + queue/NAPI netdev-genl objects                            safe driver abstraction and explicit netdev objects develop in parallel
 
-  6.x→7.x                 page_pool introspection queue, poller and
-                          → queue/NAPI            memory ownership become
-                          configuration → memory  first-class driver/core
-                          providers               contracts
-  -----------------------------------------------------------------------
+  6.x→7.x                 page_pool introspection → queue/NAPI configuration → memory providers   queue, poller and memory ownership become first-class driver/core contracts
+  -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ### The long architectural transition
 
@@ -1370,14 +1178,9 @@ queue-bound memory providers
 typed / memory-safe Rust driver abstractions
 ```
 
-The last steps are important: modern netdev work increasingly exposes
-what used to be opaque driver implementation details as generic objects
-with IDs and relationships.
+The last steps are important: modern netdev work increasingly exposes what used to be opaque driver implementation details as generic objects with IDs and relationships.
 
-This section deliberately does **not** enumerate individual NIC drivers.
-It follows the common infrastructure which changed what a Linux network
-driver is expected to implement, and which moved repeated driver-local
-mechanisms into reusable kernel frameworks.
+This section deliberately does **not** enumerate individual NIC drivers. It follows the common infrastructure which changed what a Linux network driver is expected to implement, and which moved repeated driver-local mechanisms into reusable kernel frameworks.
 
 ## Architectural thesis
 
@@ -1397,15 +1200,11 @@ introspectable netdev objects and queue/memory ownership
 typed / memory-safe driver abstractions in Rust
 ```
 
-This is a sixth axis crossing the performance, programmability, memory,
-control-plane and observability axes already used elsewhere in this
-document.
+This is a sixth axis crossing the performance, programmability, memory, control-plane and observability axes already used elsewhere in this document.
 
 ## Starting point at Linux 3.0
 
-By the Linux 3.0 era, NAPI and multiqueue networking were already
-established. RPS/RFS had arrived in 2.6.35 and XPS in 2.6.38, so the
-v3.x story begins with a driver model already centered on:
+By the Linux 3.0 era, NAPI and multiqueue networking were already established. RPS/RFS had arrived in 2.6.35 and XPS in 2.6.38, so the v3.x story begins with a driver model already centered on:
 
 ``` text
 RX/TX descriptor rings
@@ -1417,9 +1216,7 @@ RPS/RFS/XPS in the stack
 ethtool + net_device_ops
 ```
 
-The important v3.x change is therefore not the invention of NAPI, but
-increasing coordination between drivers and common networking-core
-algorithms.
+The important v3.x change is therefore not the invention of NAPI, but increasing coordination between drivers and common networking-core algorithms.
 
 ## Linux 3.3 --- DQL/BQL: queue control moves into common core
 
@@ -1442,54 +1239,21 @@ Exact DQL core anchor already audited elsewhere in this document:
 dql: Dynamic queue limits
 ```
 
-LWN series: https://lwn.net/Articles/469651/
-https://lwn.net/Articles/469652/
+LWN series: https://lwn.net/Articles/469651/ https://lwn.net/Articles/469652/
 
-Driver-framework significance: performance policy begins moving out of
-individual drivers into reusable net core infrastructure.
+Driver-framework significance: performance policy begins moving out of individual drivers into reusable net core infrastructure.
 
 ## Linux 4.x --- hardware becomes a first-class Linux networking object
 
-### phylink provenance correction: RFC in 2015, mainline infrastructure in 4.13
+### switchdev --- origin in Linux 3.19, expansion through 4.x
 
-The 2015 26-patch RFC established the architecture for coordinating MAC,
-PHY, PCS/SerDes and hot-pluggable SFP modules. It was **not** yet the
-mainline landing.
+The initial switchdev infrastructure belongs to the Linux 3.19 generation. The 4.x era is where the model expands into the broader hardware-offload architecture discussed below.
 
-The canonical infrastructure anchor is:
-
-``` text
-9525ae83959b60c6061fe2f2caabdc8f69a48bc6
-phylink: add phylink infrastructure
-Russell King
-authored 2017-07-25; committed 2017-08-06
-```
-
-Later stable fixes explicitly cite this SHA in `Fixes:` tags, providing
-independent confirmation of its role. The history is therefore:
-
-``` text
-2015 RFC architecture
-   ↓
-2017 / Linux 4.13 generation
-   phylink infrastructure mainline
-   ↓
-later PCS/SFP/MAC API expansion
-```
-
-### 4.1 switchdev --- origin in Linux 3.19, expansion through 4.x
-
-The initial switchdev infrastructure belongs to the Linux 3.19
-generation. The 4.x era is where the model expands into the broader
-hardware-offload architecture discussed below.
-
-switchdev turns switch ASIC forwarding into a Linux driver model rather
-than a proprietary SDK-controlled island.
+switchdev turns switch ASIC forwarding into a Linux driver model rather than a proprietary SDK-controlled island.
 
 LWN: https://lwn.net/Articles/675826/ https://lwn.net/Articles/676096/
 
-The model represents physical switch ports as normal netdevices and lets
-bridge, VLAN, routing and related kernel objects drive hardware offload.
+The model represents physical switch ports as normal netdevices and lets bridge, VLAN, routing and related kernel objects drive hardware offload.
 
 ``` text
 Linux bridge / FIB / VLAN / TC
@@ -1501,15 +1265,13 @@ Linux bridge / FIB / VLAN / TC
         hardware
 ```
 
-This is a major change in driver responsibility: a driver becomes an
-implementation of Linux networking semantics in hardware.
+This is a major change in driver responsibility: a driver becomes an implementation of Linux networking semantics in hardware.
 
-### 4.2 devlink --- device-wide control plane
+### devlink --- device-wide control plane
 
 Initial devlink series: https://lwn.net/Articles/677967/
 
-devlink fills a gap left by `net_device`: many settings belong to the
-whole ASIC/device, not one network interface.
+devlink fills a gap left by `net_device`: many settings belong to the whole ASIC/device, not one network interface.
 
 Examples include:
 
@@ -1522,8 +1284,7 @@ device parameters
 firmware / health
 ```
 
-Linux 5.1 later adds devlink health reporting/recovery as a generic
-mechanism.
+Linux 5.1 later adds devlink health reporting/recovery as a generic mechanism.
 
 This establishes a useful split:
 
@@ -1535,11 +1296,20 @@ devlink
   device / ASIC / resource / health behavior
 ```
 
-### 4.3 phylink and SFP
+### phylink and SFP
 
-The 2015 phylink/SFP RFC addresses a recurring driver problem: MAC, PHY,
-PCS/SerDes and hot-pluggable SFP combinations could not be modeled
-cleanly by simple PHY attachment.
+The 2015 26-patch phylink/SFP RFC is **design provenance**, not the mainline landing. The canonical infrastructure anchor is:
+
+``` text
+9525ae83959b60c6061fe2f2caabdc8f69a48bc6
+phylink: add phylink infrastructure
+Russell King
+authored 2017-07-25; committed 2017-08-06
+```
+
+Thus the canonical history is `2015 RFC → Linux 4.13 mainline infrastructure → later PCS/SFP/MAC API expansion`.
+
+The 2015 phylink/SFP RFC addresses a recurring driver problem: MAC, PHY, PCS/SerDes and hot-pluggable SFP combinations could not be modeled cleanly by simple PHY attachment.
 
 RFC: https://lwn.net/Articles/667055/
 
@@ -1554,19 +1324,15 @@ MAC driver
    └── SFP module
 ```
 
-This progressively removes link-mode state-machine duplication from
-Ethernet MAC drivers.
+This progressively removes link-mode state-machine duplication from Ethernet MAC drivers.
 
-### 4.4 VF representors and SmartNIC/DPU control
+### VF representors and SmartNIC/DPU control
 
-Representors extend the switchdev idea to SR-IOV embedded switches and
-later SmartNIC/DPU architectures.
+Representors extend the switchdev idea to SR-IOV embedded switches and later SmartNIC/DPU architectures.
 
 LWN: https://lwn.net/Articles/692942/
 
-A representor is both a control-plane representation of a VF/SF and a
-netdevice endpoint through which the normal Linux stack can control the
-virtual switch.
+A representor is both a control-plane representation of a VF/SF and a netdevice endpoint through which the normal Linux stack can control the virtual switch.
 
 This is the foundation for the now-familiar:
 
@@ -1583,15 +1349,11 @@ bridge / TC / OVS / routing
 hardware offload
 ```
 
-### 4.5 XDP changes the driver fast path
+### XDP changes the driver fast path
 
-Linux 4.8 introduces first-generation XDP. From the driver's point of
-view the important change is that the RX path gains a programmable hook
-before skb allocation / normal stack processing.
+Linux 4.8 introduces first-generation XDP. From the driver's point of view the important change is that the RX path gains a programmable hook before skb allocation / normal stack processing.
 
-Kernel Recipes 2018 explicitly describes XDP as a programmable layer
-running in device driver context:
-https://archives.kernel-recipes.org/document/xdp-a-new-programmable-network-layer/
+Kernel Recipes 2018 explicitly describes XDP as a programmable layer running in device driver context: https://archives.kernel-recipes.org/document/xdp-a-new-programmable-network-layer/
 
 This creates new common driver responsibilities:
 
@@ -1605,15 +1367,15 @@ manage RX memory so buffers can move between RX/XDP/TX
 
 The last point directly motivates page_pool.
 
-### 4.6 DIM --- interrupt moderation becomes a common library
+### DIM --- interrupt moderation becomes a common library
 
-Netdev 0x12 (2018) presented DIM as a driver-independent Dynamic
-Interrupt Moderation library.
+**Release attribution:** the 2018 Netdev material confirms the common `net_dim` library was already upstream/in use, but this edition does not assign an exact first release until the origin commit/tag is re-audited.
+
+Netdev 0x12 (2018) presented DIM as a driver-independent Dynamic Interrupt Moderation library.
 
 https://www.netdevconf.info/0x12/
 
-Rather than every driver inventing adaptive interrupt/coalescing
-algorithms:
+Rather than every driver inventing adaptive interrupt/coalescing algorithms:
 
 ``` text
 driver samples events/bytes/packets
@@ -1625,20 +1387,15 @@ profile decision
 driver programs hardware moderation
 ```
 
-This is another example of extracting policy from drivers into common
-netdev infrastructure.
+This is another example of extracting policy from drivers into common netdev infrastructure.
 
-### 4.7 page_pool --- RX memory management becomes shared infrastructure
+### page_pool --- RX memory management becomes shared infrastructure
 
-The page_pool work was motivated by drivers independently reinventing
-high-speed DMA page recycling. A 2016 RFC explicitly described it as a
-generic API for streaming-DMA page pools, and the refurbished
-implementation appears in the 2018 XDP-era work.
+The page_pool work was motivated by drivers independently reinventing high-speed DMA page recycling. A 2016 RFC explicitly described it as a generic API for streaming-DMA page pools, and the refurbished implementation appears in the 2018 XDP-era work.
 
 Key late series: https://lists.openwall.net/netdev/2018/03/31/91
 
-Modern page_pool provides a common allocation/recycling/DMA model for
-skb and XDP buffers.
+Modern page_pool provides a common allocation/recycling/DMA model for skb and XDP buffers.
 
 ``` text
 before:
@@ -1654,14 +1411,11 @@ after:
      common recycling
 ```
 
-Its importance grows well beyond the original XDP motivation. By Netdev
-0x19, page_pool is described as the standard RX datapath
-memory-management mechanism, and newer zero-copy features require
-drivers to integrate with it.
+Its importance grows well beyond the original XDP motivation. By Netdev 0x19, page_pool is described as the standard RX datapath memory-management mechanism, and newer zero-copy features require drivers to integrate with it.
 
 ## Linux 5.x --- driver management APIs become structured and observable
 
-### 5.1 devlink health
+### devlink health
 
 Linux 5.1 adds generic devlink health reporting and recovery.
 
@@ -1674,30 +1428,21 @@ self-healing / recovery
 vendor-support data collection
 ```
 
-Conference:
-https://netdevconf.org/0x13/loadsessions/devlink-health-reporting-and-recovery-system.html
+Conference: https://netdevconf.org/0x13/loadsessions/devlink-health-reporting-and-recovery-system.html
 
-This changes hardware error handling from driver-specific logs/private
-tools toward a common operational model.
+This changes hardware error handling from driver-specific logs/private tools toward a common operational model.
 
-### 5.2 ethtool ioctl → Generic Netlink
+### ethtool ioctl → Generic Netlink
 
-The ethtool netlink work addresses limitations of the old ioctl ABI:
-extensibility, races, error reporting and lack of notifications.
+The ethtool netlink work addresses limitations of the old ioctl ABI: extensibility, races, error reporting and lack of notifications.
 
-Series: https://lwn.net/Articles/808028/
-https://lwn.net/Articles/810618/
+Series: https://lwn.net/Articles/808028/ https://lwn.net/Articles/810618/
 
-Architecturally this is not just a userspace-tool rewrite. It creates a
-structured, extensible management API between userspace, networking core
-and drivers.
+Architecturally this is not just a userspace-tool rewrite. It creates a structured, extensible management API between userspace, networking core and drivers.
 
-### 5.3 netdevsim and selftest-driven driver API design
+### netdevsim and selftest-driven driver API design
 
-`netdevsim` becomes an important test vehicle for driver-facing APIs.
-Current netdev maintainer documentation explicitly encourages new driver
-configuration APIs to have netdevsim/selftest coverage, while also
-requiring a real driver use case.
+`netdevsim` becomes an important test vehicle for driver-facing APIs. Current netdev maintainer documentation explicitly encourages new driver configuration APIs to have netdevsim/selftest coverage, while also requiring a real driver use case.
 
 This changes the development model:
 
@@ -1711,14 +1456,11 @@ netdevsim model + selftests
 real hardware driver
 ```
 
-Driver frameworks are increasingly expected to be testable without the
-physical NIC.
+Driver frameworks are increasingly expected to be testable without the physical NIC.
 
-### 5.4 auxiliary bus --- one PCI device, multiple subsystem drivers
+### auxiliary bus --- one PCI device, multiple subsystem drivers
 
-Merged for Linux 5.11, the auxiliary bus addresses complex devices
-exposing Ethernet, RDMA, vDPA and related functions from shared
-hardware.
+Merged for Linux 5.11, the auxiliary bus addresses complex devices exposing Ethernet, RDMA, vDPA and related functions from shared hardware.
 
 Instead of ad-hoc cross-driver glue:
 
@@ -1735,10 +1477,9 @@ This becomes increasingly important for SmartNIC/IPU/DPU architectures.
 
 ## Linux 6.x--7.x --- queues and memory become explicit framework objects
 
-### 6.1 page_pool becomes observable
+### page_pool becomes observable
 
-2023 page_pool netlink introspection associates pools with netdevices
-and NAPI IDs and exports allocation/recycling/memory information.
+2023 page_pool netlink introspection associates pools with netdevices and NAPI IDs and exports allocation/recycling/memory information.
 
 LWN: https://lwn.net/Articles/948718/
 
@@ -1750,10 +1491,9 @@ page_pool as hidden driver implementation detail
 page_pool as identifiable / observable netdev resource
 ```
 
-### 6.2 queue and NAPI objects move toward a generic netdev API
+### queue and NAPI objects move toward a generic netdev API
 
-Netdev 0x17 discusses exposing queues and NAPI instances through
-`netdev-genl`.
+Netdev 0x17 discusses exposing queues and NAPI instances through `netdev-genl`.
 
 https://netdevconf.info/0x17/sessions/talk/netlink-apis-to-exposeconfigure-netdev-objects.html
 
@@ -1773,14 +1513,11 @@ NAPI
  └─ thread / CPU relationship
 ```
 
-This is a conceptual shift from "the driver owns opaque rings" toward
-"queues and memory are objects negotiated among driver, kernel and
-userspace".
+This is a conceptual shift from "the driver owns opaque rings" toward "queues and memory are objects negotiated among driver, kernel and userspace".
 
-It directly connects to Device Memory TCP, io_uring ZCRX and
-queue-leasing work elsewhere in this document.
+It directly connects to Device Memory TCP, io_uring ZCRX and queue-leasing work elsewhere in this document.
 
-### 6.3 page_pool → netmem → memory providers
+### page_pool → netmem → memory providers
 
 The driver-framework view of the memory lineage is:
 
@@ -1798,20 +1535,13 @@ memory providers
 host pages / userspace memory / device memory
 ```
 
-Kernel Recipes 2024's io_uring zero-copy discussion makes the dependency
-explicit: zero-copy RX requires support from NIC hardware, firmware and
-driver, and uses page_pool / netmem plus queue configuration.
+Kernel Recipes 2024's io_uring zero-copy discussion makes the dependency explicit: zero-copy RX requires support from NIC hardware, firmware and driver, and uses page_pool / netmem plus queue configuration.
 
-This means modern high-speed network drivers are increasingly
-**memory-provider-aware** rather than simply allocating `struct page`
-objects.
+This means modern high-speed network drivers are increasingly **memory-provider-aware** rather than simply allocating `struct page` objects.
 
-### 6.4 XFRM device / IPsec packet offload
+### XFRM device / IPsec packet offload
 
-XFRM device offload is another common driver-framework contract. The
-important 6.2 generation extends the model from crypto acceleration to
-packet offload, where the NIC can own SA/policy processing as well as
-encryption/decryption.
+XFRM device offload is another common driver-framework contract. The important 6.2 generation extends the model from crypto acceleration to packet offload, where the NIC can own SA/policy processing as well as encryption/decryption.
 
 ``` text
 XFRM core
@@ -1823,16 +1553,11 @@ NIC driver
 IPsec hardware pipeline
 ```
 
-This is the same architectural pattern seen in switchdev and TC offload:
-the kernel keeps the canonical networking semantics while the driver
-maps those semantics onto hardware.
+This is the same architectural pattern seen in switchdev and TC offload: the kernel keeps the canonical networking semantics while the driver maps those semantics onto hardware.
 
 ## Queue / NAPI / page_pool become first-class netdev objects
 
-The 2023 Netdev 0x17 design work is an important turning point. Rather
-than treating an RX queue, its NAPI poller and its memory allocator as
-opaque details inside each driver, `netdev-genl` exposes generic
-relationships such as:
+The 2023 Netdev 0x17 design work is an important turning point. Rather than treating an RX queue, its NAPI poller and its memory allocator as opaque details inside each driver, `netdev-genl` exposes generic relationships such as:
 
 ``` text
 net_device
@@ -1854,17 +1579,11 @@ net_device
           └── outstanding memory
 ```
 
-By Linux 6.8 documentation, the netdev Netlink specification already
-exposes queue and NAPI objects, including the NAPI ID servicing a queue,
-interrupt-vector information and threaded-NAPI PID. This turns topology
-that previously required driver-specific inspection into a generic
-kernel ABI.
+By Linux 6.8 documentation, the netdev Netlink specification already exposes queue and NAPI objects, including the NAPI ID servicing a queue, interrupt-vector information and threaded-NAPI PID. This turns topology that previously required driver-specific inspection into a generic kernel ABI.
 
 ### page_pool introspection is the memory side of the same transition
 
-The 2023 page_pool introspection series gives page pools IDs, associates
-them with netdev and NAPI IDs, and exports memory/recycling statistics
-over the same netdev Netlink family.
+The 2023 page_pool introspection series gives page pools IDs, associates them with netdev and NAPI IDs, and exports memory/recycling statistics over the same netdev Netlink family.
 
 This changes page_pool's architectural role:
 
@@ -1880,21 +1599,13 @@ observable memory owner
 basis for configurable queue-bound memory providers
 ```
 
-The important point is not merely observability. Once queue, NAPI and
-page-pool identity exists in a common ABI, later zero-copy/device-memory
-APIs can express **which queue owns which memory model** without
-inventing a new driver-specific control plane.
+The important point is not merely observability. Once queue, NAPI and page-pool identity exists in a common ABI, later zero-copy/device-memory APIs can express **which queue owns which memory model** without inventing a new driver-specific control plane.
 
 ### Current netdev-genl completes the direction
 
-Current kernel documentation goes beyond read-only topology. It contains
-operations such as per-NAPI configuration, queue creation, queue
-statistics, and binding DMA-BUF memory to queues. Queue attributes can
-also carry provider-specific information such as io_uring
-memory-provider or XSK state.
+Current kernel documentation goes beyond read-only topology. It contains operations such as per-NAPI configuration, queue creation, queue statistics, and binding DMA-BUF memory to queues. Queue attributes can also carry provider-specific information such as io_uring memory-provider or XSK state.
 
-This provides the missing bridge between the Driver Framework and Memory
-axes:
+This provides the missing bridge between the Driver Framework and Memory axes:
 
 ``` text
 Driver Framework                     Memory
@@ -1905,23 +1616,17 @@ page_pool object    ───────────────→ recyclable 
 queue statistics    ───────────────→ provider/offload observability
 ```
 
-Thus Device Memory TCP, io_uring ZCRX and queue leasing should not be
-described as isolated zero-copy features. They are consumers of a
-broader transition in which queue and memory ownership become explicit
-networking-core concepts.
+Thus Device Memory TCP, io_uring ZCRX and queue leasing should not be described as isolated zero-copy features. They are consumers of a broader transition in which queue and memory ownership become explicit networking-core concepts.
 
 ## Rust --- from language support to a safe driver model
 
 ### Linux 6.1 --- Rust enters the kernel
 
-Linux 6.1 introduces the initial Rust-for-Linux support. This does not
-yet mean that network drivers can generally be written in Rust;
-driver-facing abstractions must be built subsystem by subsystem.
+Linux 6.1 introduces the initial Rust-for-Linux support. This does not yet mean that network drivers can generally be written in Rust; driver-facing abstractions must be built subsystem by subsystem.
 
 ### 2023 --- first network-device and PHY abstraction work
 
-A June 2023 proposal adds minimum Rust abstractions for `net_device`
-drivers and a Rust dummy driver:
+A June 2023 proposal adds minimum Rust abstractions for `net_device` drivers and a Rust dummy driver:
 
 https://lwn.net/Articles/934517/
 
@@ -1929,14 +1634,11 @@ In parallel, PHY abstractions mature through repeated review.
 
 ### Linux 6.8 --- Rust PHY support reaches mainline
 
-Linux 6.8 is the first major networking-driver milestone. LWN's
-merge-window coverage says Rust support for creating network PHY drivers
-was added, including abstractions and an Asix reference PHY driver.
+Linux 6.8 is the first major networking-driver milestone. LWN's merge-window coverage says Rust support for creating network PHY drivers was added, including abstractions and an Asix reference PHY driver.
 
 https://lwn.net/Articles/957188/
 
-This is more significant architecturally than the size of the example
-driver:
+This is more significant architecturally than the size of the example driver:
 
 ``` text
 C phylib API
@@ -1946,13 +1648,11 @@ sound Rust abstraction boundary
 safe Rust PHY driver
 ```
 
-The abstraction decides where `unsafe` is contained and what
-lifetime/state guarantees can be expressed in the type system.
+The abstraction decides where `unsafe` is contained and what lifetime/state guarantees can be expressed in the type system.
 
 ### Driver core, PCI, platform, DMA, MMIO and IRQ abstractions
 
-Writing a real high-performance NIC driver needs much more than
-`net_device_ops`:
+Writing a real high-performance NIC driver needs much more than `net_device_ops`:
 
 ``` text
 PCI / platform probing
@@ -1964,16 +1664,11 @@ lifetime / removal handling
 networking abstractions
 ```
 
-The 2024--2026 Rust driver-core work therefore matters directly to
-future network drivers, even when developed outside `net/`.
+The 2024--2026 Rust driver-core work therefore matters directly to future network drivers, even when developed outside `net/`.
 
-Kernel Recipes:
-https://kernel-recipes.org/en/2024/schedule/interfacing-kernel-c-apis-from-rust/
-https://kernel-recipes.org/en/2025/schedule/so-you-want-to-write-a-driver-in-rust/
-https://kernel-recipes.org/en/2026/schedule/enforcing-device-driver-lifecycle-rules-at-compile-time/
+Kernel Recipes: https://kernel-recipes.org/en/2024/schedule/interfacing-kernel-c-apis-from-rust/ https://kernel-recipes.org/en/2025/schedule/so-you-want-to-write-a-driver-in-rust/ https://kernel-recipes.org/en/2026/schedule/enforcing-device-driver-lifecycle-rules-at-compile-time/
 
-The 2026 driver-model work frames a major goal as converting lifecycle
-conventions into compile-time invariants:
+The 2026 driver-model work frames a major goal as converting lifecycle conventions into compile-time invariants:
 
 ``` text
 C driver:
@@ -1987,8 +1682,7 @@ Rust driver:
 
 ### Rust is not merely a C-to-Rust rewrite
 
-The deeper significance is that common driver frameworks become **safe
-abstraction boundaries**.
+The deeper significance is that common driver frameworks become **safe abstraction boundaries**.
 
 The long-term lineage is therefore:
 
@@ -2003,17 +1697,13 @@ Rust abstractions around those contracts
 more driver logic can live in safe Rust
 ```
 
-Netdev 0x17's Rust networking tutorial emphasized memory safety and
-prevention of use-after-free, double-free and data-race classes, while
-Kernel Recipes 2026 extends this idea to device lifecycle rules
-themselves.
+Netdev 0x17's Rust networking tutorial emphasized memory safety and prevention of use-after-free, double-free and data-race classes, while Kernel Recipes 2026 extends this idea to device lifecycle rules themselves.
 
 ## Conference lineage
 
 ### Netdev
 
-Netdev is the strongest conference source for driver-framework
-implementation:
+Netdev is the strongest conference source for driver-framework implementation:
 
 ``` text
 2016  switchdev / hardware-offload model
@@ -2070,15 +1760,11 @@ DRIVER FRAMEWORK
    → Rust safe driver abstractions
 ```
 
-The key insight is that the driver-framework axis is not independent. It
-is the layer that makes the other five axes implementable across
-heterogeneous hardware without every driver reinventing the same
-mechanisms.
+The key insight is that the driver-framework axis is not independent. It is the layer that makes the other five axes implementable across heterogeneous hardware without every driver reinventing the same mechanisms.
 
 ## Topics worth a second exact-commit audit
 
-Before assigning every item a precise kernel release/commit, a follow-up
-provenance pass should enumerate:
+Before assigning every item a precise kernel release/commit, a follow-up provenance pass should enumerate:
 
 ``` text
 switchdev initial core series
@@ -2095,28 +1781,21 @@ Rust net_device / PCI / DMA / IRQ abstraction landing status
 netdev-genl queue/NAPI object landing boundaries
 ```
 
-As with the rest of this document, review proposals should not be
-promoted to mainline facts until landing is verified.
+As with the rest of this document, review proposals should not be promoted to mainline facts until landing is verified.
 
 ------------------------------------------------------------------------
 
 ## Transition: mechanisms → observability
 
-Fast paths, memory ownership and offload are useful only if operators
-and developers can understand what the kernel did. Part V follows the
-parallel evolution of visibility, tracing and explanation.
+Fast paths, memory ownership and offload are useful only if operators and developers can understand what the kernel did. Part V follows the parallel evolution of visibility, tracing and explanation.
 
 # Part V --- Observability / Explainability
 
-This chapter focuses on how the networking stack became observable and
-explainable. Release attribution remains in Part II; feature
-architecture remains in Parts III--IV.
+This chapter focuses on how the networking stack became observable and explainable. Release attribution remains in Part II; feature architecture remains in Parts III--IV.
 
 ## Observability / Explainability evolution
 
-Linux networkingの進化には、performance、programmability、memory/control
-planeに加えて **observability / explainability**
-という独立した軸がある。
+Linux networkingの進化には、performance、programmability、memory/control planeに加えて **observability / explainability** という独立した軸がある。
 
 ``` text
 "What happened?"
@@ -2128,16 +1807,11 @@ planeに加えて **observability / explainability**
 "What path did this packet take through the kernel?"
 ```
 
-Retisはkernel datapathそのものではなく、eBPF、tracepoints、BTF、
-`skb_drop_reason`、`struct sk_buff` metadataなど、kernel側で発達した
-observability
-primitivesを統合する代表的なconsumer/toolとして位置付ける。
+Retisはkernel datapathそのものではなく、eBPF、tracepoints、BTF、 `skb_drop_reason`、`struct sk_buff` metadataなど、kernel側で発達した observability primitivesを統合する代表的なconsumer/toolとして位置付ける。
 
 ### Counters/interface capture → kernel-internal observation
 
-従来はinterface statistics、MIB/SNMP counters、ethtool statistics、
-tcpdump/AF_PACKETなどが中心だった。これらではcounter増加と特定packetを
-対応付けたり、kernel内部のどのfunctionをどう通ったかを追うのが難しい。
+従来はinterface statistics、MIB/SNMP counters、ethtool statistics、 tcpdump/AF_PACKETなどが中心だった。これらではcounter増加と特定packetを 対応付けたり、kernel内部のどのfunctionをどう通ったかを追うのが難しい。
 
 tracepoint、kprobe/fentry、eBPFにより:
 
@@ -2188,15 +1862,11 @@ tcp_v4_rcv
        reason   = NO_SOCKET
 ```
 
-重要なのはnetwork stack自身がdrop decisionの意味をstructured
-metadataとして trace infrastructureへ渡すようになった点である。
+重要なのはnetwork stack自身がdrop decisionの意味をstructured metadataとして trace infrastructureへ渡すようになった点である。
 
 ### Coverage expands beyond core networking
 
-drop-reason
-coverageは段階的にIP、neighbour、TCP、qdisc/device/XDP関連pathへ
-拡大した。さらにnon-core reasonのruntime registrationにより、mac80211や
-Open vSwitchのようなsubsystem固有reasonも表現可能になった。
+drop-reason coverageは段階的にIP、neighbour、TCP、qdisc/device/XDP関連pathへ 拡大した。さらにnon-core reasonのruntime registrationにより、mac80211や Open vSwitchのようなsubsystem固有reasonも表現可能になった。
 
 ``` text
 core skb reasons
@@ -2208,8 +1878,7 @@ subsystem-specific semantic reasons
 
 ### Raw enum values are not stable ABI
 
-`skb_drop_reason`はkernel internal enumであり、numeric valueをstable
-userspace ABI として扱うべきではない。
+`skb_drop_reason`はkernel internal enumであり、numeric valueをstable userspace ABI として扱うべきではない。
 
 ``` text
 raw integer
@@ -2241,13 +1910,11 @@ conntrack / OVS state ---------┤
                                └─ packet tracking
 ```
 
-RetisはBTFを使ってrunning kernelのdrop-reason definitionを解釈するため、
-kernel versionごとのraw enum値を固定tableとして仮定しない。
+RetisはBTFを使ってrunning kernelのdrop-reason definitionを解釈するため、 kernel versionごとのraw enum値を固定tableとして仮定しない。
 
 ### Drop monitoring → packet journey
 
-Retisの本質はdropwatchの高機能版だけではない。複数のskb-aware
-function/tracepointを同時に観測し、tracking logicによって:
+Retisの本質はdropwatchの高機能版だけではない。複数のskb-aware function/tracepointを同時に観測し、tracking logicによって:
 
 ``` text
 event A
@@ -2261,8 +1928,7 @@ A → B → C → D
 
 へ再構成する方向にある。
 
-tracking IDはkernelのuniversal ABIではなくRetis側のtracking
-mechanismである、 という区別は重要。
+tracking IDはkernelのuniversal ABIではなくRetis側のtracking mechanismである、 という区別は重要。
 
 ### Header filtering → kernel-metadata filtering
 
@@ -2293,8 +1959,7 @@ follow packet through later probes
 
 ### cBPF → eBPFという歴史の再接続
 
-Retisのpcap-style filteringは、classic BPF由来のpacket-filter modelを
-modern eBPF probeへ橋渡しする。
+Retisのpcap-style filteringは、classic BPF由来のpacket-filter modelを modern eBPF probeへ橋渡しする。
 
 ``` text
 pcap-filter syntax
@@ -2334,9 +1999,7 @@ physical NIC
 
 のように複雑化した。
 
-programmability、virtualization、offloadがnetworkingを強力にした一方で、
-packetが「どこを通り、なぜdropされたか」を理解する難易度も上がった。
-Retis型observabilityはこの複雑化への回答と位置付けられる。
+programmability、virtualization、offloadがnetworkingを強力にした一方で、 packetが「どこを通り、なぜdropされたか」を理解する難易度も上がった。 Retis型observabilityはこの複雑化への回答と位置付けられる。
 
 ### Performance evolution creates an observability requirement
 
@@ -2358,9 +2021,7 @@ structured drop reasons
 Retis-style packet journey tracing
 ```
 
-observabilityは付加的なdebug機能ではなく、programmable/heterogeneousな
-network datapathを運用するためのarchitecture
-capabilityへ発展したと考えられる。
+observabilityは付加的なdebug機能ではなく、programmable/heterogeneousな network datapathを運用するためのarchitecture capabilityへ発展したと考えられる。
 
 ### Updated six-axis model
 
@@ -2397,9 +2058,7 @@ NAPI / multiqueue
 
 ### 2023 OVSCon --- Retis as an OVS kernel/userspace correlator
 
-OVSCon 2023のRetis発表は、Retisを単なるgeneric Linux tracing
-toolとしてではなく、 OVS datapath
-troubleshootingのための統合observability toolとして理解する重要資料。
+OVSCon 2023のRetis発表は、Retisを単なるgeneric Linux tracing toolとしてではなく、 OVS datapath troubleshootingのための統合observability toolとして理解する重要資料。
 
 発表ではnetwork tracingの問題を三つに整理している。
 
@@ -2414,9 +2073,7 @@ many packets
     → filtering is required
 ```
 
-2023時点でRetisはOVS kernel datapathをfirst-class targetとして扱い、
-`openvswitch:ovs_dp_upcall`などのkernel tracepointに加え、
-`ovs-vswitchd`側のUSDT probesを利用してupcallを追跡していた。
+2023時点でRetisはOVS kernel datapathをfirst-class targetとして扱い、 `openvswitch:ovs_dp_upcall`などのkernel tracepointに加え、 `ovs-vswitchd`側のUSDT probesを利用してupcallを追跡していた。
 
 ``` text
 OVS kernel datapath
@@ -2447,9 +2104,7 @@ kernel datapath
 ovs_execute_actions
 ```
 
-この点は重要で、eBPF/kprobe/tracepointだけではkernel→userspace→kernelという
-OVS slow path全体を一つのpacket journeyとして相関しにくい。
-Retisはkernel probesとUSDTを組み合わせてこの境界を越える。
+この点は重要で、eBPF/kprobe/tracepointだけではkernel→userspace→kernelという OVS slow path全体を一つのpacket journeyとして相関しにくい。 Retisはkernel probesとUSDTを組み合わせてこの境界を越える。
 
 2023資料ではcollector modelも明確になっている。
 
@@ -2462,16 +2117,13 @@ ct           conntrack state
 nft          nftables table/chain/verdict
 ```
 
-したがってRetisは単なるpacket dumperではなく、 **multiple networking
-subsystemsのcontextを同じevent streamへ載せる** architectureを持つ。
+したがってRetisは単なるpacket dumperではなく、 **multiple networking subsystemsのcontextを同じevent streamへ載せる** architectureを持つ。
 
 ------------------------------------------------------------------------
 
 ### OVS tracking --- packet identity is harder than skb identity
 
-OVSCon
-2023資料ではRetisのtrackingが`struct sk_buff *`だけに依存しないことも
-重要である。
+OVSCon 2023資料ではRetisのtrackingが`struct sk_buff *`だけに依存しないことも 重要である。
 
 packetは:
 
@@ -2484,8 +2136,7 @@ userspace upcall
 
 などでrepresentationやidentityが変化する。
 
-Retisはskb tracking ID、packet contentのhash、thread/event
-orderingなどを 状況に応じて利用してOVS upcallを相関する。
+Retisはskb tracking ID、packet contentのhash、thread/event orderingなどを 状況に応じて利用してOVS upcallを相関する。
 
 これは:
 
@@ -2497,9 +2148,7 @@ same logical network packet
 
 というnetwork observability上の本質的問題への対応である。
 
-したがってpacket trackingはkernel ABIではなくtool-side
-heuristic/correlation logicであり、各tracking
-boundaryにはassumptionがあることを明示する。
+したがってpacket trackingはkernel ABIではなくtool-side heuristic/correlation logicであり、各tracking boundaryにはassumptionがあることを明示する。
 
 ------------------------------------------------------------------------
 
@@ -2542,8 +2191,7 @@ dpctl/get-flow
 ofproto/detrace
 ```
 
-などを使ってkernel datapath flowをOVS/OpenFlow
-representationへ関連付ける。
+などを使ってkernel datapath flowをOVS/OpenFlow representationへ関連付ける。
 
 概念的には:
 
@@ -2571,16 +2219,13 @@ OpenFlow representation
 
 を説明する方向への進化。
 
-ただし2024資料自身がflow deletion/update
-trackingやupcall時のflow表示などに
-制約があることを明示しており、完全なOVS state reconstructionではない。
+ただし2024資料自身がflow deletion/update trackingやupcall時のflow表示などに 制約があることを明示しており、完全なOVS state reconstructionではない。
 
 ------------------------------------------------------------------------
 
 ### `ofproto/trace` and Retis --- simulation vs live observation
 
-OVSには以前から`ofproto/trace`という強力なtroubleshooting
-mechanismがある。
+OVSには以前から`ofproto/trace`という強力なtroubleshooting mechanismがある。
 
 役割を単純化すると:
 
@@ -2630,18 +2275,15 @@ observe real execution
              └──────────────────┘
 ```
 
-特にconntrack state、kernel datapath behavior、upcall、runtime
-stateなどを含む 問題ではlive observationが重要になる。
+特にconntrack state、kernel datapath behavior、upcall、runtime stateなどを含む 問題ではlive observationが重要になる。
 
-一方、OpenFlow pipeline logicそのものを理解するにはsimulation-based
-traceも 依然として有用。
+一方、OpenFlow pipeline logicそのものを理解するにはsimulation-based traceも 依然として有用。
 
 ------------------------------------------------------------------------
 
 ### 2025 --- arbitrary-point packet dumping becomes user-facing
 
-2025年1月のRed Hat Developer記事は、Retisのgeneric Linux
-networking側の価値を 明確に説明している。
+2025年1月のRed Hat Developer記事は、Retisのgeneric Linux networking側の価値を 明確に説明している。
 
 traditional capture:
 
@@ -2671,8 +2313,7 @@ TCP/UDP               ← dump
 net_dev_start_xmit    ← dump
 ```
 
-ではskb-aware kernel function/tracepointをcapture
-pointとして選択できる。
+ではskb-aware kernel function/tracepointをcapture pointとして選択できる。
 
 さらに複数probeを同時に使い、packet trackingによってflowを再構成できる。
 
@@ -2688,8 +2329,7 @@ kernel-internal capture
 tcpdump / Wireshark
 ```
 
-つまり新しいkernel observabilityを既存packet-analysis
-ecosystemへ橋渡ししている。
+つまり新しいkernel observabilityを既存packet-analysis ecosystemへ橋渡ししている。
 
 ------------------------------------------------------------------------
 
@@ -2772,12 +2412,9 @@ FLOW ENRICHMENT
 "this actual packet corresponds to this OVS/OpenFlow state"
 ```
 
-この意味でRetisはLinux kernel networkingの新しいforwarding
-architectureではない。
+この意味でRetisはLinux kernel networkingの新しいforwarding architectureではない。
 
-**Linux networking stackが長年かけて獲得したprogrammability、typed
-metadata、 tracepoints、structured drop
-semanticsを統合し、複雑化したdatapathを explainableにするtooling layer**
+**Linux networking stackが長年かけて獲得したprogrammability、typed metadata、 tracepoints、structured drop semanticsを統合し、複雑化したdatapathを explainableにするtooling layer**
 
 として扱うのが最も正確。
 
@@ -2787,26 +2424,18 @@ semanticsを統合し、複雑化したdatapathを explainableにするtooling l
 
 この系譜のRetis側の主要資料として以下を扱う。
 
--   Red Hat Developer (2023-07-19): *How to retrieve packet drop reasons
-    in the Linux kernel*
--   Red Hat Developer (2024-01-04): *An update on packet drop reasons in
-    Linux*
--   Red Hat Developer (2025-01-09): *Dumping packets from anywhere in
-    the networking stack*
--   Red Hat Developer (2025-10-02): *Filtering packets from anywhere in
-    the networking stack*
+-   Red Hat Developer (2023-07-19): *How to retrieve packet drop reasons in the Linux kernel*
+-   Red Hat Developer (2024-01-04): *An update on packet drop reasons in Linux*
+-   Red Hat Developer (2025-01-09): *Dumping packets from anywhere in the networking stack*
+-   Red Hat Developer (2025-10-02): *Filtering packets from anywhere in the networking stack*
 
-kernel側の中心anchorはv5.17の`kfree_skb_reason()` /
-`skb_drop_reason`であり、 その後もsubsystem
-coverageが継続して拡張される。
+kernel側の中心anchorはv5.17の`kfree_skb_reason()` / `skb_drop_reason`であり、 その後もsubsystem coverageが継続して拡張される。
 
 ------------------------------------------------------------------------
 
 ## pwru and Retis --- two packet-journey observability models
 
-pwruとRetisは競合する部分を持つが、単純な「軽量版/高機能版」という関係ではない。
-両者は同じmodern Linux kernel
-observability基盤から異なる探索戦略を取る。
+pwruとRetisは競合する部分を持つが、単純な「軽量版/高機能版」という関係ではない。 両者は同じmodern Linux kernel observability基盤から異なる探索戦略を取る。
 
 ``` text
                  eBPF + BTF
@@ -2826,9 +2455,7 @@ observability基盤から異なる探索戦略を取る。
 
 ### pwru --- start broad when you do not know where to look
 
-pwruの中心的アイデアは、kernel
-BTFから`struct sk_buff *`をargumentとして取る
-functionsを発見し、それらへeBPF probeを広くattachすること。
+pwruの中心的アイデアは、kernel BTFから`struct sk_buff *`をargumentとして取る functionsを発見し、それらへeBPF probeを広くattachすること。
 
 ``` text
 kernel BTF
@@ -2852,8 +2479,7 @@ print functions actually traversed
 
 という初動調査に特に強い。
 
-FOSDEM 2024では約1,500個規模のfunctionsへprobeをattachする例が示され、
-pcap filterで対象packetだけを選択してtrajectoryを表示している。
+FOSDEM 2024では約1,500個規模のfunctionsへprobeをattachする例が示され、 pcap filterで対象packetだけを選択してtrajectoryを表示している。
 
 ### pwru is more than a simple skb-pointer tracer
 
@@ -2887,8 +2513,7 @@ pwru = "all skb functionsにprobeするだけ"
 
 ### Retis --- start from events and enrich their meaning
 
-Retisはcollector architectureを使ってeventへsubsystem
-contextを追加する。
+Retisはcollector architectureを使ってeventへsubsystem contextを追加する。
 
 ``` text
 probe/event
@@ -2907,9 +2532,7 @@ probe/event
  sort/correlate/reconstruct
 ```
 
-特にOVSではkernel datapathだけでなくuserspace upcallとの相関を行うため、
-単一kernel function trajectoryを越えたsubsystem-specific
-semanticsを扱う。
+特にOVSではkernel datapathだけでなくuserspace upcallとの相関を行うため、 単一kernel function trajectoryを越えたsubsystem-specific semanticsを扱う。
 
 ### Same foundation, different use of BTF
 
@@ -2929,8 +2552,7 @@ BTF
  └─ metadata filtering/introspection
 ```
 
-この違いはBTFが単なるCO-RE portability mechanismではなく、 network
-observability infrastructureへ発展したことを示す。
+この違いはBTFが単なるCO-RE portability mechanismではなく、 network observability infrastructureへ発展したことを示す。
 
 ### pcap filter: classic BPF history reconnects to eBPF tracing
 
@@ -2950,8 +2572,7 @@ pcap-filter syntax
  tracing program
 ```
 
-Retisにもpcap-style packet filteringがあり、両者は歴史的なclassic BPFの
-packet-filter modelをmodern eBPF observabilityへ再接続している。
+Retisにもpcap-style packet filteringがあり、両者は歴史的なclassic BPFの packet-filter modelをmodern eBPF observabilityへ再接続している。
 
 ``` text
 classic BPF
@@ -2969,9 +2590,7 @@ eBPF
        └─ Retis
 ```
 
-BPFは「packetをfilterする技術」から「network
-datapathをprogramする技術」へ進化し、 さらにそのprogrammable
-datapath自身を観測する技術としても使われるようになった。
+BPFは「packetをfilterする技術」から「network datapathをprogramする技術」へ進化し、 さらにそのprogrammable datapath自身を観測する技術としても使われるようになった。
 
 ### Tracking comparison
 
@@ -3002,8 +2621,7 @@ subsystem metadata/stateをcorrelateする
 "what happened, where, and in which subsystem context?"
 ```
 
-どちらもclone、representation change、XDP↔skbなどpacket
-identityが変化する 境界にはtool-side logic/assumptionが必要になる。
+どちらもclone、representation change、XDP↔skbなどpacket identityが変化する 境界にはtool-side logic/assumptionが必要になる。
 
 ### OVS is the clearest architectural difference
 
@@ -3045,68 +2663,49 @@ kernel datapath
 OVS flow enrichment
 ```
 
-pwruでもOVS kernel functionsを観測できるが、 RetisのOVS
-collectorはOVS固有のupcall semanticsやuserspace correlationを
-明示的にmodel化する。
+pwruでもOVS kernel functionsを観測できるが、 RetisのOVS collectorはOVS固有のupcall semanticsやuserspace correlationを 明示的にmodel化する。
 
-ここが「generic broad tracing」と「subsystem-aware
-correlation」の典型的な差。
+ここが「generic broad tracing」と「subsystem-aware correlation」の典型的な差。
 
 ### Comparison matrix
 
-  -----------------------------------------------------------------------
-  Aspect                  pwru                    Retis
-  ----------------------- ----------------------- -----------------------
-  Primary model           broad kernel-function   event/collector-based
-                          tracing                 correlation
+  ----------------------------------------------------------------------------------------------------------------
+  Aspect                  pwru                                        Retis
+  ----------------------- ------------------------------------------- --------------------------------------------
+  Primary model           broad kernel-function tracing               event/collector-based correlation
 
-  Starting point          target packet, location probes/events +
-                          unknown                 collectors
+  Starting point          target packet, location unknown             probes/events + collectors
 
-  Probe discovery         BTFからskb              configured/selected
-                          functionsを広く発見     probes and profiles
+  Probe discovery         BTFからskb functionsを広く発見              configured/selected probes and profiles
 
-  kprobe-multi            supported               different probe
-                                                  architecture
+  kprobe-multi            supported                                   different probe architecture
 
-  Packet filter           pcap-style              pcap-style
+  Packet filter           pcap-style                                  pcap-style
 
-  Kernel metadata         skb/BTF/expressions     skb/BTF metadata
-                                                  filters
+  Kernel metadata         skb/BTF/expressions                         skb/BTF metadata filters
 
-  skb tracking            yes                     yes
+  skb tracking            yes                                         yes
 
-  clone handling          yes                     tracking/correlation
-                                                  logic
+  clone handling          yes                                         tracking/correlation logic
 
-  XDP tracking            supported               XDP/kernel probes
-                                                  depending on collection
+  XDP tracking            supported                                   XDP/kernel probes depending on collection
 
-  Drop reason             can observe/output      dedicated skb-drop
-                          relevant path/state     semantics
+  Drop reason             can observe/output relevant path/state      dedicated skb-drop semantics
 
-  Conntrack               generic tracing/state   dedicated collector
-                          inspection possible     
+  Conntrack               generic tracing/state inspection possible   dedicated collector
 
-  nftables                generic kernel          dedicated semantic
-                          trajectory              collector
+  nftables                generic kernel trajectory                   dedicated semantic collector
 
-  OVS kernel path         visible                 dedicated OVS collector
+  OVS kernel path         visible                                     dedicated OVS collector
 
-  OVS userspace upcall    not the central model   explicit
-                                                  kernel↔ovs-vswitchd
-                                                  correlation
+  OVS userspace upcall    not the central model                       explicit kernel↔ovs-vswitchd correlation
 
-  Post-processing         trajectory-oriented     collect → store →
-                          output/JSON             sort/reconstruct
+  Post-processing         trajectory-oriented output/JSON             collect → store → sort/reconstruct
 
-  Best first question     "where did this packet  "what happened in this
-                          go?"                    subsystem context?"
-  -----------------------------------------------------------------------
+  Best first question     "where did this packet go?"                 "what happened in this subsystem context?"
+  ----------------------------------------------------------------------------------------------------------------
 
-この表は絶対的な機能境界ではない。両projectとも進化しており、
-overlapする機能は多い。比較軸は「できる/できない」より**design
-center**。
+この表は絶対的な機能境界ではない。両projectとも進化しており、 overlapする機能は多い。比較軸は「できる/できない」より**design center**。
 
 ### Practical troubleshooting model
 
@@ -3137,9 +2736,7 @@ enrich with:
  netns/device
 ```
 
-ただしこれは必須workflowではない。
-Retisだけで最初から追跡することも、pwruだけでroot
-causeへ到達することもある。
+ただしこれは必須workflowではない。 Retisだけで最初から追跡することも、pwruだけでroot causeへ到達することもある。
 
 ### Evolutionary interpretation
 
@@ -3178,18 +2775,14 @@ tools can discover and explain
 the running kernel dynamically
 ```
 
-つまりpwru/Retisはkernel networking featureそのものではないが、
-**eBPF/BTFによってLinux kernelが「実行中に探索可能なnetwork platform」へ
-変化したことを象徴するtools** と位置付けられる。
+つまりpwru/Retisはkernel networking featureそのものではないが、 **eBPF/BTFによってLinux kernelが「実行中に探索可能なnetwork platform」へ 変化したことを象徴するtools** と位置付けられる。
 
 ### Conference provenance
 
 pwruについては特に以下をdesign/architecture evidenceとして扱う。
 
--   FOSDEM 2024, Quentin Monnet: *Packet, where are you? Track in the
-    stack with pwru*
--   Linux Plumbers Conference 2024: pwru architecture/evolution
-    presentation
+-   FOSDEM 2024, Quentin Monnet: *Packet, where are you? Track in the stack with pwru*
+-   Linux Plumbers Conference 2024: pwru architecture/evolution presentation
 
 Retisについては前章の:
 
@@ -3220,8 +2813,7 @@ Linux networking observability evolution
 
 ## Transition: evidence → synthesis
 
-The preceding chapters separate chronology and architectural lineages.
-Part VI recombines them into a small number of long-term trends.
+The preceding chapters separate chronology and architectural lineages. Part VI recombines them into a small number of long-term trends.
 
 # Part VI --- Synthesis: v3.x → 7.x を一つの進化として見る
 
@@ -3230,7 +2822,7 @@ Part VI recombines them into a small number of long-term trends.
 ``` text
                      v5.0                    2026
 
-packet memory        struct page      →      page_pool / netmem / providers
+packet memory        early page_pool  →      page_pool maturation / netmem / providers
 fast path            XDP/AF_XDP       →      AF_XDP MB / netkit / queue lease
 aggregation          GRO/GSO          →      BIG TCP / tunnel BIG TCP
 BPF                   packet/socket    →      struct_ops/netkit/BPF qdisc
@@ -3241,8 +2833,7 @@ memory path          NIC→RAM          →      NIC→RAM or device memory
 async I/O             conventional     →      io_uring ZC TX/RX
 ```
 
-最大の変化は、network stack が **「CPU が system RAM 上の skb
-を逐次処理する単一モデル」から離れたこと** にある。
+最大の変化は、network stack が **「CPU が system RAM 上の skb を逐次処理する単一モデル」から離れたこと** にある。
 
 ------------------------------------------------------------------------
 
@@ -3254,10 +2845,10 @@ async I/O             conventional     →      io_uring ZC TX/RX
         ┌───────────────┼────────────────┐
         │               │                │
         ▼               ▼                ▼
-      XDP/BPF         GRO/GSO          skb/page
+      XDP/BPF         GRO/GSO       page_pool (already present)
         │               │                │
         ▼               ▼                ▼
-   struct_ops        BIG TCP          page_pool
+   struct_ops        BIG TCP       netmem / memory providers
    SK_LOOKUP             │                │
         │                │             netmem
         ▼                │          ┌─────┴─────┐
@@ -3291,77 +2882,93 @@ single network model ────→ multi-network / VM-aware networking
 1.  Part IIでrelease attributionを確認する。
 2.  Part III--Vでfeature / driver / observabilityのlineageを読む。
 3.  Part VIIで未解決のattribution境界を確認する。
-4.  Appendixは一次資料・conference・commit
-    provenanceを検証するときに参照する。
+4.  Appendixは一次資料・conference・commit provenanceを検証するときに参照する。
 
-Appendixは旧release chronologyのコピーではなく、non-normativeなevidence
-catalogである。
+Appendixは旧release chronologyのコピーではなく、non-normativeなevidence catalogである。
 
 ------------------------------------------------------------------------
 
 ## Transition: synthesis → provenance
 
-The synthesis is intentionally compact. Part VII records the attribution
-boundaries that remain important for verification or future re-audit.
+The synthesis is intentionally compact. Part VII records the attribution boundaries that remain important for verification or future re-audit.
 
 # Part VII --- Canonical provenance ledger
 
-This section records only unresolved or especially important attribution
-boundaries. The detailed research diary from the re-audit passes is
-intentionally omitted from the clean edition.
+## Exact mainline anchor inventory retained in this edition
 
-  ---------------------------------------------------------------------
+These are representative **anchor commits**, not necessarily every commit in the feature series.
+
+  --------------------------------------------------------------------------------------------------------------------------------------------------
+  Feature                       Mainline anchor                              Subject / role
+  ----------------------------- -------------------------------------------- -----------------------------------------------------------------------
+  DQL                           `75957ba36c05b979701e9ec64b37819adc12f830`   `dql: Dynamic queue limits`
+
+  CoDel                         `76e3cc126bb223013a6b9a0e2a51238d1ef2e409`   CoDel qdisc core anchor
+
+  SO_REUSEPORT infrastructure   `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a`   `soreuseport: infrastructure`
+
+  nftables set API              `20a69341f2d00cd042e81c82289fba8a13c05a25`   nftables core-generation anchor
+
+  BBR                           `0f8782ea14974ce992618b55f0c041ef43ed0b78`   initial BBR mainline anchor
+
+  phylink                       `9525ae83959b60c6061fe2f2caabdc8f69a48bc6`   `phylink: add phylink infrastructure`
+
+  TCP MSG_ZEROCOPY              `f214f915e7db99091f1312c48b30928c1e0c90b7`   `tcp: enable MSG_ZEROCOPY`
+
+  page_pool/XDP integration     `60bbf7eeef10dc647430646d7fe5e3d8d132dbec`   mlx5 page_pool/XDP integration anchor; **not page_pool origin**
+
+  ethtool Generic Netlink       `2b4a8990b7df55875745a80a609a1ceaaf51f322`   `ethtool: introduce ethtool netlink interface`
+
+  SK_LOOKUP                     `e9ddbb7707ff...`                            `bpf: Introduce SK_LOOKUP program type with a dedicated attach point`
+
+  XFRM packet offload           `d14f28b8c1de668bab863bf5892a49c824cb110d`   `xfrm: add new packet offload flag`
+
+  IPv6 BIG TCP / GRO            `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12`   `net: allow gro_max_size to exceed 65536`
+
+  IPv6 BIG TCP / GSO            `7c4e983c4f3cf94fcd879730c6caa877e0768a4d`   `net: allow gso_max_size to exceed 65536`
+
+  netkit                        `35dfaad7188cdc043fde31709c796f5a692ba2bd`   netkit core anchor
+
+  net-next 7.3 merge            `91ec2035134982b98fab0609a9fd8480e8217dc1`   `Merge tag 'net-next-7.3' ...`
+  --------------------------------------------------------------------------------------------------------------------------------------------------
+
+Where only a shortened SHA is shown (currently SK_LOOKUP), the full SHA remains an explicit re-audit item rather than being guessed.
+
+This section records only unresolved or especially important attribution boundaries. The detailed research diary from the re-audit passes is intentionally omitted from the clean edition.
+
+  -------------------------------------------------------------------------------------------------------------------------------------
   Topic                              Canonical status
-  ---------------------------------- ----------------------------------
-  BQL/DQL                            Linux 3.3 mainline generation; DQL
-                                     exact anchor retained
+  ---------------------------------- --------------------------------------------------------------------------------------------------
+  BQL/DQL                            Linux 3.3 mainline generation; DQL exact anchor retained
 
-  SO_REUSEPORT                       Linux 3.9; infrastructure exact
-                                     anchor retained
+  SO_REUSEPORT                       Linux 3.9; infrastructure exact anchor retained
 
-  switchdev                          3.19 origin; later 4.x work
-                                     treated as expansion
+  switchdev                          3.19 origin; later 4.x work treated as expansion
 
-  devlink                            Linux 4.6 release origin; exact
-                                     initial commit set still pending
+  devlink                            Linux 4.6 release origin; exact initial commit set still pending
 
-  phylink                            2015 RFC → Linux 4.13
-                                     infrastructure; exact anchor
-                                     retained
+  phylink                            2015 RFC → Linux 4.13 infrastructure; exact anchor retained
 
-  MSG_ZEROCOPY                       TCP foundation 4.14; UDP extension
-                                     5.0
+  MSG_ZEROCOPY                       TCP foundation 4.14; UDP extension 5.0
 
-  SK_MSG                             4.17 generation; final series
-                                     verified, core SHA still pending
+  SK_MSG                             4.17 generation; final series verified, core SHA still pending
 
-  page_pool                          4.18 refurbished/XDP-memory-return
-                                     generation; do not claim all
-                                     page_pool ideas originated there
+  page_pool                          4.18 refurbished/XDP-memory-return generation; do not claim all page_pool ideas originated there
 
-  ethtool Generic Netlink            5.6 generation; exact
-                                     core-interface anchor retained
+  ethtool Generic Netlink            5.6 generation; exact core-interface anchor retained
 
-  SK_LOOKUP                          5.9; exact program-type anchor
-                                     retained
+  SK_LOOKUP                          5.9; exact program-type anchor retained
 
-  auxiliary bus                      5.11; final series/tag verified,
-                                     exact feature-origin SHA pending
+  auxiliary bus                      5.11; final series/tag verified, exact feature-origin SHA pending
 
-  XFRM packet offload                6.2; exact `XFRM_OFFLOAD_PACKET`
-                                     anchor retained
+  XFRM packet offload                6.2; exact `XFRM_OFFLOAD_PACKET` anchor retained
 
-  Rust PHY                           2023 RFC/final v11 → Linux 6.8;
-                                     per-patch mainline SHA set pending
+  Rust PHY                           2023 RFC/final v11 → Linux 6.8; per-patch mainline SHA set pending
 
-  queue/NAPI objects                 6.8 documentation-level milestone;
-                                     later write/configuration APIs
-                                     must not be backdated
+  queue/NAPI objects                 6.8 documentation-level milestone; later write/configuration APIs must not be backdated
 
-  7.x development                    released 7.2 separated from
-                                     7.3-rc/mainline-but-unreleased
-                                     work
-  ---------------------------------------------------------------------
+  7.x development                    released 7.2 separated from 7.3-rc/mainline-but-unreleased work
+  -------------------------------------------------------------------------------------------------------------------------------------
 
 ## Evidence grades
 
@@ -3372,51 +2979,52 @@ C  development status or architecture verified; exact landing incomplete
 D  RFC/design/proposal only
 ```
 
-The canonical chronology in Part II takes precedence over all provenance
-notes.
+The canonical chronology in Part II takes precedence over all provenance notes.
 
 ## Reading rule for the appendix
 
-The appendix is an evidence catalog. Dates found there may be RFC dates,
-posting dates, review bases, or conference dates. They must not be read
-as release attribution unless Part II says so.
+The appendix is an evidence catalog. Dates found there may be RFC dates, posting dates, review bases, or conference dates. They must not be read as release attribution unless Part II says so.
+
+## Open attribution items and evidence grade
+
+  ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Item                                     Grade                   Current treatment
+  ---------------------------------------- ----------------------- -------------------------------------------------------------------------------------------------------------------------------------
+  queue leasing                            B                       RX side is merged; TX queue leasing remains PoC/design in the cited 2026 discussion; exact released tag for RX remains to be pinned
+
+  devmem buffers \> `PAGE_SIZE`            A for 7.3 mainline-rc   explicitly listed in the `net-next-7.3` pull merged to Linus mainline
+
+  MPTCP max subflows 8 → 64                B                       2026 merge series verified; exact released-tag containment should be pinned before using it as a 7.2-specific anchor
+
+  YNL initial rollout boundary             C                       treated as a 6.2--6.3 generation pending exact origin/tag audit
+
+  DIM / `net_dim` origin                   C                       upstream/in-use by 2018 is established; exact origin commit/release pending
+
+  `cake_mq` release attribution            C                       mainline merge dated 2026-01-13 verified; exact release tag pending
+
+  queue-leasing revert/remerge narrative   removed                 not retained without a re-verified primary-source chain
+  ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # Appendix --- Evidence catalog and research notes (non-normative)
 
-This appendix is a compact evidence catalog. It intentionally omits the
-old duplicate release chronology, intermediate audit passes,
-completeness matrices, and "next pass" notes. Part II is the only
-normative release map.
+This appendix is a compact evidence catalog. It intentionally omits the old duplicate release chronology, intermediate audit passes, completeness matrices, and "next pass" notes. Part II is the only normative release map.
 
-The retained material serves four purposes: source navigation,
-exact-commit dossiers, conference provenance, and cross-source lineage
-reconstruction. RFC/review dates in this appendix must not be read as
-released-kernel attribution.
+The retained material serves four purposes: source navigation, exact-commit dossiers, conference provenance, and cross-source lineage reconstruction. RFC/review dates in this appendix must not be read as released-kernel attribution.
 
 ## LWN reading list --- core articles
 
-以下は、この期間の Linux networking
-の技術史を追う「幹」として特に有用な記事群である。順位付けではなく、時系列の学習経路として並べている。
+以下は、この期間の Linux networking の技術史を追う「幹」として特に有用な記事群である。順位付けではなく、時系列の学習経路として並べている。
 
-1.  *Memory management for 400Gb/s interfaces* --- high-speed networking
-    と memory management
-2.  [Kernel operations structures in
-    BPF](https://lwn.net/Articles/811631/) --- BPF `struct_ops`
+1.  *Memory management for 400Gb/s interfaces* --- high-speed networking と memory management
+2.  [Kernel operations structures in BPF](https://lwn.net/Articles/811631/) --- BPF `struct_ops`
 3.  *Zero-copy network transmission with io_uring* --- zero-copy TX
-4.  [Going big with TCP packets](https://lwn.net/Articles/884104/) ---
-    BIG TCP
-5.  [5.19 Merge window, part 1](https://lwn.net/Articles/896140/) ---
-    BIG TCP mainline
-6.  [The first half of the 6.6 merge
-    window](https://lwn.net/Articles/942954/) --- AF_XDP multi-buffer
-7.  [The BPF-programmable network
-    device](https://lwn.net/Articles/949960/) --- netkit
-8.  [The 6.12 merge window begins](https://lwn.net/Articles/990750/) ---
-    Device Memory TCP
-9.  [The first part of the 6.15 merge
-    window](https://lwn.net/Articles/1015414/) --- io_uring ZC RX / RTNL
-10. [6.18 merge window, part 1](https://lwn.net/Articles/1040203/) ---
-    AccECN / UDP / DIBS
+4.  [Going big with TCP packets](https://lwn.net/Articles/884104/) --- BIG TCP
+5.  [5.19 Merge window, part 1](https://lwn.net/Articles/896140/) --- BIG TCP mainline
+6.  [The first half of the 6.6 merge window](https://lwn.net/Articles/942954/) --- AF_XDP multi-buffer
+7.  [The BPF-programmable network device](https://lwn.net/Articles/949960/) --- netkit
+8.  [The 6.12 merge window begins](https://lwn.net/Articles/990750/) --- Device Memory TCP
+9.  [The first part of the 6.15 merge window](https://lwn.net/Articles/1015414/) --- io_uring ZC RX / RTNL
+10. [6.18 merge window, part 1](https://lwn.net/Articles/1040203/) --- AccECN / UDP / DIBS
 
 ------------------------------------------------------------------------
 
@@ -3477,8 +3085,7 @@ released-kernel attribution.
 
 ## Commit-level research status
 
-この文書では commit hash を「それらしい hash」で埋めず、upstream tree /
-lore で照合できたものだけを確定情報として追加する。
+この文書では commit hash を「それらしい hash」で埋めず、upstream tree / lore で照合できたものだけを確定情報として追加する。
 
 優先して commit-level history を展開する系列:
 
@@ -3488,8 +3095,7 @@ lore で照合できたものだけを確定情報として追加する。
 4.  Device Memory TCP RX
 5.  Device Memory TCP TX
 6.  io_uring zero-copy TX/RX
-7.  page_pool / netmem / memory-provider; DIBS (separate shared-memory
-    lineage)
+7.  page_pool / netmem / memory-provider; DIBS (separate shared-memory lineage)
 8.  RTNL breakup
 9.  AccECN
 10. UDP receive optimization
@@ -3541,73 +3147,52 @@ Tags:
 -   [LWN 6.12 / Device Memory TCP](https://lwn.net/Articles/990750/)
 -   [LWN 6.15 merge window](https://lwn.net/Articles/1015414/)
 -   [LWN 6.18 merge window](https://lwn.net/Articles/1040203/)
--   [Linux kernel networking
-    documentation](https://docs.kernel.org/networking/)
--   [Linux Device Memory TCP
-    documentation](https://docs.kernel.org/networking/devmem.html)
--   [Linux networking patch archive
-    (lore)](https://lore.kernel.org/netdev/)
--   [Linux kernel
-    git](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/)
+-   [Linux kernel networking documentation](https://docs.kernel.org/networking/)
+-   [Linux Device Memory TCP documentation](https://docs.kernel.org/networking/devmem.html)
+-   [Linux networking patch archive (lore)](https://lore.kernel.org/netdev/)
+-   [Linux kernel git](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/)
 
 ------------------------------------------------------------------------
 
 ### Notes on completeness
 
-この change log は「LWN の記事タイトル一覧」ではなく、Linux v3.0以降の
-Linux networking
-の重要な変更を技術系列として再構成することを目的としている。そのため、個別
-driver の通常更新は除外する一方、独立した LWN feature がなくても
-merge-window coverage に現れる architecture-level change は含める。
+この change log は「LWN の記事タイトル一覧」ではなく、Linux v3.0以降の Linux networking の重要な変更を技術系列として再構成することを目的としている。そのため、個別 driver の通常更新は除外する一方、独立した LWN feature がなくても merge-window coverage に現れる architecture-level change は含める。
 
-commit-level の項目は upstream で確認できたものから順次追加し、LWN
-の記述だけから hash を逆算・推測しない。
+commit-level の項目は upstream で確認できたものから順次追加し、LWN の記述だけから hash を逆算・推測しない。
 
 ------------------------------------------------------------------------
 
 ## Commit-level history --- verified entries
 
-この章では、upstream patch archive / git history で commit ID
-まで確認できた系列を記録する。 短縮 hash
-だけが一次資料に掲載されている場合は短縮形をそのまま記載し、推測で full
-hash に展開しない。
+この章では、upstream patch archive / git history で commit ID まで確認できた系列を記録する。 短縮 hash だけが一次資料に掲載されている場合は短縮形をそのまま記載し、推測で full hash に展開しない。
 
 ### BIG TCP --- Linux 5.19
 
 **Feature:** BIG TCP (initial IPv6 support)\
 **Kernel:** Linux 5.19\
 **Subsystem:** `net/core`, IPv6, TCP, GRO/GSO\
-**Primary motivation:** 64KiB を超える kernel-internal GRO/GSO aggregate
-を利用し、高速 TCP datapath の per-packet overhead を削減する。
+**Primary motivation:** 64KiB を超える kernel-internal GRO/GSO aggregate を利用し、高速 TCP datapath の per-packet overhead を削減する。
 
 #### Mainline evidence
 
-5.19 の networking pull request は、IPv6 Jumbogram extension header
-を利用して 64KiB より大きな TCPv6 GSO super-segment
-をサポートする機能を明示的に `BIG TCP` として記載している。
+5.19 の networking pull request は、IPv6 Jumbogram extension header を利用して 64KiB より大きな TCPv6 GSO super-segment をサポートする機能を明示的に `BIG TCP` として記載している。
 
--   Networking pull request:
-    https://lists.openwall.net/netdev/2022/05/24/216
+-   Networking pull request: https://lists.openwall.net/netdev/2022/05/24/216
 -   LWN feature: https://lwn.net/Articles/884104/
 -   LWN 5.19 merge-window coverage: https://lwn.net/Articles/896140/
 
 #### Verified commits
 
-後続の upstream/stable fix history から、少なくとも以下の initial BIG
-TCP commits を 確実に逆参照できる。
+後続の upstream/stable fix history から、少なくとも以下の initial BIG TCP commits を 確実に逆参照できる。
 
 -   `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12`
-    -   Linux 5.19 で導入された BIG TCP/GRO 系列の commit。
-    -   後の GRO validation fix がこの commit を introduction point
-        として明示している。
+    -   `net: allow gro_max_size to exceed 65536`
+    -   Linux 5.19 BIG TCP/GRO core anchor.
 -   `7c4e983c4f3cf94fcd879730c6caa877e0768a4d`
-    -   Linux 5.19 の BIG TCP 関連 commit。
-    -   `skb_copy_ubufs()` と BIG TCP の interaction に対する後続 fix が
-        introduction point として参照している。
+    -   `net: allow gso_max_size to exceed 65536`
+    -   Linux 5.19 BIG TCP/GSO core anchor.
 
-> BIG TCP は複数 commit からなる系列である。この2つだけを「BIG TCP の全
-> commit」と 解釈してはいけない。series 全体の exact commit list
-> は引き続き upstream tree と patch archive を照合する。
+> BIG TCP は複数 commit からなる系列である。この2つだけを「BIG TCP の全 commit」と 解釈してはいけない。series 全体の exact commit list は引き続き upstream tree と patch archive を照合する。
 
 #### Later evolution
 
@@ -3622,14 +3207,12 @@ TCP commits を 確実に逆参照できる。
 
 **Feature:** AF_XDP multi-buffer RX/TX\
 **Kernel:** Linux 6.6\
-**Subsystem:** `net/xdp`, AF_XDP, Intel `ice` / `i40e` initial driver
-support\
+**Subsystem:** `net/xdp`, AF_XDP, Intel `ice` / `i40e` initial driver support\
 **Patch series:** `[PATCH v7 bpf-next 00/24] xsk: multi-buffer support`
 
 #### Development
 
-v7 series は 24 patches から構成され、core AF_XDP support、zero-copy、
-driver support、documentation/selftests をまとめて導入した。
+v7 series は 24 patches から構成され、core AF_XDP support、zero-copy、 driver support、documentation/selftests をまとめて導入した。
 
 Patch series:
 
@@ -3677,8 +3260,7 @@ one packet
    └── descriptor #N (EOP)
 ```
 
-これにより jumbo frame や大きな packet representation を AF_XDP
-で扱いやすくなる。
+これにより jumbo frame や大きな packet representation を AF_XDP で扱いやすくなる。
 
 #### Important files
 
@@ -3691,8 +3273,7 @@ one packet
 
 #### Follow-up / maintenance evidence
 
-2026 年の修正でも `Fixes: cf24f5a5feea` が使われており、TX multi-buffer
-introduction point を独立に確認できる。
+2026 年の修正でも `Fixes: cf24f5a5feea` が使われており、TX multi-buffer introduction point を独立に確認できる。
 
 ------------------------------------------------------------------------
 
@@ -3721,10 +3302,7 @@ Subject:
 netkit, bpf: Add bpf programmable net device
 ```
 
-この commit の説明では、BPF program を driver の `xmit` routine
-内で実行し、 Pod/container egress で BPF processing を packet source
-に近づけること、 さらに物理 device へ直接 redirect する場合に per-CPU
-backlog queue を経由しない ことが目的として説明されている。
+この commit の説明では、BPF program を driver の `xmit` routine 内で実行し、 Pod/container egress で BPF processing を packet source に近づけること、 さらに物理 device へ直接 redirect する場合に per-CPU backlog queue を経由しない ことが目的として説明されている。
 
 #### Datapath implication
 
@@ -3759,14 +3337,11 @@ NIC
 
 -   LWN: https://lwn.net/Articles/949960/
 -   v4 patch: https://lists.openwall.net/netdev/2023/10/24/365
--   commit mirror:
-    https://git.zx2c4.com/linux-rng/commit/?id=35dfaad7188cdc043fde31709c796f5a692ba2bd
+-   commit mirror: https://git.zx2c4.com/linux-rng/commit/?id=35dfaad7188cdc043fde31709c796f5a692ba2bd
 
 #### Follow-ups
 
-2026 年には netkit queue leasing と io_uring zero-copy RX の integration
-が進み、 network namespace 内の guest/VM datapath
-にまで対象が広がっている。
+2026 年には netkit **RX queue leasing** と io_uring zero-copy RX の integration が進み、 network namespace 内の guest/VM datapath にまで対象が広がっている。
 
 ------------------------------------------------------------------------
 
@@ -3779,12 +3354,9 @@ NIC
 
 #### Mainline state
 
-Linux kernel documentation は Device Memory TCP を、TCP socket
-で受信した data を DMA-BUF-backed device memory
-へ直接配置する機能として説明している。
+Linux kernel documentation は Device Memory TCP を、TCP socket で受信した data を DMA-BUF-backed device memory へ直接配置する機能として説明している。
 
--   Kernel documentation:
-    https://kernel.org/doc/html/latest/networking/devmem.html
+-   Kernel documentation: https://kernel.org/doc/html/latest/networking/devmem.html
 -   LWN 6.12 merge window: https://lwn.net/Articles/990750/
 
 #### Architecture
@@ -3817,8 +3389,7 @@ accelerator / GPU / SSD-side consumer
 
 #### Source areas
 
-Current upstream tree contains Device Memory TCP infrastructure
-including:
+Current upstream tree contains Device Memory TCP infrastructure including:
 
 -   `net/core/devmem.h`
 -   networking device-memory support
@@ -3828,11 +3399,7 @@ including:
 
 #### Commit verification status
 
-6.12 への feature merge 自体と source/documentation は確認済み。 ただし
-RX series は多数の preparatory commits に分割されているため、
-**individual commit list はまだ「series 全体として確定」していない**。
-単一 commit を Device Memory TCP RX の introduction commit
-と誤って表記しない。
+6.12 への feature merge 自体と source/documentation は確認済み。 ただし RX series は多数の preparatory commits に分割されているため、 **individual commit list はまだ「series 全体として確定」していない**。 単一 commit を Device Memory TCP RX の introduction commit と誤って表記しない。
 
 ------------------------------------------------------------------------
 
@@ -3842,9 +3409,7 @@ RX series は多数の preparatory commits に分割されているため、
 **Kernel:** Linux 6.16\
 **Subsystem:** TCP / DMA-BUF / device-memory / zero-copy TX
 
-RX support は 6.12 に入ったが、TX support は review を分離して後続
-series となった。 2025-05 時点で TX patch set は net-next に queue
-され、6.16 cycle 向けとなった。
+RX support は 6.12 に入ったが、TX support は review を分離して後続 series となった。 2025-05 時点で TX patch set は net-next に queue され、6.16 cycle 向けとなった。
 
 #### Significance
 
@@ -3856,8 +3421,7 @@ TX (6.16)
 device memory → NIC → network
 ```
 
-これにより Device Memory TCP は device memory を network endpoint の
-data buffer として双方向に利用する方向へ進んだ。
+これにより Device Memory TCP は device memory を network endpoint の data buffer として双方向に利用する方向へ進んだ。
 
 #### Verification status
 
@@ -3877,9 +3441,7 @@ commit-level 情報は次の優先順位で検証する。
 4.  LWN merge-window / feature article
 5.  stable-tree `Fixes:` history（introduction commit の相互検証）
 
-特に `Fixes:` tag は、後続 bug fix から introduction commit
-を逆引きするために有用だが、 それだけで patch series 全体を代表する
-commit とみなさない。
+特に `Fixes:` tag は、後続 bug fix から introduction commit を逆引きするために有用だが、 それだけで patch series 全体を代表する commit とみなさない。
 
 ------------------------------------------------------------------------
 
@@ -3887,38 +3449,23 @@ commit とみなさない。
 
 ### Historical conference provenance for v3/v4 foundations
 
-The conference inventory is not limited to the old 2019-05-07 scope.
-Earlier material is included when it explains a canonical v3/v4 lineage.
+The conference inventory is not limited to the old 2019-05-07 scope. Earlier material is included when it explains a canonical v3/v4 lineage.
 
--   **Netdev 1.1 (2016): switchdev BoF** --- documents the early common
-    hardware-offload model and open issues around ACL offload, resource
-    accounting, VXLAN and policy routing.
--   **Netdev 1.1 (2016): wireless latency/BQL discussion** ---
-    explicitly describes BQL as an established wired-driver
-    queue-latency mechanism and motivates BQL-like wireless work.
--   **Netdev 1.2 (2016): XDP workshop and cls_bpf** --- captures the
-    early XDP and TC/eBPF programmability period close to the Linux 4.8
-    XDP landing.
--   **Netdev 2.1 (2017): XDP in practice** --- shows early operational
-    adoption after the initial mainline landing.
--   **Kernel Recipes 2018: XDP, a new programmable network layer** ---
-    connects XDP, driver-context eBPF, redirect and AF_XDP-era
-    architecture.
+-   **Netdev 1.1 (2016): switchdev BoF** --- documents the early common hardware-offload model and open issues around ACL offload, resource accounting, VXLAN and policy routing.
+-   **Netdev 1.1 (2016): wireless latency/BQL discussion** --- explicitly describes BQL as an established wired-driver queue-latency mechanism and motivates BQL-like wireless work.
+-   **Netdev 1.2 (2016): XDP workshop and cls_bpf** --- captures the early XDP and TC/eBPF programmability period close to the Linux 4.8 XDP landing.
+-   **Netdev 2.1 (2017): XDP in practice** --- shows early operational adoption after the initial mainline landing.
+-   **Kernel Recipes 2018: XDP, a new programmable network layer** --- connects XDP, driver-context eBPF, redirect and AF_XDP-era architecture.
 
-These talks are design/architecture provenance; Part II remains
-authoritative for release attribution.
+These talks are design/architecture provenance; Part II remains authoritative for release attribution.
 
-Netdev Society の archive を 0x13--0x1A まで確認し、LWN/kernel change
-log と 技術的に対応する講演を cross-reference する。
+Netdev Society の archive を 0x13--0x1A まで確認し、LWN/kernel change log と 技術的に対応する講演を cross-reference する。
 
 注意点:
 
 -   0x14 (2020) 以降は対象期間内。
--   conference talk は upstream merge を意味しない。`proposal`,
-    `development`, `deployment`, `research` を区別して読む。
--   Netdev の講演資料は、LWN記事より前に proposal/design
-    を説明しているケースが多く、
-    「機能がどこから来たか」を追う一次資料として有用。
+-   conference talk は upstream merge を意味しない。`proposal`, `development`, `deployment`, `research` を区別して読む。
+-   Netdev の講演資料は、LWN記事より前に proposal/design を説明しているケースが多く、 「機能がどこから来たか」を追う一次資料として有用。
 
 Netdev archive: https://netdevconf.info/
 
@@ -3930,57 +3477,37 @@ Conference: https://netdevconf.info/0x14/
 
 既存 change log と特に関連する講演:
 
-  -----------------------------------------------------------------------
-  Netdev 0x14 session     Change-log lineage      Relevance
-  ----------------------- ----------------------- -----------------------
-  The Path To TCP 4K MTU  TCP RX zero-copy →      early receive-side
-  and RX ZeroCopy         io_uring ZCRX / devmem  zero-copy work
+  -------------------------------------------------------------------------------------------------------------------------------------------------
+  Netdev 0x14 session                                        Change-log lineage                          Relevance
+  ---------------------------------------------------------- ------------------------------------------- ------------------------------------------
+  The Path To TCP 4K MTU and RX ZeroCopy                     TCP RX zero-copy → io_uring ZCRX / devmem   early receive-side zero-copy work
 
-  Implementation of IPv6  IPv6 IOAM               direct upstream
-  IOAM in Linux Kernel                            implementation topic
+  Implementation of IPv6 IOAM in Linux Kernel                IPv6 IOAM                                   direct upstream implementation topic
 
-  Using Upstream MPTCP in MPTCP                   follows initial MPTCP
-  Linux Systems                                   mainlining
+  Using Upstream MPTCP in Linux Systems                      MPTCP                                       follows initial MPTCP mainlining
 
-  TC Connection tracking  conntrack / TC HW       flow offload lineage
-  hardware offload -      offload                 
-  upstream work                                   
+  TC Connection tracking hardware offload - upstream work    conntrack / TC HW offload                   flow offload lineage
 
-  Fast OVS data path with XDP / virtual switching XDP fast-path work
-  XDP                                             
+  Fast OVS data path with XDP                                XDP / virtual switching                     XDP fast-path work
 
-  Issuing SYN cookies in  XDP/BPF TCP             SYN-cookie fast path
-  XDP                                             
+  Issuing SYN cookies in XDP                                 XDP/BPF TCP                                 SYN-cookie fast path
 
-  Replacing HTB with EDT  BPF / traffic control   programmable scheduling
-  and BPF                                         lineage
+  Replacing HTB with EDT and BPF                             BPF / traffic control                       programmable scheduling lineage
 
-  Hierarchical QoS        TC HW offload           qdisc/offload
-  Hardware Offload (HTB)                          
+  Hierarchical QoS Hardware Offload (HTB)                    TC HW offload                               qdisc/offload
 
-  kTLS HW offload -       KTLS                    TLS record/offload
-  implementation and                              lineage
-  performance gains                               
+  kTLS HW offload - implementation and performance gains     KTLS                                        TLS record/offload lineage
 
-  Performance study of    KTLS / handshake        precursor to later
-  kernel TLS handshakes                           kernel-handshake work
+  Performance study of kernel TLS handshakes                 KTLS / handshake                            precursor to later kernel-handshake work
 
-  devlink enhancements    devlink/SR-IOV          netdev
-  for sub functions                               device-management API
-  management                                      
+  devlink enhancements for sub functions management          devlink/SR-IOV                              netdev device-management API
 
-  Hardware offload for    container/offload       Kubernetes datapath
-  K8s container                                   
-  networking                                      
+  Hardware offload for K8s container networking              container/offload                           Kubernetes datapath
 
-  Hardware Acceleration   container/offload       virtual networking
-  of Container Networking                         
-  Interfaces                                      
-  -----------------------------------------------------------------------
+  Hardware Acceleration of Container Networking Interfaces   container/offload                           virtual networking
+  -------------------------------------------------------------------------------------------------------------------------------------------------
 
-Netdev 0x14 is particularly useful because several topics later
-appearing as mature kernel features were already being discussed
-together:
+Netdev 0x14 is particularly useful because several topics later appearing as mature kernel features were already being discussed together:
 
 ``` text
 TCP zero-copy
@@ -4002,8 +3529,7 @@ Accepted sessions: https://netdevconf.info/0x15/accepted-sessions.html
 
 One of the strongest cross-references in this audit.
 
-Netdev 0x15 accepted **BIG TCP** in June 2021, before the LWN feature
-article and before the Linux 5.19 merge.
+Netdev 0x15 accepted **BIG TCP** in June 2021, before the LWN feature article and before the Linux 5.19 merge.
 
 This gives the lineage:
 
@@ -4029,8 +3555,7 @@ VXLAN/GENEVE BIG TCP
 
 #### Accelerating synproxy with XDP
 
-Session:
-https://netdevconf.info/0x15/loadsessions/Accelerating-synproxy-with-XDP.html
+Session: https://netdevconf.info/0x15/loadsessions/Accelerating-synproxy-with-XDP.html
 
 The talk explicitly describes extending BPF helpers so XDP can:
 
@@ -4045,13 +3570,11 @@ XDP
   └── conntrack BPF integration
 ```
 
-and is a useful precursor to the later BPF conntrack lifecycle kfunc
-work.
+and is a useful precursor to the later BPF conntrack lifecycle kfunc work.
 
 #### Resilient nexthop groups
 
-This directly follows the 2019 nexthop-object work and belongs in the
-routing/FIB lineage.
+This directly follows the 2019 nexthop-object work and belongs in the routing/FIB lineage.
 
 ``` text
 nexthop objects
@@ -4065,9 +3588,7 @@ resilient groups
 
 #### Rethinking Zero-Copy Networking with MAIO
 
-This is relevant as an alternative high-performance networking design in
-the same period that eventually produced stronger kernel-side zero-copy
-efforts around io_uring, page_pool/netmem and Device Memory TCP.
+This is relevant as an alternative high-performance networking design in the same period that eventually produced stronger kernel-side zero-copy efforts around io_uring, page_pool/netmem and Device Memory TCP.
 
 #### TC / ACL / BPF
 
@@ -4088,8 +3609,7 @@ The ACL analysis compares:
 -   TC/eBPF;
 -   TC flower.
 
-Ptables was implemented over eBPF at TC/XDP and provides useful
-historical context for the later bpfilter/BPF-firewall discussions.
+Ptables was implemented over eBPF at TC/XDP and provides useful historical context for the later bpfilter/BPF-firewall discussions.
 
 ------------------------------------------------------------------------
 
@@ -4099,11 +3619,9 @@ Conference: https://netdevconf.info/0x16/
 
 #### Merging the Networking Worlds --- David Ahern, Shrijeet Mukherjee
 
-Session:
-https://netdevconf.info/0x16/sessions/talk/merging-the-networking-worlds.html
+Session: https://netdevconf.info/0x16/sessions/talk/merging-the-networking-worlds.html
 
-This is a particularly important architectural precursor to Device
-Memory TCP and modern io_uring zero-copy receive.
+This is a particularly important architectural precursor to Device Memory TCP and modern io_uring zero-copy receive.
 
 The talk compares:
 
@@ -4186,8 +3704,7 @@ io_uring ZC RX
 
 Sessions: https://netdevconf.info/0x17/pages/sessions.html
 
-This edition has unusually strong overlap with the mainline networking
-developments covered in this document.
+This edition has unusually strong overlap with the mainline networking developments covered in this document.
 
 #### Device Memory TCP
 
@@ -4198,24 +3715,20 @@ Speakers:
 -   Eric Dumazet
 -   Kaiyuan Zhang
 
-This is the direct conference counterpart to the Device Memory TCP
-RFC/mainline lineage.
+This is the direct conference counterpart to the Device Memory TCP RFC/mainline lineage.
 
 #### Fast ZC Rx Data Plane using io_uring / Zero Copy Receive using io_uring
 
-Session:
-https://netdevconf.info/0x17/sessions/talk/zero-copy-receive-using-io_uring.html
+Session: https://netdevconf.info/0x17/sessions/talk/zero-copy-receive-using-io_uring.html
 
 Speakers:
 
 -   David Wei
 -   Pavel Begunkov
 
-The description explicitly frames memory bandwidth as a bottleneck and
-compares the kernel socket copy path with kernel bypass and RDMA.
+The description explicitly frames memory bandwidth as a bottleneck and compares the kernel socket copy path with kernel bypass and RDMA.
 
-This is one of the most useful primary sources for the later Linux 6.15
-io_uring ZCRX feature.
+This is one of the most useful primary sources for the later Linux 6.15 io_uring ZCRX feature.
 
 #### eBPF Qdisc: a generic building block for traffic control
 
@@ -4224,13 +3737,11 @@ Speakers:
 -   Hsin-Wei (Amery) Hung
 -   Cong Wang
 
-This is a direct precursor/context source for the later BPF qdisc /
-`struct_ops` development.
+This is a direct precursor/context source for the later BPF qdisc / `struct_ops` development.
 
 #### Integrating eBPF Into The P4TC Datapath
 
-This provides the conference-side history for the P4TC proposal that
-later encountered maintainer resistance and was covered by LWN in 2024.
+This provides the conference-side history for the P4TC proposal that later encountered maintainer resistance and was covered by LWN in 2024.
 
 #### Netlink APIs to Expose/Configure Netdev Objects
 
@@ -4248,8 +3759,7 @@ modern netdev configuration APIs
 
 -   NIC offloads at Hyperscale: experience, new offloads and validation
 -   SO_TIMESTAMPING: powering fleetwide RPC monitoring
--   TCP Offload via AF_XDP sockets --- Not your grandmother's TCP
-    Offload!
+-   TCP Offload via AF_XDP sockets --- Not your grandmother's TCP Offload!
 -   Using eBPF to inject IPv6 Extension Headers
 -   Multi-core IPsec tunnels
 -   TLS handshake for in-kernel consumers (BoF)
@@ -4257,8 +3767,7 @@ modern netdev configuration APIs
 -   TC Workshop
 -   Netfilter Mini Workshop
 
-The TLS handshake BoF is especially useful alongside the
-`net/handshake`/KTLS chapters.
+The TLS handshake BoF is especially useful alongside the `net/handshake`/KTLS chapters.
 
 ------------------------------------------------------------------------
 
@@ -4270,8 +3779,7 @@ Schedule: https://netdevconf.info/0x18/pages/schedule.html
 
 Speakers include Willem de Bruijn et al.
 
-This conference occurred while both Device Memory TCP and io_uring ZC RX
-were moving toward mainline maturity.
+This conference occurred while both Device Memory TCP and io_uring ZC RX were moving toward mainline maturity.
 
 The sequence is therefore:
 
@@ -4289,8 +3797,7 @@ The sequence is therefore:
 
 #### The Future of AI Networks: Advancing TCP with Device Memory and Collective Communication
 
-This extends Device Memory TCP from a pure networking optimization into
-AI/GPU/collective communication use cases.
+This extends Device Memory TCP from a pure networking optimization into AI/GPU/collective communication use cases.
 
 #### A new lightweight Zero-Copy Notification Mechanism in Linux
 
@@ -4298,13 +3805,11 @@ Relevant to the broader zero-copy TX/RX completion/lifetime problem.
 
 #### Characterizing IOTLB Wall for Multi-100-Gbps Linux-based Networking
 
-Relevant to DMA/IOMMU overhead in high-speed networking and therefore
-complementary to page_pool/netmem/device-memory work.
+Relevant to DMA/IOMMU overhead in high-speed networking and therefore complementary to page_pool/netmem/device-memory work.
 
 #### Fine-grained TCP Tuning
 
-Relevant to the growing set of per-socket TCP controls and later
-RTO/receive-side tuning changes.
+Relevant to the growing set of per-socket TCP controls and later RTO/receive-side tuning changes.
 
 #### Workshops/BoFs
 
@@ -4336,8 +3841,7 @@ netmem
    └── io_uring ZCRX
 ```
 
-It is useful operational material because page_pool recycling/lifetime
-bugs are a key failure mode in modern RX-memory infrastructure.
+It is useful operational material because page_pool recycling/lifetime bugs are a key failure mode in modern RX-memory infrastructure.
 
 #### MPTCP: present, future, and its development workflow
 
@@ -4345,13 +3849,11 @@ Directly complements the MPTCP release/patch history.
 
 #### SRv6 in Linux Kernel, FRR and eBPF
 
-Directly complements the SRv6 Headend Reduced / PSP / NEXT-C-SID
-evolution.
+Directly complements the SRv6 Headend Reduced / PSP / NEXT-C-SID evolution.
 
 #### Communication via Internal Shared Memory (ISM) - Time to open up
 
-This is especially interesting in light of the later DIBS/shared-memory
-transport work.
+This is especially interesting in light of the later DIBS/shared-memory transport work.
 
 The conceptual lineage is not `netmem → DIBS`; instead:
 
@@ -4364,8 +3866,7 @@ DIBS / later shared-memory socket ideas
 
 #### mq-cake: Scaling software rate limiting across CPU cores
 
-This is the conference-side precursor/context for CAKE multiqueue work
-that later appears in the Linux 7.0-era change log.
+This is the conference-side precursor/context for CAKE multiqueue work that later appears in the Linux 7.0-era change log.
 
 #### Linux Kernel Support for IOAM Direct Exporting
 
@@ -4373,8 +3874,7 @@ Follow-up to the earlier IPv6 IOAM implementation.
 
 #### The Battle Of The ZCs: Who is the prettiest of them all?
 
-Useful comparison material for the multiple Linux zero-copy mechanisms
-that this document otherwise follows separately.
+Useful comparison material for the multiple Linux zero-copy mechanisms that this document otherwise follows separately.
 
 #### IRQ Suspension: a new, efficient mechanism for packet delivery
 
@@ -4386,9 +3886,7 @@ Complements the packet/network timestamp observability lineage.
 
 #### State of the union in TCP land --- Eric Dumazet
 
-Useful cross-reference for contemporary TCP performance/API work,
-including the period around AccECN, receive-side optimization, and timer
-tuning.
+Useful cross-reference for contemporary TCP performance/API work, including the period around AccECN, receive-side optimization, and timer tuning.
 
 ------------------------------------------------------------------------
 
@@ -4396,8 +3894,7 @@ tuning.
 
 Sessions: https://netdevconf.info/0x1A/pages/sessions.html
 
-Netdev 0x1A is inside the requested time window and is especially
-valuable because its materials were available by August 2026.
+Netdev 0x1A is inside the requested time window and is especially valuable because its materials were available by August 2026.
 
 #### io_uring ZCRX: Progress and Next Steps --- Pavel Begunkov
 
@@ -4423,13 +3920,11 @@ Device Memory / devmem
 software RDMA
 ```
 
-and reinforces that netkit is becoming a mechanism for exposing modern
-memory/queue facilities beyond ordinary container networking.
+and reinforces that netkit is becoming a mechanism for exposing modern memory/queue facilities beyond ordinary container networking.
 
 #### Kernel shared memory socket transport --- David Wei
 
-Session:
-https://netdevconf.info/0x1A/sessions/talk/kernel-shared-memory-socket-transport.html
+Session: https://netdevconf.info/0x1A/sessions/talk/kernel-shared-memory-socket-transport.html
 
 Proposal:
 
@@ -4444,8 +3939,7 @@ shared memory
 zero-copy sender + receiver IPC
 ```
 
-This is a new RFC/proposal lineage and should not be confused with DIBS,
-but it belongs in the same broad "avoid local-host copies" design space.
+This is a new RFC/proposal lineage and should not be confused with DIBS, but it belongs in the same broad "avoid local-host copies" design space.
 
 #### Linux QUIC: Bringing a Modern Secure Transport into the Kernel
 
@@ -4453,22 +3947,17 @@ Direct conference counterpart to the 2024--2026 kernel QUIC RFC series.
 
 #### TCP State of the union (2026) --- Eric Dumazet
 
-Session:
-https://netdevconf.info/0x1A/sessions/talk/tcp-state-of-the-union-2026.html
+Session: https://netdevconf.info/0x1A/sessions/talk/tcp-state-of-the-union-2026.html
 
-The talk explicitly focuses on recent/upcoming TCP changes and
-performance on modern platforms, making it a useful companion source for
-the late TCP chapters.
+The talk explicitly focuses on recent/upcoming TCP changes and performance on modern platforms, making it a useful companion source for the late TCP chapters.
 
 #### Thrice the charm: an skb extension for BPF metadata
 
-Relevant to the long-running question of how metadata is carried with
-skb/BPF datapaths.
+Relevant to the long-running question of how metadata is carried with skb/BPF datapaths.
 
 #### Securing IOAM in the Linux Kernel
 
-Follow-up to IOAM deployment: telemetry integrity/trust rather than
-merely carrying trace data.
+Follow-up to IOAM deployment: telemetry integrity/trust rather than merely carrying trace data.
 
 #### Network Observability BoF
 
@@ -4597,30 +4086,25 @@ Communication via ISM
           kernel shared-memory socket transport
 ```
 
-These are related design spaces, not necessarily direct implementation
-ancestry.
+These are related design spaces, not necessarily direct implementation ancestry.
 
 ------------------------------------------------------------------------
 
 ## Recommended Netdev talks for this change log
 
-For understanding the architectural evolution rather than simply
-collecting conference talks, the highest-value sessions are:
+For understanding the architectural evolution rather than simply collecting conference talks, the highest-value sessions are:
 
 1.  **BIG TCP** --- Netdev 0x15 (2021)
 2.  **Merging the Networking Worlds** --- Netdev 0x16 (2022)
 3.  **Device Memory TCP** --- Netdev 0x17 (2023)
 4.  **Zero Copy Receive using io_uring** --- Netdev 0x17 (2023)
-5.  **eBPF Qdisc: a generic building block for traffic control** ---
-    Netdev 0x17 (2023)
+5.  **eBPF Qdisc: a generic building block for traffic control** --- Netdev 0x17 (2023)
 6.  **Devmem TCP & io uring zero copy** --- Netdev 0x18 (2024)
 7.  **Diagnosing Page Pool Leaks** --- Netdev 0x19 (2025)
-8.  **Communication via Internal Shared Memory (ISM) - Time to open up**
-    --- Netdev 0x19 (2025)
+8.  **Communication via Internal Shared Memory (ISM) - Time to open up** --- Netdev 0x19 (2025)
 9.  **State of the union in TCP land** --- Netdev 0x19 (2025)
 10. **io_uring ZCRX: Progress and Next Steps** --- Netdev 0x1A (2026)
-11. **Linux QUIC: Bringing a Modern Secure Transport into the Kernel**
-    --- Netdev 0x1A (2026)
+11. **Linux QUIC: Bringing a Modern Secure Transport into the Kernel** --- Netdev 0x1A (2026)
 12. **TCP State of the union (2026)** --- Netdev 0x1A (2026)
 
 These talks are especially useful because they form a bridge between:
@@ -4657,15 +4141,13 @@ The Netdev site confirms the relevant editions in the requested period:
 0x1A — 2026
 ```
 
-Future provenance work should add a `Netdev` column to the canonical LWN
-inventory where a direct conference counterpart exists.
+Future provenance work should add a `Netdev` column to the canonical LWN inventory where a direct conference counterpart exists.
 
 ------------------------------------------------------------------------
 
 ## Provenance index --- Netdev → LWN → patch series → mainline
 
-この章は canonical inventory の主要項目について、conference talk と
-upstream development の位置関係を横断的に追えるようにした索引である。
+この章は canonical inventory の主要項目について、conference talk と upstream development の位置関係を横断的に追えるようにした索引である。
 
 `Netdev phase`:
 
@@ -4674,120 +4156,53 @@ upstream development の位置関係を横断的に追えるようにした索�
 -   **post-merge** --- mainline 後の運用・performance・次世代設計
 -   **parallel** --- 同じ問題領域だが直接の実装系列とは断定しない
 
-  -------------------------------------------------------------------------------------------------------------------------------
-  Feature           Netdev counterpart   Phase                   LWN / upstream       Kernel milestone  Provenance interpretation
-                                                                 milestone                              
-  ----------------- -------------------- ----------------------- -------------------- ----------------- -------------------------
-  BIG TCP           0x15 (2021) ---      pre-merge               LWN *Going big with  5.19              conference
-                    **BIG TCP**, Eric                            TCP packets*; IPv6                     prototype/design → LWN
-                    Dumazet                                      BIG TCP series                         analysis → merge
+  ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Feature                           Netdev counterpart                                                                                                                       Phase                     LWN / upstream milestone                                     Kernel milestone                      Provenance interpretation
+  --------------------------------- ---------------------------------------------------------------------------------------------------------------------------------------- ------------------------- ------------------------------------------------------------ ------------------------------------- -------------------------------------------------------------------
+  BIG TCP                           0x15 (2021) --- **BIG TCP**, Eric Dumazet                                                                                                pre-merge                 LWN *Going big with TCP packets*; IPv6 BIG TCP series        5.19                                  conference prototype/design → LWN analysis → merge
 
-  IPv4 BIG TCP      BIG TCP 0x15 as      pre-merge               2023 IPv4 BIG TCP    6.3               original design
-                    origin                                       series                                 generalized to IPv4
+  IPv4 BIG TCP                      BIG TCP 0x15 as origin                                                                                                                   pre-merge                 2023 IPv4 BIG TCP series                                     6.3                                   original design generalized to IPv4
 
-  BIG TCP over      BIG TCP 0x15 as      historical origin       BIG TCP for UDP      7.3 development   BIG TCP extended to
-  tunnels           origin; later tunnel                         tunnels series                         VXLAN/GENEVE
-                    work                                                                                
+  BIG TCP over tunnels              BIG TCP 0x15 as origin; later tunnel work                                                                                                historical origin         BIG TCP for UDP tunnels series                               7.3 development                       BIG TCP extended to VXLAN/GENEVE
 
-  TCP RX zero-copy  0x14 --- **The Path  pre-merge               multiple later ZC RX multi-release     early socket/TCP
-                    To TCP 4K MTU and RX                         RFCs                                   receive-copy reduction
-                    ZeroCopy**                                                                          work
+  TCP RX zero-copy                  0x14 --- **The Path To TCP 4K MTU and RX ZeroCopy**                                                                                      pre-merge                 multiple later ZC RX RFCs                                    multi-release                         early socket/TCP receive-copy reduction work
 
-  Device Memory TCP 0x16 **Merging the   pre-merge → merge-era   Device Memory TCP    6.12 RX           unusually clear
-                    Networking Worlds**                          RFC series                             conference→RFC→mainline
-                    → 0x17 **Device                                                                     lineage
-                    Memory TCP** → 0x18                                                                 
-                    devmem/io_uring BoF                                                                 
+  Device Memory TCP                 0x16 **Merging the Networking Worlds** → 0x17 **Device Memory TCP** → 0x18 devmem/io_uring BoF                                           pre-merge → merge-era     Device Memory TCP RFC series                                 6.12 RX                               unusually clear conference→RFC→mainline lineage
 
-  io_uring ZC RX    0x16 **Merging the   pre-merge → post-merge  2022--25 RFC/patch   6.15              design → implementation →
-                    Networking Worlds**                          series                                 joint review → post-merge
-                    → 0x17 **Zero Copy                                                                  refinement
-                    Receive using                                                                       
-                    io_uring** → 0x18                                                                   
-                    BoF → 0x1A **ZCRX:                                                                  
-                    Progress and Next                                                                   
-                    Steps**                                                                             
+  io_uring ZC RX                    0x16 **Merging the Networking Worlds** → 0x17 **Zero Copy Receive using io_uring** → 0x18 BoF → 0x1A **ZCRX: Progress and Next Steps**   pre-merge → post-merge    2022--25 RFC/patch series                                    6.15                                  design → implementation → joint review → post-merge refinement
 
-  page_pool         0x19 **Diagnosing    post-merge              page_pool/netmem     established infra operational/lifetime
-                    Page Pool Leaks**                            development                            debugging after broad
-                                                                                                        adoption
+  page_pool                         0x19 **Diagnosing Page Pool Leaks**                                                                                                      post-merge                page_pool/netmem development                                 established infra                     operational/lifetime debugging after broad adoption
 
-  netmem            0x17/0x18 devmem +   merge-era/parallel      netmem abstraction   6.x               enabling memory
-                    ZCRX talks                                   series                                 abstraction used by
-                                                                                                        devmem/ZCRX
+  netmem                            0x17/0x18 devmem + ZCRX talks                                                                                                            merge-era/parallel        netmem abstraction series                                    6.x                                   enabling memory abstraction used by devmem/ZCRX
 
-  BPF qdisc         0x17 **eBPF Qdisc: a pre-merge               BPF qdisc            2025-era          research/prototype
-                    generic building                             `struct_ops` series                    direction → upstream BPF
-                    block for traffic                                                                   qdisc
-                    control**                                                                           
+  BPF qdisc                         0x17 **eBPF Qdisc: a generic building block for traffic control**                                                                        pre-merge                 BPF qdisc `struct_ops` series                                2025-era                              research/prototype direction → upstream BPF qdisc
 
-  P4TC              0x17 **Integrating   pre-merge               LWN *P4TC hits a     not established   conference design →
-                    eBPF Into The P4TC                           brick wall*          as mainline       upstream review
-                    Datapath**                                                        feature           resistance/stall
+  P4TC                              0x17 **Integrating eBPF Into The P4TC Datapath**                                                                                         pre-merge                 LWN *P4TC hits a brick wall*                                 not established as mainline feature   conference design → upstream review resistance/stall
 
-  XDP SYN proxy /   0x15 **Accelerating  pre-merge               BPF conntrack        6.x               XDP needs CT/SYN-cookie
-  conntrack         synproxy with XDP**                          kfunc/helper work                      primitives → richer BPF
-                                                                                                        networking API
+  XDP SYN proxy / conntrack         0x15 **Accelerating synproxy with XDP**                                                                                                  pre-merge                 BPF conntrack kfunc/helper work                              6.x                                   XDP needs CT/SYN-cookie primitives → richer BPF networking API
 
-  nexthop           0x15 **Resilient     post-origin             2019 nexthop-object  5.x onward        object model → resilient
-  objects/groups    nexthop groups**                             series                                 grouping/selection
+  nexthop objects/groups            0x15 **Resilient nexthop groups**                                                                                                        post-origin               2019 nexthop-object series                                   5.x onward                            object model → resilient grouping/selection
 
-  MPTCP             0x14 **Using         merge-era → post-merge  LWN *Upstreaming     5.6 onward        initial deployment →
-                    Upstream MPTCP**;                            multipath TCP*;                        mature workflow/scaling
-                    0x19 **MPTCP:                                later BPF/subflow                      
-                    present, future...**                         work                                   
+  MPTCP                             0x14 **Using Upstream MPTCP**; 0x19 **MPTCP: present, future...**                                                                        merge-era → post-merge    LWN *Upstreaming multipath TCP*; later BPF/subflow work      5.6 onward                            initial deployment → mature workflow/scaling
 
-  IPv6 IOAM         0x14                 pre/merge → post        IPv6 IOAM patch      5.15/5.16 onward  implementation → export →
-                    **Implementation of                          series                                 security
-                    IPv6 IOAM in Linux                                                                  
-                    Kernel**; 0x19                                                                      
-                    **IOAM Direct                                                                       
-                    Exporting**; 0x1A                                                                   
-                    **Securing IOAM**                                                                   
+  IPv6 IOAM                         0x14 **Implementation of IPv6 IOAM in Linux Kernel**; 0x19 **IOAM Direct Exporting**; 0x1A **Securing IOAM**                             pre/merge → post          IPv6 IOAM patch series                                       5.15 core; 5.16+ f                    ollow-ups implementation → export → security
 
-  KTLS / kernel     0x14 KTLS offload +  pre/merge               LWN kernel-TLS       6.x               KTLS record path →
-  handshake         handshake                                    handshake articles;                    generic kernel-consumer
-                    performance; 0x17                            `net/handshake`                        handshake
-                    TLS handshake BoF                                                                   
+  KTLS / kernel handshake           0x14 KTLS offload + handshake performance; 0x17 TLS handshake BoF                                                                        pre/merge                 LWN kernel-TLS handshake articles; `net/handshake`           6.x                                   KTLS record path → generic kernel-consumer handshake
 
-  TC HW offload     0x14 conntrack HW    merge-era               standalone TC action 5.x/6.x           common flow/action
-                    offload / HTB HW                             HW-offload series                      representation → richer
-                    offload; 0x15 TC                                                                    HW lifecycle
-                    flower/police talks                                                                 
+  TC HW offload                     0x14 conntrack HW offload / HTB HW offload; 0x15 TC flower/police talks                                                                  merge-era                 standalone TC action HW-offload series                       5.x/6.x                               common flow/action representation → richer HW lifecycle
 
-  SO_TIMESTAMPING / 0x17                 post/parallel           `skb_drop_reason`,   6.x               packet causality + timing
-  observability     SO_TIMESTAMPING;                             BPF timestamp                          observability
-                    0x19 **future of                             callbacks                              
-                    SO_TIMESTAMPING**;                                                                  
-                    0x1A observability                                                                  
-                    BoF                                                                                 
+  SO_TIMESTAMPING / observability   0x17 SO_TIMESTAMPING; 0x19 **future of SO_TIMESTAMPING**; 0x1A observability BoF                                                         post/parallel             `skb_drop_reason`, BPF timestamp callbacks                   6.x                                   packet causality + timing observability
 
-  SRv6              0x19 SRv6            post/ongoing            Headend Reduced,     6.x/7.x           mainline behavior
-                    Linux/FRR/eBPF BoF;                          PSP, NEXT-C-SID, MUP                   growth +
-                    0x1A SRv6 workshop                                                                  operational/planning
-                                                                                                        feedback
+  SRv6                              0x19 SRv6 Linux/FRR/eBPF BoF; 0x1A SRv6 workshop                                                                                         post/ongoing              Headend Reduced, PSP, NEXT-C-SID, MUP                        6.x/7.x                               mainline behavior growth + operational/planning feedback
 
-  shared-memory     0x19 **Communication parallel / new proposal DIBS and local       6.18+ / RFC       common goal: remove
-  networking        via ISM**; 0x1A                              shared-memory work                     same-host copies; not one
-                    **kernel                                                                            direct code lineage
-                    shared-memory socket                                                                
-                    transport**                                                                         
+  shared-memory networking          0x19 **Communication via ISM**; 0x1A **kernel shared-memory socket transport**                                                           parallel / new proposal   DIBS and local shared-memory work                            6.18+ / RFC                           common goal: remove same-host copies; not one direct code lineage
 
-  QUIC              0x1A **Linux QUIC:   merge-era/development   2024--26 kernel QUIC RFC/development   conference presentation
-                    Bringing a Modern                            RFC series; LWN                        of active upstream
-                    Secure Transport                             *QUIC for the                          architecture
-                    into the Kernel**                            kernel*                                
+  QUIC                              0x1A **Linux QUIC: Bringing a Modern Secure Transport into the Kernel**                                                                  merge-era/development     2024--26 kernel QUIC RFC series; LWN *QUIC for the kernel*   RFC/development                       conference presentation of active upstream architecture
 
-  TCP contemporary  0x19 **State of the  post/ongoing            AccECN, RX tuning,   6.15--7.x         useful umbrella talks for
-  evolution         union in TCP land**;                         RTO API, performance                   late-period TCP changes
-                    0x1A **TCP State of                          work                                   
-                    the union (2026)**                                                                  
+  TCP contemporary evolution        0x19 **State of the union in TCP land**; 0x1A **TCP State of the union (2026)**                                                          post/ongoing              AccECN, RX tuning, RTO API, performance work                 6.15--7.x                             useful umbrella talks for late-period TCP changes
 
-  netkit / devmem   0x1A **Accelerating  post/ongoing            netkit + queue       6.7 onward        netkit expands from
-                    Software RDMA (RXE)                          leasing/devmem                         virtual netdev to
-                    with Netkit and                              development                            queue/memory
-                    Devmem**                                                                            infrastructure
-  -------------------------------------------------------------------------------------------------------------------------------
+  netkit / devmem                   0x1A **Accelerating Software RDMA (RXE) with Netkit and Devmem**                                                                         post/ongoing              netkit + queue leasing/devmem development                    6.7 onward                            netkit expands from virtual netdev to queue/memory infrastructure
+  ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -4820,13 +4235,9 @@ IPv6 BIG TCP
             BIG TCP over VXLAN/GENEVE
 ```
 
-**Interpretation:** Netdev is not merely a later presentation of the
-merged feature. In this case it records the design before mainline
-adoption.
+**Interpretation:** Netdev is not merely a later presentation of the merged feature. In this case it records the design before mainline adoption.
 
-Netdev 0x15 materials describe the motivation as reducing TCP/IP stack
-overhead at 200/400-Gbit speeds by allowing much larger TSO/GRO
-aggregates.
+Netdev 0x15 materials describe the motivation as reducing TCP/IP stack overhead at 200/400-Gbit speeds by allowing much larger TSO/GRO aggregates.
 
 ------------------------------------------------------------------------
 
@@ -4864,14 +4275,9 @@ Netdev 0x1A (2026)
 "ZCRX: Progress and Next Steps"
 ```
 
-**Interpretation:** this is the strongest provenance chain in the
-document. Netdev captures the problem definition, concrete
-implementations, integration discussion, and post-merge operational/API
-issues.
+**Interpretation:** this is the strongest provenance chain in the document. Netdev captures the problem definition, concrete implementations, integration discussion, and post-merge operational/API issues.
 
-The 0x17 io_uring talk explicitly describes preserving the Linux TCP
-stack while DMAing payload data into userspace-visible memory, rather
-than replacing the stack with a kernel-bypass datapath.
+The 0x17 io_uring talk explicitly describes preserving the Linux TCP stack while DMAing payload data into userspace-visible memory, rather than replacing the stack with a kernel-bypass datapath.
 
 ------------------------------------------------------------------------
 
@@ -4892,12 +4298,9 @@ BPF qdisc upstream series
 2025 networking merge work
 ```
 
-**Interpretation:** `struct_ops` evolves from replacing TCP operation
-tables to replacing or implementing scheduling operations in the
-traffic-control layer.
+**Interpretation:** `struct_ops` evolves from replacing TCP operation tables to replacing or implementing scheduling operations in the traffic-control layer.
 
-This is more informative than treating BPF qdisc as an isolated 2025
-feature.
+This is more informative than treating BPF qdisc as an isolated 2025 feature.
 
 ------------------------------------------------------------------------
 
@@ -4926,12 +4329,12 @@ Netdev 0x19 (2025)
 "MPTCP: present, future, and its development workflow"
         │
         ▼
-Linux 7.2
-max subflows 8 → 64
+2026 mainline generation
+in-kernel PM: max subflows 8 → 64
+(merged series verified; exact 7.2 tag containment should be read from Part VII evidence grade)
 ```
 
-**Interpretation:** Netdev 0x14 is deployment-oriented shortly after
-initial upstreaming; 0x19 is a mature-project/status discussion.
+**Interpretation:** Netdev 0x14 is deployment-oriented shortly after initial upstreaming; 0x19 is a mature-project/status discussion.
 
 ------------------------------------------------------------------------
 
@@ -4945,8 +4348,12 @@ Netdev 0x14 (2020)
 upstream IPv6 IOAM series
         │
         ▼
-Linux 5.15 / 5.16 era
-IOAM + encapsulation
+Linux 5.15
+IOAM core
+        │
+        ▼
+Linux 5.16+ follow-ups
+encapsulation / later extensions
         │
         ▼
 Netdev 0x19 (2025)
@@ -4957,9 +4364,7 @@ Netdev 0x1A (2026)
 Securing IOAM in the Linux Kernel
 ```
 
-**Interpretation:** the topic evolves from implementing telemetry
-carriage to exporting the telemetry efficiently and then protecting its
-integrity/trust.
+**Interpretation:** the topic evolves from implementing telemetry carriage to exporting the telemetry efficiently and then protecting its integrity/trust.
 
 ------------------------------------------------------------------------
 
@@ -5004,8 +4409,7 @@ net/handshake
 
 ### P4TC vs BPF qdisc
 
-Netdev helps separate two superficially similar programmable-TC
-directions.
+Netdev helps separate two superficially similar programmable-TC directions.
 
 ``` text
 P4TC
@@ -5049,35 +4453,25 @@ Tags
 
 Example:
 
-  ------------------------------------------------------------------------------------------------------
-  LWN /      Kernel            Status                 Netdev   Session           Phase
-  feature                                                                        
-  ---------- ----------------- ---------------------- -------- ----------------- -----------------------
-  BIG TCP    5.19              merged                 0x15     BIG TCP           pre-merge
+  -------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  LWN / feature          Kernel            Status                         Netdev               Session                                        Phase
+  ---------------------- ----------------- ------------------------------ -------------------- ---------------------------------------------- -----------------------
+  BIG TCP                5.19              merged                         0x15                 BIG TCP                                        pre-merge
 
-  Device     6.12              merged                 0x17 /   Device Memory TCP pre/merge-era
-  Memory TCP                                          0x18     / Devmem+io_uring 
-  RX                                                           BoF               
+  Device Memory TCP RX   6.12              merged                         0x17 / 0x18          Device Memory TCP / Devmem+io_uring BoF        pre/merge-era
 
-  io_uring   6.15              merged                 0x17 /   Zero Copy RX /    pre→post
-  ZCRX                                                0x18 /   BoF / Progress    
-                                                      0x1A     and Next Steps    
+  io_uring ZCRX          6.15              merged                         0x17 / 0x18 / 0x1A   Zero Copy RX / BoF / Progress and Next Steps   pre→post
 
-  BPF qdisc  2025-era          merged                 0x17     eBPF Qdisc        pre-merge
+  BPF qdisc              2025-era          merged                         0x17                 eBPF Qdisc                                     pre-merge
 
-  P4TC       ---               stalled/under-review   0x17     eBPF Into P4TC    pre-merge
-                               lineage                         Datapath          
+  P4TC                   ---               stalled/under-review lineage   0x17                 eBPF Into P4TC Datapath                        pre-merge
 
-  MPTCP      5.6+              merged/evolving        0x14 /   Using Upstream    merge→post
-                                                      0x19     MPTCP / present & 
-                                                               future            
+  MPTCP                  5.6+              merged/evolving                0x14 / 0x19          Using Upstream MPTCP / present & future        merge→post
 
-  IPv6 IOAM  5.15/5.16+        merged/evolving        0x14 /   implementation /  pre→post
-                                                      0x19 /   export / security 
-                                                      0x1A                       
+  IPv6 IOAM              5.15/5.16+        merged/evolving                0x14 / 0x19 / 0x1A   implementation / export / security             pre→post
 
-  QUIC       RFC/development   under review           0x1A     Linux QUIC        merge-era/development
-  ------------------------------------------------------------------------------------------------------
+  QUIC                   RFC/development   under review                   0x1A                 Linux QUIC                                     merge-era/development
+  -------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -5119,8 +4513,7 @@ Netdev 0x17 Device Memory TCP
    └── Linux 6.12 merge
 ```
 
-This makes Netdev a provenance source rather than a detached conference
-bibliography.
+This makes Netdev a provenance source rather than a detached conference bibliography.
 
 ------------------------------------------------------------------------
 
@@ -5140,13 +4533,11 @@ The first pass uses:
 Category = networking
 ```
 
-and then supplements it with talks filed under other categories whose
-contents directly intersect the networking change log.
+and then supplements it with talks filed under other categories whose contents directly intersect the networking change log.
 
 ### In-scope conference talks found so far
 
-The canonical document begins with Linux v3.0. Therefore Kernel Recipes
-2019 is in scope.
+The canonical document begins with Linux v3.0. Therefore Kernel Recipes 2019 is in scope.
 
 #### Kernel Recipes 2019 --- XDP closer integration with network stack
 
@@ -5176,8 +4567,7 @@ XDP
        └── other in-kernel tables
 ```
 
-A particularly interesting proposal in the abstract is moving skb
-allocation out of drivers by using XDP frames.
+A particularly interesting proposal in the abstract is moving skb allocation out of drivers by using XDP frames.
 
 #### Relation to the change log
 
@@ -5205,12 +4595,9 @@ does not necessarily mean
 kernel bypass
 ```
 
-That same idea later appears in Device Memory TCP, io_uring zero-copy RX
-and netkit: retain kernel TCP/networking semantics while removing
-unnecessary allocation/copy/queue costs.
+That same idea later appears in Device Memory TCP, io_uring zero-copy RX and netkit: retain kernel TCP/networking semantics while removing unnecessary allocation/copy/queue costs.
 
-Kernel Recipes archive:
-`https://archives.kernel-recipes.org/document/xdp-closer-integration-with-network-stack/`
+Kernel Recipes archive: `https://archives.kernel-recipes.org/document/xdp-closer-integration-with-network-stack/`
 
 ------------------------------------------------------------------------
 
@@ -5257,8 +4644,7 @@ netkit
 BPF qdisc
 ```
 
-Kernel Recipes archive:
-`https://archives.kernel-recipes.org/document/bpf-at-facebook/`
+Kernel Recipes archive: `https://archives.kernel-recipes.org/document/bpf-at-facebook/`
 
 ------------------------------------------------------------------------
 
@@ -5275,11 +4661,9 @@ Year:
 2023
 ```
 
-This is the most important Kernel Recipes networking artifact found in
-the first pass.
+This is the most important Kernel Recipes networking artifact found in the first pass.
 
-The slides summarize the Netconf workshop held at Kernel Recipes and
-name the major discussion areas.
+The slides summarize the Netconf workshop held at Kernel Recipes and name the major discussion areas.
 
 #### Willem de Bruijn
 
@@ -5298,8 +4682,7 @@ netmem
 Device Memory TCP
 ```
 
-and is especially valuable because it captures SO_DEVMEM while the
-architecture was still being designed.
+and is especially valuable because it captures SO_DEVMEM while the architecture was still being designed.
 
 #### Daniel Borkmann
 
@@ -5333,8 +4716,7 @@ three-band FQ with WRR
 UDP accept()
 ```
 
-These belong to the broader socket/skb/queue scalability work
-surrounding the release timeline.
+These belong to the broader socket/skb/queue scalability work surrounding the release timeline.
 
 #### David Ahern
 
@@ -5346,8 +4728,7 @@ BIG TCP for IPv6
 zero-cost counters for userspace monitoring
 ```
 
-The ML/TCP discussion is particularly relevant to the later Device
-Memory TCP and AI-networking work.
+The ML/TCP discussion is particularly relevant to the later Device Memory TCP and AI-networking work.
 
 #### Florian Westphal
 
@@ -5362,8 +4743,7 @@ PF_KEY deprecation
 nftables CVE fixes
 ```
 
-This provides conference context for the document's netfilter/offload
-and IPsec tracks.
+This provides conference context for the document's netfilter/offload and IPsec tracks.
 
 #### Other networking topics
 
@@ -5394,11 +4774,9 @@ Kernel Recipes / Netconf workshop
         └── nftables ────────────→ netfilter maintenance
 ```
 
-Kernel Recipes archive:
-`https://archives.kernel-recipes.org/document/netconf-2023-workshop/`
+Kernel Recipes archive: `https://archives.kernel-recipes.org/document/netconf-2023-workshop/`
 
-Slides:
-`https://archives.kernel-recipes.org/wp-content/uploads/2025/01/netconf_2023.pdf`
+Slides: `https://archives.kernel-recipes.org/wp-content/uploads/2025/01/netconf_2023.pdf`
 
 ------------------------------------------------------------------------
 
@@ -5419,8 +4797,7 @@ Year:
 2019
 ```
 
-This predates the networking-specific io_uring work, but is important
-architectural provenance for the interface itself.
+This predates the networking-specific io_uring work, but is important architectural provenance for the interface itself.
 
 Lineage:
 
@@ -5441,8 +4818,7 @@ On the way to io_uring networking
 io_uring zero-copy RX
 ```
 
-Kernel Recipes archive:
-`https://archives.kernel-recipes.org/document/faster-io-through-io_uring/`
+Kernel Recipes archive: `https://archives.kernel-recipes.org/document/faster-io-through-io_uring/`
 
 ------------------------------------------------------------------------
 
@@ -5459,12 +4835,9 @@ Year:
 2022
 ```
 
-Although filed as storage, the archive describes io_uring as a
-consistent high-performance I/O model, and it sits chronologically in
-the same period as the first serious io_uring zero-copy networking work.
+Although filed as storage, the archive describes io_uring as a consistent high-performance I/O model, and it sits chronologically in the same period as the first serious io_uring zero-copy networking work.
 
-Kernel Recipes archive:
-`https://archives.kernel-recipes.org/document/whats-new-with-io_uring/`
+Kernel Recipes archive: `https://archives.kernel-recipes.org/document/whats-new-with-io_uring/`
 
 ------------------------------------------------------------------------
 
@@ -5481,8 +4854,7 @@ Year:
 2023
 ```
 
-The archive explicitly describes networking as io_uring's next
-performance frontier.
+The archive explicitly describes networking as io_uring's next performance frontier.
 
 This is therefore a direct networking talk despite its archive category.
 
@@ -5507,44 +4879,29 @@ page_pool / netmem integration
 Linux 6.15 io_uring ZCRX
 ```
 
-This should be treated as a **merge-era/design-era conference
-counterpart** to the io_uring networking LWN series.
+This should be treated as a **merge-era/design-era conference counterpart** to the io_uring networking LWN series.
 
-Kernel Recipes archive:
-`https://archives.kernel-recipes.org/document/on-the-way-to-io_uring-networking/`
+Kernel Recipes archive: `https://archives.kernel-recipes.org/document/on-the-way-to-io_uring-networking/`
 
 ------------------------------------------------------------------------
 
 ## Kernel Recipes → LWN → mainline mapping
 
-  -----------------------------------------------------------------------------
-  Kernel           Year Archive      Change-log lineage  Phase
-  Recipes               category                         
-  ------------- ------- ------------ ------------------- ----------------------
-  XDP closer       2019 networking   XDP →               design/architecture
-  integration                        page_pool/AF_XDP →  
-  with network                       netkit              
-  stack                                                  
+  ---------------------------------------------------------------------------------------------------------------------------------------------------------
+  Kernel Recipes                                 Year Archive category   Change-log lineage                                     Phase
+  ------------------------------------------- ------- ------------------ ------------------------------------------------------ ---------------------------
+  XDP closer integration with network stack      2019 networking         XDP → page_pool/AF_XDP → netkit                        design/architecture
 
-  BPF at           2019 networking   BPF networking →    deployment/design
-  Facebook                           struct_ops/socket   
-                                     hooks/netkit        
+  BPF at Facebook                                2019 networking         BPF networking → struct_ops/socket hooks/netkit        deployment/design
 
-  Faster IO        2019 storage      io_uring →          pre-networking
-  through                            networking TX/RX    foundation
-  io_uring                                               
+  Faster IO through io_uring                     2019 storage            io_uring → networking TX/RX                            pre-networking foundation
 
-  What's new       2022 storage      io_uring → ZC       foundation/merge-era
-  with io_uring                      networking          
+  What's new with io_uring                       2022 storage            io_uring → ZC networking                               foundation/merge-era
 
-  On the way to    2023 storage      io_uring ZC TX/RX   design/merge-era
-  io_uring                                               
-  networking                                             
+  On the way to io_uring networking              2023 storage            io_uring ZC TX/RX                                      design/merge-era
 
-  Netconf 2023     2023 networking   SO_DEVMEM, BIG TCP, multi-lineage workshop
-  Workshop                           XDP/BPF, IPsec,     
-                                     nftables, TCP/ML    
-  -----------------------------------------------------------------------------
+  Netconf 2023 Workshop                          2023 networking         SO_DEVMEM, BIG TCP, XDP/BPF, IPsec, nftables, TCP/ML   multi-lineage workshop
+  ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -5608,25 +4965,19 @@ LWN series
 Linux 6.15 ZCRX
 ```
 
-This additional conference layer makes the change log useful not only
-for answering "when was it merged?" but also "where did the
-architectural direction come from?"
+This additional conference layer makes the change log useful not only for answering "when was it merged?" but also "where did the architectural direction come from?"
 
 ------------------------------------------------------------------------
 
 ## Linux Plumbers Conference cross-reference --- historical provenance through 2025
 
-The Linux Plumbers Conference (LPC) is now added as a fourth
-conference/review layer.
+The Linux Plumbers Conference (LPC) is now added as a fourth conference/review layer.
 
-Unlike Netdev, LPC often combines networking with BPF and
-cross-subsystem discussions, and many sessions are explicitly intended
-to discuss work that is not yet finished.
+Unlike Netdev, LPC often combines networking with BPF and cross-subsystem discussions, and many sessions are explicitly intended to discuss work that is not yet finished.
 
 ### LPC 2019 --- Networking Summit
 
-The 2019 Networking Summit already contains several lineages that later
-become major parts of this change log:
+The 2019 Networking Summit already contains several lineages that later become major parts of this change log:
 
 ``` text
 Multipath TCP Upstreaming
@@ -5657,14 +5008,11 @@ This is strong pre-merge provenance for the initial MPTCP generation.
 
 #### BPF socket lookup
 
-The "Programmable socket lookup with BPF" session predates the later
-`BPF_PROG_TYPE_SK_LOOKUP` mainline API and belongs directly in the
-socket-programmability lineage.
+The "Programmable socket lookup with BPF" session predates the later `BPF_PROG_TYPE_SK_LOOKUP` mainline API and belongs directly in the socket-programmability lineage.
 
 #### Netfilter hardware offload
 
-This provides conference provenance for the same offload direction
-covered by LWN's 2020 two-part netfilter hardware-offload series.
+This provides conference provenance for the same offload direction covered by LWN's 2020 two-part netfilter hardware-offload series.
 
 ------------------------------------------------------------------------
 
@@ -5682,8 +5030,7 @@ Userspace OVS with HW Offload and AF_XDP
 
 #### BPF qdisc
 
-The 2020 "A programmable Qdisc with eBPF" talk is a particularly useful
-early ancestor of the later BPF-qdisc work.
+The 2020 "A programmable Qdisc with eBPF" talk is a particularly useful early ancestor of the later BPF-qdisc work.
 
 It should be classified as:
 
@@ -5701,13 +5048,11 @@ Netdev 0x17 eBPF Qdisc
 mainline BPF Qdisc
 ```
 
-It is **design lineage**, not evidence that the later `Qdisc_ops`
-struct_ops design had already landed in 2020.
+It is **design lineage**, not evidence that the later `Qdisc_ops` struct_ops design had already landed in 2020.
 
 #### BPF TCP extensibility
 
-The TCP header option / congestion-control / socket-local-storage
-session connects to:
+The TCP header option / congestion-control / socket-local-storage session connects to:
 
 ``` text
 BPF struct_ops TCP congestion control
@@ -5733,8 +5078,7 @@ Bringing TSO/GRO and Jumbo frames to XDP
 
 #### SO_REUSEPORT socket migration
 
-The talk explicitly describes the Linux 5.14 socket-migration feature
-and its BPF extension.
+The talk explicitly describes the Linux 5.14 socket-migration feature and its BPF extension.
 
 This maps directly to the LWN `SO_REUSEPORT` failover coverage.
 
@@ -5746,8 +5090,7 @@ merge/post-merge explanation
 
 #### XDP multi-buffer precursor
 
-"Bringing TSO/GRO and Jumbo frames to XDP" states the core limitation
-clearly:
+"Bringing TSO/GRO and Jumbo frames to XDP" states the core limitation clearly:
 
 ``` text
 XDP single-buffer packet model
@@ -5869,8 +5212,7 @@ runtime extensibility
         └── BPF
 ```
 
-This aligns almost exactly with the commit provenance already
-reconstructed in this document:
+This aligns almost exactly with the commit provenance already reconstructed in this document:
 
 ``` text
 5.6 initial MPTCP
@@ -5893,8 +5235,7 @@ AF_XDP userspace
 chained BPF programs
 ```
 
-This is early provenance for the packet-metadata problem that remains
-active in later LPC sessions.
+This is early provenance for the packet-metadata problem that remains active in later LPC sessions.
 
 ------------------------------------------------------------------------
 
@@ -5917,8 +5258,7 @@ kernel memory
 userspace memory
 ```
 
-and contrasts kernel-socket networking with kernel-bypass approaches
-such as:
+and contrasts kernel-socket networking with kernel-bypass approaches such as:
 
 ``` text
 DPDK
@@ -5927,8 +5267,7 @@ AF_XDP
 RDMA / RoCE / InfiniBand
 ```
 
-The design goal is to preserve the generic kernel socket/networking
-stack while removing the extra data copy.
+The design goal is to preserve the generic kernel socket/networking stack while removing the extra data copy.
 
 #### Provenance chain
 
@@ -5961,8 +5300,7 @@ This gives unusually strong multi-conference provenance for the feature.
 
 ## LPC 2024 --- Networking Track
 
-LPC 2024 has a dedicated Networking Track described by the organizers as
-an in-person manifestation of the netdev mailing list.
+LPC 2024 has a dedicated Networking Track described by the organizers as an in-person manifestation of the netdev mailing list.
 
 Important sessions include:
 
@@ -5981,9 +5319,7 @@ State of the Bloat
 
 This is one of the strongest LPC matches to the existing change log.
 
-The session explicitly describes `rtnl_lock()` as the networking
-subsystem's "Big Kernel Lock" and notes that work to avoid it for some
-requests dates back to Linux 4.14.
+The session explicitly describes `rtnl_lock()` as the networking subsystem's "Big Kernel Lock" and notes that work to avoid it for some requests dates back to Linux 4.14.
 
 Lineage:
 
@@ -6008,13 +5344,11 @@ per-netns RTNL infrastructure
 subsystem-specific lock/refcount conversion
 ```
 
-This directly validates the document's decision to treat RTNL breakup as
-a **multi-year migration**, not a single-release feature.
+This directly validates the document's decision to treat RTNL breakup as a **multi-year migration**, not a single-release feature.
 
 ### Network virtualization overhead
 
-The network-virtualization session discusses reducing the cost of
-traversing both guest and host networking stacks.
+The network-virtualization session discusses reducing the cost of traversing both guest and host networking stacks.
 
 It belongs in the broader lineage:
 
@@ -6034,8 +5368,7 @@ queue leasing / KubeVirt zero-copy
 
 ## LPC 2025 --- Networking Track
 
-The 2025 Networking Track is exceptionally relevant to the late part of
-this change log.
+The 2025 Networking Track is exceptionally relevant to the late part of this change log.
 
 Sessions include:
 
@@ -6053,11 +5386,11 @@ Linux Networking with MANA: RX Path Optimization and Netshaper
 
 ### Zero-copy in containers / netkit queue leasing
 
+**Status boundary:** merged queue leasing is the **RX** side. Later 2026 developer discussion explicitly describes TX queue leasing as symmetric first-class infrastructure still at PoC/design stage. This document therefore does not describe TX queue leasing as merged.
+
 This is the most important LPC 2025 session for the current document.
 
-The talk proposes leasing a physical NIC hardware queue to a virtual
-device such as `netkit`, so applications inside network namespaces/Pods
-can use:
+The talk proposes leasing a physical NIC hardware queue to a virtual device such as `netkit`, so applications inside network namespaces/Pods can use:
 
 ``` text
 io_uring zero-copy
@@ -6123,8 +5456,7 @@ RX metadata propagation
 future TX metadata
 ```
 
-This is a later continuation of the XDP hardware-hints/metadata
-discussions seen at LPC 2022.
+This is a later continuation of the XDP hardware-hints/metadata discussions seen at LPC 2022.
 
 Lineage:
 
@@ -6153,8 +5485,7 @@ AMDGPU
 BPF JIT
 ```
 
-The stated goal is kernel-native packet processing on an AMD GPU without
-a userspace GPU runtime.
+The stated goal is kernel-native packet processing on an AMD GPU without a userspace GPU runtime.
 
 Architecturally:
 
@@ -6171,9 +5502,7 @@ GPU-executed packet processing
 
 Device Memory TCP is explicitly part of the data-transfer discussion.
 
-This should be treated as **post-merge application/extension
-provenance** for the device memory infrastructure, not as part of the
-initial Device Memory TCP implementation.
+This should be treated as **post-merge application/extension provenance** for the device memory infrastructure, not as part of the initial Device Memory TCP implementation.
 
 ### page_pool in MANA
 
@@ -6185,80 +5514,59 @@ page_pool fragments
 pre-DMA-mapped page pools per RX queue
 ```
 
-to avoid wasting a full 64-KiB page for a small packet on large-page
-ARM64 systems.
+to avoid wasting a full 64-KiB page for a small packet on large-page ARM64 systems.
 
-This is a useful post-merge production example of why `page_pool` became
-a core networking memory-management primitive.
+This is a useful post-merge production example of why `page_pool` became a core networking memory-management primitive.
 
 ------------------------------------------------------------------------
 
 ## LPC timeline mapped to the major change-log lineages
 
-  ---------------------------------------------------------------------------
-      Year LPC topic          Change-log lineage           Phase
-  -------- ------------------ ---------------------------- ------------------
-      2019 Multipath TCP      MPTCP 5.6                    pre-merge
-           Upstreaming                                     
+  --------------------------------------------------------------------------------------------------------
+      Year LPC topic                                 Change-log lineage           Phase
+  -------- ----------------------------------------- ---------------------------- ------------------------
+      2019 Multipath TCP Upstreaming                 MPTCP 5.6                    pre-merge
 
-      2019 Programmable       SK_LOOKUP                    pre-merge
-           socket lookup with                              
-           BPF                                             
+      2019 Programmable socket lookup with BPF       SK_LOOKUP                    pre-merge
 
-      2019 netfilter hardware nftables/flowtable/offload   design/merge-era
-           offloads                                        
+      2019 netfilter hardware offloads               nftables/flowtable/offload   design/merge-era
 
-      2020 Programmable Qdisc BPF qdisc                    early design
-           with eBPF                                       
+      2020 Programmable Qdisc with eBPF              BPF qdisc                    early design
 
-      2020 BPF TCP header     BPF TCP programmability      design/merge-era
-           option/CC/socket                                
-           storage                                         
+      2020 BPF TCP header option/CC/socket storage   BPF TCP programmability      design/merge-era
 
-      2020 OVS + AF_XDP       AF_XDP/virtual networking    application
+      2020 OVS + AF_XDP                              AF_XDP/virtual networking    application
 
-      2021 SO_REUSEPORT       SO_REUSEPORT failover        merge/post-merge
-           socket migration                                
+      2021 SO_REUSEPORT socket migration             SO_REUSEPORT failover        merge/post-merge
 
-      2021 TSO/GRO/Jumbo for  XDP multi-buffer             pre-merge
-           XDP                                             
+      2021 TSO/GRO/Jumbo for XDP                     XDP multi-buffer             pre-merge
 
-      2021 bpfilter           BPF firewall                 design
+      2021 bpfilter                                  BPF firewall                 design
 
-      2022 high-speed Linux   BIG TCP/ZC/devmem            architecture
-           networking                                      
+      2022 high-speed Linux networking               BIG TCP/ZC/devmem            architecture
 
-      2022 machine-readable   YNL                          pre-merge
-           Netlink YAML                                    
+      2022 machine-readable Netlink YAML             YNL                          pre-merge
 
-      2022 MPTCP BPF +        MPTCP extensibility          merge/design
-           Netlink                                         
+      2022 MPTCP BPF + Netlink                       MPTCP extensibility          merge/design
 
-      2022 XDP hardware hints packet metadata              design
+      2022 XDP hardware hints                        packet metadata              design
 
-      2022 packet queueing in programmable queueing        RFC
-           XDP                                             
+      2022 packet queueing in XDP                    programmable queueing        RFC
 
-      2023 io_uring ZC        io_uring ZCRX                pre-merge
-           receive                                         
+      2023 io_uring ZC receive                       io_uring ZCRX                pre-merge
 
-      2024 Per Netns RTNL     RTNL breakup                 pre/merge-era
+      2024 Per Netns RTNL                            RTNL breakup                 pre/merge-era
 
-      2024 network            virtio/AF_XDP/netkit         architecture
-           virtualization                                  
-           overhead                                        
+      2024 network virtualization overhead           virtio/AF_XDP/netkit         architecture
 
-      2025 zero-copy in       netkit queue leasing         design/merge-era
-           containers                                      
+      2025 zero-copy in containers                   netkit queue leasing         design/merge-era
 
-      2025 packet metadata    XDP/BPF metadata             ongoing
+      2025 packet metadata                           XDP/BPF metadata             ongoing
 
-      2025 XDP on AMD GPU     devmem/P2PDMA/XDP            post-merge
-                                                           extension
+      2025 XDP on AMD GPU                            devmem/P2PDMA/XDP            post-merge extension
 
-      2025 MANA RX page_pool  page_pool                    post-merge
-                                                           application
-  ---------------------------------------------------------------------------
+      2025 MANA RX page_pool                         page_pool                    post-merge application
+  --------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -6294,8 +5602,7 @@ git.kernel.org
 kernel release
 ```
 
-The ordering is conceptual, not strictly chronological: a feature may
-appear at Netdev before LPC, or return to LPC after merging.
+The ordering is conceptual, not strictly chronological: a feature may appear at Netdev before LPC, or return to LPC after merging.
 
 The important property is that each source answers a different question:
 
@@ -6319,17 +5626,13 @@ git:
 what is actually in mainline?
 ```
 
-This makes it possible to distinguish **idea provenance** from **landing
-provenance** and from **mainline provenance**.
+This makes it possible to distinguish **idea provenance** from **landing provenance** and from **mainline provenance**.
 
 ------------------------------------------------------------------------
 
 ## LPC cross-track sweep --- DMA, RDMA, virtualization and io_uring
 
-The LPC search was expanded beyond the Networking/eBPF tracks. This
-matters because several prerequisites for modern zero-copy networking
-live in RDMA, VFIO/IOMMU/PCI, virtualization, and generic io_uring
-discussions rather than in the networking track itself.
+The LPC search was expanded beyond the Networking/eBPF tracks. This matters because several prerequisites for modern zero-copy networking live in RDMA, VFIO/IOMMU/PCI, virtualization, and generic io_uring discussions rather than in the networking track itself.
 
 ### LPC 2019 --- Challenges of the RDMA subsystem
 
@@ -6355,8 +5658,7 @@ PCI peer-to-peer DMA
 overlap with netdev / virtio / NVMe
 ```
 
-The accompanying RDMA microconference description is even more explicit
-about:
+The accompanying RDMA microconference description is even more explicit about:
 
 ``` text
 RDMA ↔ GPU / NVMe P2P
@@ -6369,11 +5671,9 @@ container support
 
 #### Historical relevance
 
-This is not direct Device Memory TCP provenance. The networking feature
-did not yet exist in its later form.
+This is not direct Device Memory TCP provenance. The networking feature did not yet exist in its later form.
 
-It is instead **infrastructure/problem-space provenance** for a
-recurring kernel question:
+It is instead **infrastructure/problem-space provenance** for a recurring kernel question:
 
 ``` text
 How can a high-speed I/O device DMA directly to memory that is not ordinary
@@ -6395,10 +5695,7 @@ RDMA / P2P / HMM / DMA-BUF
            TCP
 ```
 
-The important distinction is that Device Memory TCP solves the
-networking-stack side of the problem through
-page_pool/netmem/memory-provider integration rather than simply reusing
-the RDMA subsystem.
+The important distinction is that Device Memory TCP solves the networking-stack side of the problem through page_pool/netmem/memory-provider integration rather than simply reusing the RDMA subsystem.
 
 ------------------------------------------------------------------------
 
@@ -6412,11 +5709,9 @@ Year:
 2020
 ```
 
-The proposal discusses moving/offloading guest XDP programs toward the
-host for `virtio-net` and `xen-netfront`.
+The proposal discusses moving/offloading guest XDP programs toward the host for `virtio-net` and `xen-netfront`.
 
-It predates the later AF_XDP zero-copy work, but belongs in the
-virtual-networking performance lineage:
+It predates the later AF_XDP zero-copy work, but belongs in the virtual-networking performance lineage:
 
 ``` text
 guest virtual NIC
@@ -6437,8 +5732,7 @@ virtio-net AF_XDP RX zero-copy
 netkit / KubeVirt queue-leasing direction
 ```
 
-This is **design lineage**, not a claim that the later virtio-net AF_XDP
-API originated from this exact proposal.
+This is **design lineage**, not a claim that the later virtio-net AF_XDP API originated from this exact proposal.
 
 ------------------------------------------------------------------------
 
@@ -6455,15 +5749,11 @@ The session proposes a three-level processing hierarchy:
 3. OVS userspace datapath via AF_XDP
 ```
 
-A key property is that AF_XDP retains a kernel network driver, unlike an
-OVS-DPDK style full userspace-driver deployment. That allows hardware
-offload through `tc-flower` while also providing a high-performance
-userspace fallback.
+A key property is that AF_XDP retains a kernel network driver, unlike an OVS-DPDK style full userspace-driver deployment. That allows hardware offload through `tc-flower` while also providing a high-performance userspace fallback.
 
 #### Relevance
 
-This is useful historical evidence for the recurring Linux networking
-design pattern:
+This is useful historical evidence for the recurring Linux networking design pattern:
 
 ``` text
 do not choose only between
@@ -6502,12 +5792,9 @@ Year:
 2021
 ```
 
-This is not itself a networking feature. It explores allowing BPF to
-influence/control io_uring submission in order to reduce context
-switches and scheduling overhead.
+This is not itself a networking feature. It explores allowing BPF to influence/control io_uring submission in order to reduce context switches and scheduling overhead.
 
-For this networking history its value is as an early cross-subsystem
-connection:
+For this networking history its value is as an early cross-subsystem connection:
 
 ``` text
 BPF programmability
@@ -6515,9 +5802,7 @@ BPF programmability
 io_uring asynchronous I/O
 ```
 
-The later networking history increasingly combines these two ecosystems,
-but the 2021 proposal should remain classified as **generic io_uring/BPF
-design context**, not as a direct ancestor of a specific networking API.
+The later networking history increasingly combines these two ecosystems, but the 2021 proposal should remain classified as **generic io_uring/BPF design context**, not as a direct ancestor of a specific networking API.
 
 ------------------------------------------------------------------------
 
@@ -6536,8 +5821,7 @@ Year:
 2022
 ```
 
-The talk identifies a concrete virtualization problem for peer-to-peer
-DMA.
+The talk identifies a concrete virtualization problem for peer-to-peer DMA.
 
 Typical P2P consumers include:
 
@@ -6553,13 +5837,11 @@ p2pdma
 DMA-BUF
 ```
 
-The host kernel can validate PCI topology/distance, but a guest may not
-see enough of the physical PCI topology to make the same decision.
+The host kernel can validate PCI topology/distance, but a guest may not see enough of the physical PCI topology to make the same decision.
 
 #### Relevance to the networking history
 
-This is especially useful when interpreting later GPU/device-memory
-networking work.
+This is especially useful when interpreting later GPU/device-memory networking work.
 
 ``` text
 P2P DMA on bare metal
@@ -6571,10 +5853,7 @@ virtualization hides physical topology
 guest cannot safely determine P2P feasibility
 ```
 
-That is a different problem from the later KubeVirt/netkit queue-leasing
-path, but both show why zero-copy networking inside
-virtualized/containerized environments requires more than merely
-exposing a fast packet API.
+That is a different problem from the later KubeVirt/netkit queue-leasing path, but both show why zero-copy networking inside virtualized/containerized environments requires more than merely exposing a fast packet API.
 
 ------------------------------------------------------------------------
 
@@ -6605,8 +5884,7 @@ page_pool memory providers
 io_uring
 ```
 
-The control plane/stateful networking remains in the normal kernel stack
-while payload DMA can go directly to userspace memory.
+The control plane/stateful networking remains in the normal kernel stack while payload DMA can go directly to userspace memory.
 
 Conceptually:
 
@@ -6625,8 +5903,7 @@ Conceptually:
                   userspace memory
 ```
 
-The LPC material also explicitly mentions future extension toward GPU
-device memory.
+The LPC material also explicitly mentions future extension toward GPU device memory.
 
 This provides an important bridge:
 
@@ -6642,15 +5919,13 @@ io_uring ZCRX
               adjacent design space
 ```
 
-The two features should still be kept distinct in the canonical
-inventory.
+The two features should still be kept distinct in the canonical inventory.
 
 ------------------------------------------------------------------------
 
 ## VFIO/IOMMU/PCI as supporting provenance
 
-The 2023--2025 VFIO/IOMMU/PCI microconference descriptions repeatedly
-list:
+The 2023--2025 VFIO/IOMMU/PCI microconference descriptions repeatedly list:
 
 ``` text
 ATS / PRI
@@ -6663,11 +5938,9 @@ IOMMU
 DMA ownership
 ```
 
-These sessions are too broad to map to a single networking feature and
-should not be promoted into the main networking timeline individually.
+These sessions are too broad to map to a single networking feature and should not be promoted into the main networking timeline individually.
 
-They are nevertheless useful as **supporting infrastructure provenance**
-for topics such as:
+They are nevertheless useful as **supporting infrastructure provenance** for topics such as:
 
 ``` text
 Device Memory TCP
@@ -6691,8 +5964,7 @@ generic microconference proposal
 
 ## Cross-track findings that materially change the networking narrative
 
-The additional LPC material strengthens three long-term architectural
-themes.
+The additional LPC material strengthens three long-term architectural themes.
 
 ### Theme 1 --- zero copy is also a memory-ownership problem
 
@@ -6777,77 +6049,53 @@ AF_XDP placement
 KubeVirt zero-copy
 ```
 
-The later netkit queue-leasing work can therefore be understood as part
-of a broader attempt to preserve kernel-managed isolation while exposing
-enough of the physical data path to containers and VMs.
+The later netkit queue-leasing work can therefore be understood as part of a broader attempt to preserve kernel-managed isolation while exposing enough of the physical data path to containers and VMs.
 
 ------------------------------------------------------------------------
 
 ## Updated LPC canonical inventory
 
-  -------------------------------------------------------------------------
-            Year Session          LPC area          Canonical role
-  -------------- ---------------- ----------------- -----------------------
-            2019 Multipath TCP    Networking        MPTCP pre-merge
-                 Upstreaming                        
+  -------------------------------------------------------------------------------------------------------------------
+            Year Session                                      LPC area          Canonical role
+  -------------- -------------------------------------------- ----------------- -------------------------------------
+            2019 Multipath TCP Upstreaming                    Networking        MPTCP pre-merge
 
-            2019 Programmable     Networking        SK_LOOKUP pre-merge
-                 socket lookup                      
-                 with BPF                           
+            2019 Programmable socket lookup with BPF          Networking        SK_LOOKUP pre-merge
 
-            2019 Challenges of    Refereed/RDMA     DMA/P2P/device-memory
-                 the RDMA                           problem-space
-                 subsystem                          
+            2019 Challenges of the RDMA subsystem             Refereed/RDMA     DMA/P2P/device-memory problem-space
 
-            2019 RDMA MC          RDMA              HMM/DMA-BUF/P2P
-                                                    supporting context
+            2019 RDMA MC                                      RDMA              HMM/DMA-BUF/P2P supporting context
 
-            2020 xen-netfront and Networking+BPF    virtual-NIC XDP design
-                 virtio_net XDP                     
-                 offloading                         
+            2020 xen-netfront and virtio_net XDP offloading   Networking+BPF    virtual-NIC XDP design
 
-            2020 Userspace OVS    Networking+BPF    hybrid HW/XDP/AF_XDP
-                 with HW Offload                    datapath
-                 and AF_XDP                         
+            2020 Userspace OVS with HW Offload and AF_XDP     Networking+BPF    hybrid HW/XDP/AF_XDP datapath
 
-            2020 A programmable   Networking+BPF    BPF-qdisc early design
-                 Qdisc with eBPF                    
+            2020 A programmable Qdisc with eBPF               Networking+BPF    BPF-qdisc early design
 
-            2021 TSO/GRO/Jumbo    BPF+Networking    XDP multi-buffer
-                 frames for XDP                     precursor
+            2021 TSO/GRO/Jumbo frames for XDP                 BPF+Networking    XDP multi-buffer precursor
 
-            2021 io_uring: BPF    Refereed          io_uring/BPF context
-                 controlled I/O                     
+            2021 io_uring: BPF controlled I/O                 Refereed          io_uring/BPF context
 
-            2022 High-speed Linux eBPF+Networking   BIG-TCP/ZC architecture
-                 TCP                                
+            2022 High-speed Linux TCP                         eBPF+Networking   BIG-TCP/ZC architecture
 
-            2022 Netlink YAML     eBPF+Networking   YNL pre-merge
+            2022 Netlink YAML                                 eBPF+Networking   YNL pre-merge
 
-            2022 MPTCP BPF +      eBPF+Networking   MPTCP extensibility
-                 Netlink                            
+            2022 MPTCP BPF + Netlink                          eBPF+Networking   MPTCP extensibility
 
-            2022 PCIe topology to VFIO/IOMMU/PCI    virtualized P2P
-                 guest for P2P                      constraint
+            2022 PCIe topology to guest for P2P               VFIO/IOMMU/PCI    virtualized P2P constraint
 
-            2023 Zero Copy        eBPF+Networking   io_uring ZCRX pre-merge
-                 Receive using                      
-                 io_uring                           
+            2023 Zero Copy Receive using io_uring             eBPF+Networking   io_uring ZCRX pre-merge
 
-            2024 Per Netns RTNL   Networking        RTNL breakup
+            2024 Per Netns RTNL                               Networking        RTNL breakup
 
-            2024 Network          Networking        virtual-network
-                 virtualization                     optimization
-                 overhead                           
+            2024 Network virtualization overhead              Networking        virtual-network optimization
 
-            2025 Zero-copy in     Networking        netkit queue leasing
-                 containers                         
+            2025 Zero-copy in containers                      Networking        netkit queue leasing
 
-            2025 Packet Metadata  Networking        metadata API evolution
+            2025 Packet Metadata                              Networking        metadata API evolution
 
-            2025 XDP on AMD GPUs  Networking        devmem/P2PDMA
-                                                    post-merge extension
-  -------------------------------------------------------------------------
+            2025 XDP on AMD GPUs                              Networking        devmem/P2PDMA post-merge extension
+  -------------------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -6879,23 +6127,17 @@ Device Memory   io_uring   virtio/netkit      GPU packet
 TCP             ZCRX       queue leasing      processing
 ```
 
-This is intentionally a dependency/problem-space graph, not a claim that
-each box was implemented directly from the box above it.
+This is intentionally a dependency/problem-space graph, not a claim that each box was implemented directly from the box above it.
 
 It captures a major conclusion of the multi-source research:
 
-> Linux networking's recent zero-copy evolution is inseparable from the
-> kernel's broader DMA, memory-ownership, device-memory and
-> virtualization work.
+> Linux networking's recent zero-copy evolution is inseparable from the kernel's broader DMA, memory-ownership, device-memory and virtualization work.
 
 ------------------------------------------------------------------------
 
 ## Unified chronological timeline --- conferences → LWN → patches → mainline
 
-Legend: `[KR]` Kernel Recipes, `[LPC]` Linux Plumbers Conference,
-`[Netdev]` Netdev, `[LWN]` LWN, `[Patch]` upstream series, `[Mainline]`
-canonical landing, `[Release]` kernel milestone, `[RFC]` design only,
-`[X]` removal.
+Legend: `[KR]` Kernel Recipes, `[LPC]` Linux Plumbers Conference, `[Netdev]` Netdev, `[LWN]` LWN, `[Patch]` upstream series, `[Mainline]` canonical landing, `[Release]` kernel milestone, `[RFC]` design only, `[X]` removal.
 
 ### 2019 --- upstreaming and programmable networking
 
@@ -7040,7 +6282,7 @@ netkit / queue-leasing design work
 ### 2026 --- queue ownership, larger devmem buffers, tunnel BIG TCP, RTNL reduction
 
 ``` text
-queue-leasing merge / revert / redesign / re-merge
+RX queue leasing merge / follow-up fixes
   ↓
 container-visible queue ownership
 
@@ -7113,28 +6355,23 @@ global RTNL → unlocked flags → RCU readers → per-netns RTNL → subsystem 
 
 ## Source-role matrix
 
-  ---------------------------------------------------------------------
+  -----------------------------------------------------------------------------------------------------
   Source                             Best used for
-  ---------------------------------- ----------------------------------
-  Kernel Recipes                     architectural motivation and
-                                     production experience
+  ---------------------------------- ------------------------------------------------------------------
+  Kernel Recipes                     architectural motivation and production experience
 
-  Linux Plumbers Conference          cross-subsystem API/design
-                                     discussion and unresolved problems
+  Linux Plumbers Conference          cross-subsystem API/design discussion and unresolved problems
 
-  Netdev                             networking-specific implementation
-                                     and datapath design
+  Netdev                             networking-specific implementation and datapath design
 
-  LWN                                independent explanation, review
-                                     history and merge interpretation
+  LWN                                independent explanation, review history and merge interpretation
 
-  lore / patchwork                   exact revision and accepted-series
-                                     evidence
+  lore / patchwork                   exact revision and accepted-series evidence
 
   git.kernel.org                     canonical mainline commits
 
   release pulls/tags                 release-level confirmation
-  ---------------------------------------------------------------------
+  -----------------------------------------------------------------------------------------------------
 
 ``` text
 Why?            → KR / LPC / Netdev
@@ -7156,7 +6393,6 @@ Which release?  → release pull/tag
 6. Provenance/commit tables
 ```
 
-The document is intended to function as both a Linux networking history
-and an auditable source map.
+The document is intended to function as both a Linux networking history and an auditable source map.
 
 ------------------------------------------------------------------------
