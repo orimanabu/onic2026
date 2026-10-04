@@ -8,6 +8,12 @@ networking がどのように進化したかを読む順序**に再構成した�
 
 ## この文書の読み方
 
+> **Canonicalization note (2026-10-03):** Release chronology is
+> authoritative only in **Part II**. Development-series dates and
+> mainline release dates are intentionally separated. The document uses
+> one six-axis architecture model. Appendix material is
+> provenance/research history and is non-normative.
+
 本文は次の流れで構成する。
 
 ``` text
@@ -108,7 +114,7 @@ CNI / Kubernetes networking
 
 ------------------------------------------------------------------------
 
-### 1.2 v3.2 --- Byte Queue Limits: bufferbloatをdriver queueから削る
+### 1.2 2011--2012 DQL/BQL development → Linux v3.3 mainline
 
 BQL (Byte Queue Limits) はNIC TX queueへ過剰なdataを押し込まないよう、
 driver queueの適正なbyte量を動的に制御する。
@@ -716,6 +722,12 @@ leasingへ続く直接的な祖先。 同時にTCP zero-copy receiveも入った
 time-based packet transmissionとCAKEが入り、packet
 schedulingは単純なqueue managementからtime-aware schedulingへ拡大した。
 
+#### v4.20 --- EDT, BPF flow dissector, taprio, strict rtnetlink generation
+
+4.20 is the landing release for TCP EDT pacing, BPF programmable flow
+dissector, taprio and strict rtnetlink checking. Linux 4.20 was released
+on 2018-12-23; it is not skipped in the kernel version sequence.
+
 #### v5.0 --- foundationからbaselineへ
 
 v5.0はmodern networkingの開始点ではなく、v4.xで形成された技術が成熟した
@@ -757,9 +769,9 @@ netkit / queue leasing / per-netns RTNL
 
 ------------------------------------------------------------------------
 
-## 3. Linux v5.0--v5.1 --- v4.x innovations が baseline へ収束
+## 3. Linux v4.20--v5.1 --- modern baseline の形成
 
-## Linux v5.0 を baseline にする
+## Linux v4.20 / v5.0 を連続した baseline として扱う
 
 Linux v5.0 時点ですでに
 TCP/UDP、GRO/GSO、qdisc/TC、netfilter/conntrack、 rtnetlink、network
@@ -827,9 +839,9 @@ large-scale container / VM networking
 この節は、当初の監査範囲（2019-05-07以降）より前に位置する Linux v5.0 と
 v5.1 を、後続 release と同じ観点で追加監査した結果である。
 
-### Linux v5.0 --- modern high-speed networking の baseline
+### Linux v4.20 → v5.0 --- modern high-speed networking baseline
 
-#### 1A.1 TCP EDT pacing
+#### 1A.1 TCP EDT pacing --- Linux 4.20
 
 v5.0 の重要な networking change の一つが TCP pacing の **Earliest
 Departure Time (EDT)** model への移行である。
@@ -860,7 +872,7 @@ container networking に重要な baseline となる。
 
 **LWN:** `4.20/5.0 Merge window part 1`
 
-#### 1A.2 BPF programmable flow dissector
+#### 1A.2 BPF programmable flow dissector --- Linux 4.20
 
 v5.0 では network flow dissector を BPF program
 として実装できるようになった。
@@ -899,7 +911,7 @@ BPF packet parsing
 
 という programmable-network-stack lineage の初期段階として位置付ける。
 
-#### 1A.3 rtnetlink strict checking
+#### 1A.3 rtnetlink strict checking --- Linux 4.20
 
 rtnetlink に strict checking option が追加された。
 
@@ -917,7 +929,7 @@ YAML/YNL
 
 という control-plane API modernization の前史として記録する。
 
-#### 1A.4 UDP GRO
+#### 1A.4 UDP GRO --- Linux 5.0
 
 plain UDP socket に GRO が導入された。
 
@@ -936,14 +948,14 @@ fewer receive operations / lower per-packet cost
 これは後年の UDP receive optimization、QUIC/high-rate UDP、 tunnel
 aggregation を理解する重要な baseline である。
 
-#### 1A.5 UDP MSG_ZEROCOPY
+#### 1A.5 UDP MSG_ZEROCOPY --- Linux 5.0
 
 `MSG_ZEROCOPY` が UDP socket でも利用可能になった。
 
 したがって copy-reduction lineage は:
 
 ``` text
-v5.0 UDP MSG_ZEROCOPY
+v4.14 TCP MSG_ZEROCOPY → v5.0 UDP MSG_ZEROCOPY
         ↓
 TCP/io_uring zero-copy work
         ↓
@@ -956,7 +968,7 @@ device-memory networking
 
 と長い時間軸で見るべきである。
 
-#### 1A.6 taprio
+#### 1A.6 taprio --- Linux 4.20
 
 Time-Aware Priority Scheduler (`taprio`) も v5.0 の重要な qdisc change。
 
@@ -964,7 +976,7 @@ Time-Aware Priority Scheduler (`taprio`) も v5.0 の重要な qdisc change。
 異なるが、TC/qdisc が単なる best-effort queue management から
 time-sensitive scheduling へ広がった節目として残す。
 
-#### v5.0 canonical summary
+#### v4.20 / v5.0 canonical summary
 
   Area        v5.0 change                   Later lineage
   ----------- ----------------------------- -------------------------------
@@ -1040,7 +1052,12 @@ standardized device health / recovery / observability
 
 and later devlink became a major NIC/switch management interface.
 
-#### 1A.12 Wi-Fi airtime fairness
+#### 1A.12 Wi-Fi airtime fairness chronology --- correction
+
+The previous draft incorrectly used Linux 5.1 as the airtime-fairness
+milestone. mac80211 airtime-fairness work predates that release (4.17
+generation), while AQL is a later 5.5-generation milestone. 5.1 is
+therefore not used as the canonical origin here.
 
 mac80211 gained airtime-aware fairness support. Unlike byte/packet
 fairness, wireless capacity is fundamentally constrained by airtime:
@@ -2422,181 +2439,169 @@ sufficient for the provenance standard used by this document.
 
 ------------------------------------------------------------------------
 
-# Part II --- Expansion: Linux v5.2 → 7.x release chronology
+# Part II --- Canonical release chronology
 
-## 2. 進化を5つの時代で見る
+This is the **single normative release map** for this document. The
+appendix is provenance material, not a second release table. When a
+research note conflicts with this table, this table takes precedence
+after verification.
 
-### Phase 0 --- v5.0 baseline (2019)
-
-100--400Gb/s NIC の普及で packet processing だけでなく RX buffer の
-allocation/recycling が bottleneck として顕在化した。ここから
-`page_pool → netmem → device-memory networking` が始まる。
-
-### Phase 1 --- programmable network stack (2019--2021)
+Two dates are kept conceptually separate:
 
 ``` text
-XDP / TC BPF
-      ↓
-socket/cgroup hooks
-      ↓
-SK_LOOKUP
-      ↓
-BPF struct_ops
-      ↓
-TCP algorithm / socket behavior まで programmable
+development/review generation ≠ mainline release
 ```
 
-v5.6 では MPTCP、WireGuard、BPF `struct_ops` が大きな節目となる。
-
-### Phase 2 --- aggregate more, copy less (2021--2023)
-
-``` text
-TCP zero-copy RX
-       +
-io_uring networking
-       +
-BIG TCP
-       +
-AF_XDP multi-buffer
-```
-
-高速化の中心が packet-per-second だけでなく、 **aggregation / copy
-reduction / syscall reduction** へ移る。
-
-### Phase 3 --- packet memory becomes architecture (2023--2025)
-
-``` text
-page_pool
-   ↓
-netmem
-   ↓
-memory-provider abstraction
-   ├─ Device Memory TCP
-   └─ io_uring ZCRX
-```
-
-`network buffer = normal RAM の struct page` という前提が崩れ、
-networking と memory management が不可分になる。
-
-### Phase 4 --- queue ownership + scalable control plane (2024--2026)
-
-``` text
-netkit → queue leasing → AF_XDP/userspace/VMM
-```
-
-と並行して:
-
-``` text
-global RTNL
-   ↓
-unlocked / RCU paths
-   ↓
-per-netns RTNL
-   ↓
-subsystem-specific locking
-```
-
-が進む。
-
-------------------------------------------------------------------------
-
-## 12. Linux v5.0 → 7.x release map
+This distinction is essential for cases such as BQL.
 
   ---------------------------------------------------------------------
-  Kernel                             Major networking evolution
+  Release                            Canonical networking milestones
   ---------------------------------- ----------------------------------
-  **5.0**                            **EDT TCP pacing, UDP
-                                     MSG_ZEROCOPY, UDP GRO, XDP/AF_XDP
-                                     baseline**
+  3.0                                namespace/setns-era foundation
 
-  5.1                                XDP/BPF/netdev incremental work
+  3.3                                BQL/DQL mainline generation; team;
+                                     net_prio; TCP memcg
 
-  5.2                                high-speed NIC memory management /
-                                     XDP
+  3.5                                CoDel / fq_codel
 
-  5.3                                cgroup/socket BPF, TCP hooks
+  3.6                                TSQ; TFO client; IPv4 route-cache
+                                     removal
 
-  5.4                                XDP/TC SYN-cookie BPF, CO-RE
-                                     foundation
+  3.7                                VXLAN; TFO server; IPv6 NAT
 
-  5.5                                alt interface names, TIPC crypto,
-                                     VSOCK multi-transport
+  3.9                                SO_REUSEPORT and socket-scaling
+                                     work
 
-  **5.6**                            **MPTCP, WireGuard, BPF
-                                     struct_ops/TCP CC,
-                                     ethtool-netlink**
+  3.13                               nftables
 
-  5.7--5.8                           bareudp, XDP buffer API,
-                                     TC/bridge/offload
+  3.14                               TCP autocorking; continuing BPF
+                                     transition
 
-  **5.9**                            **SK_LOOKUP, BPF socket
-                                     iterators**
+  3.18                               bpf() syscall/maps/verifier
+                                     generation; DCTCP; Geneve/FOU
 
-  5.10                               BPF TCP options, MPTCP multi-flow
+  3.19                               ipvlan; initial switchdev
+                                     generation
 
-  **5.11**                           **TCP zero-copy receive**
+  4.3                                VRF; LWT; OVS conntrack
 
-  5.12--5.14                         MPTCP, multicast, routing,
-                                     SO_REUSEPORT
+  4.6                                devlink
 
-  5.15                               IPv6 IOAM, MCTP, per-VLAN
+  4.7                                TC BPF direct packet access
+
+  4.8                                XDP
+
+  4.9                                BBR
+
+  4.10                               cgroup BPF; BPF LWT; IPv6 Segment
+                                     Routing
+
+  4.13                               SOCK_OPS; kTLS TX generation
+
+  4.14                               SOCKMAP; TCP MSG_ZEROCOPY
+                                     generation
+
+  4.17                               SK_MSG/sockmap sendmsg/sendfile
+                                     path; mac80211 airtime-fairness
+                                     generation
+
+  4.18                               AF_XDP; TCP_ZEROCOPY_RECEIVE;
+                                     page_pool initial generation;
+                                     cgroup UDP sendmsg hooks
+
+  4.19                               SO_TXTIME/time-based TX; CAKE
+
+  4.20                               TCP EDT pacing; BPF flow
+                                     dissector; taprio; rtnetlink
+                                     strict checking
+
+  5.0                                UDP GRO; UDP MSG_ZEROCOPY
+
+  5.1                                devlink health; BPF spinlocks/DCE;
+                                     SO_BINDTOIFINDEX; Y2038
+                                     timestamps; io_uring
+
+  5.3                                nexthop objects
+
+  5.5                                Wi-Fi AQL generation
+
+  5.6                                MPTCP; WireGuard; BPF
+                                     struct_ops/TCP CC; ethtool-netlink
+
+  5.9                                SK_LOOKUP
+
+  5.12                               threaded NAPI
+
+  5.15                               IPv6 IOAM; MCTP; bridge per-VLAN
                                      multicast
 
-  5.16--5.18                         socket memory, IOAM, TC offload,
-                                     BPF/netdev
+  5.17                               kfree_skb_reason()/structured skb
+                                     drop-reason foundation
 
-  **5.19**                           **BIG TCP, MPTCP
-                                     userspace/fallback**
+  5.19                               IPv6 BIG TCP; later drop-reason
+                                     expansion; MPTCP evolution
 
-  6.0--6.2                           BPF/netdev/API continuation
+  6.2                                TCP PLB; IPsec packet-offload
+                                     generation
 
-  **6.3**                            **IPv4 BIG TCP, YNL direction**
+  6.3                                IPv4 BIG TCP; YNL generation
 
-  6.4--6.5                           XDP/BPF/socket API
+  6.6                                AF_XDP multi-buffer
 
-  **6.6**                            **AF_XDP multi-buffer, BPF defrag,
-                                     MPTCP BPF**
+  6.7                                netkit; initial TCP-AO mainline
+                                     support
 
-  **6.7**                            **netkit, io_uring networking**
+  6.11                               virtio-net AF_XDP RX zero-copy
 
-  6.8--6.10                          network-core optimization, BPF
-                                     token, io_uring ZC send
+  6.12                               Device Memory TCP RX
 
-  **6.11**                           **virtio-net AF_XDP RX zero-copy**
+  6.13                               per-netns RTNL infrastructure and
+                                     migration milestone --- not
+                                     completion
 
-  **6.12**                           **Device Memory TCP RX**
+  6.15                               io_uring ZCRX; further RTNL
+                                     breakup
 
-  **6.13**                           **per-netns RTNL infrastructure /
-                                     migration begins, traffic-shaping
-                                     API**
+  6.16                               Device Memory TCP TX; BPF qdisc;
+                                     DCCP removal
 
-  6.14                               RxRPC/UDP/TCP/IPsec
+  6.18                               AccECN core; UDP RX work; DIBS
+                                     (separate shared-memory lineage)
 
-  **6.15**                           **io_uring ZCRX, RTNL breakup,
-                                     TCP_RTO_MAX_MS, BPF timestamps**
-
-  **6.16**                           **Device Memory TCP TX**
-
-  6.17                               TCP loss-detection cleanup
-
-  **6.18**                           **AccECN, UDP RX optimization,
-                                     DIBS, rmem increase**
-
-  6.19                               TCP TX locking/scalability
-
-  7.0                                AccECN expansion, CAKE multiqueue,
-                                     VSOCK netns
-
-  7.1                                UDP-Lite removal, IPv6
-                                     modularization cleanup
-
-  7.2                                TCP-AO/libcrypto, MPTCP scale,
-                                     RTNL reduction
-
-  **7.3 development**                **BIG TCP over VXLAN/GENEVE**
+  7.0+                               later AccECN/default-policy,
+                                     queue/memory/offload and protocol
+                                     evolution; exact 7.x assignments
+                                     remain subject to the latest
+                                     provenance audit
   ---------------------------------------------------------------------
 
-------------------------------------------------------------------------
+## Canonical architecture model --- six axes
+
+The document now uses **one six-axis model** throughout:
+
+``` text
+PERFORMANCE
+PROGRAMMABILITY
+MEMORY
+CONTROL PLANE
+OBSERVABILITY
+DRIVER FRAMEWORK
+```
+
+Earlier axis-count wording has been superseded by this canonical
+six-axis model.
+
+## Era model
+
+Era labels describe the **dominant architectural theme**, not the first
+appearance of every technology:
+
+``` text
+3.x       scalability + virtualization + programmability foundations
+4.x       programmable fast-path formation + early zero-copy/memory foundations
+5.x       expansion + operationalization + memory-infrastructure maturation
+6.x–7.x   memory providers + queue ownership + finer-grained control/locking
+```
 
 # Part III --- Long-term feature lineages
 
@@ -2668,8 +2673,9 @@ NIC ─────────────→ device memory → GPU/accelerator
 
 v6.16 では TX 側も mainline に入る。
 
-**DIBS はこの直系ではない。** `page_pool → netmem → DIBS` ではなく、
-shared-memory transport 側の別 lineage として扱う。
+**DIBS はこの直系ではない。**
+`page_pool → netmem → device-memory/memory-provider lineage; DIBS is separate`
+ではなく、 shared-memory transport 側の別 lineage として扱う。
 
 ------------------------------------------------------------------------
 
@@ -2878,7 +2884,7 @@ ownership/lifetime の効率化にある。
 
 ------------------------------------------------------------------------
 
-# Part III-A --- Network Device Driver Framework Evolution
+# Part IV --- Network Device Driver Framework Evolution
 
 This section deliberately does **not** enumerate individual NIC drivers.
 It follows the common infrastructure which changed what a Linux network
@@ -2956,7 +2962,11 @@ individual drivers into reusable net core infrastructure.
 
 ## 4. Linux 4.x --- hardware becomes a first-class Linux networking object
 
-### 4.1 switchdev
+### 4.1 switchdev --- origin in Linux 3.19, expansion through 4.x
+
+The initial switchdev infrastructure belongs to the Linux 3.19
+generation. The 4.x era is where the model expands into the broader
+hardware-offload architecture discussed below.
 
 switchdev turns switch ASIC forwarding into a Linux driver model rather
 than a proprietary SDK-controlled island.
@@ -3442,7 +3452,7 @@ DRIVER FRAMEWORK
 ```
 
 The key insight is that the driver-framework axis is not independent. It
-is the layer that makes the other five axes implementable across
+is the layer that makes the other six axes implementable across
 heterogeneous hardware without every driver reinventing the same
 mechanisms.
 
@@ -3471,7 +3481,7 @@ promoted to mainline facts until landing is verified.
 
 ------------------------------------------------------------------------
 
-# Part IV --- Observability / Explainability
+# Part V --- Observability / Explainability
 
 ## B. Observability / Explainability evolution
 
@@ -3723,7 +3733,7 @@ observabilityは付加的なdebug機能ではなく、programmable/heterogeneous
 network datapathを運用するためのarchitecture
 capabilityへ発展したと考えられる。
 
-### B.12 Updated five-axis model
+### B.12 Updated six-axis model
 
 ``` text
 PERFORMANCE
@@ -4570,7 +4580,7 @@ Linux networking observability evolution
 
 ------------------------------------------------------------------------
 
-# Part V --- Synthesis: v3.x → 7.x を一つの進化として見る
+# Part VI --- Synthesis: v3.x → 7.x を一つの進化として見る
 
 ## 13. v5.0 と 2026 を比較する
 
@@ -4646,7 +4656,12 @@ single network model ────→ multi-network / VM-aware networking
 
 ------------------------------------------------------------------------
 
-# Appendix --- Research provenance and audit material
+# Appendix --- Provenance and research notes
+
+> **Non-normative.** Release assignments are defined only by Part II.
+> This appendix preserves source trails, review-series history and
+> exact-commit audits. Earlier shorthand may document the research
+> process and must not override Part II.
 
 ここから先は本文を支える調査資料である。LWN記事、upstream patch series、
 mainline commit、conference資料、status correction、completeness
@@ -4709,7 +4724,7 @@ Linux networking の 2019～2026
 
 ------------------------------------------------------------------------
 
-## 2. Release chronology
+## Appendix note --- legacy chronology (non-normative; retained for provenance only)
 
 ### 2019
 
@@ -5229,7 +5244,7 @@ skb/page allocation optimization
 
 ------------------------------------------------------------------------
 
-## 8. Release matrix
+## Appendix note --- legacy release matrix (non-normative; retained for provenance only)
 
   ---------------------------------------------------------------------
   Kernel                             Networking topics to track
@@ -5820,7 +5835,8 @@ commit とみなさない。
 
 次に同じ方法で以下を追加する。
 
-1.  `page_pool` → `netmem` → DIBS
+1.  `page_pool` → `netmem` → device-memory/memory-provider lineage; DIBS
+    is separate
 2.  io_uring zero-copy TX → zero-copy RX
 3.  RTNL breakup / per-netns locking
 4.  AccECN
@@ -6120,7 +6136,8 @@ v3:
 
 #### Important correction to earlier classification
 
-以前の章では DIBS を `page_pool → netmem → DIBS`
+以前の章では DIBS を
+`page_pool → netmem → device-memory/memory-provider lineage; DIBS is separate`
 のように一続きに見える形で 記載していたが、これは技術的には粗すぎる。
 
 より正確には:
