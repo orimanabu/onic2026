@@ -593,6 +593,299 @@ per-netns RTNL
 
 ------------------------------------------------------------------------
 
+# B. Observability / Explainability evolution
+
+Linux networkingの進化には、performance、programmability、memory/control
+planeに加えて **observability / explainability**
+という独立した軸がある。
+
+``` text
+"What happened?"
+      ↓
+"Where did it happen?"
+      ↓
+"Why did this packet drop?"
+      ↓
+"What path did this packet take through the kernel?"
+```
+
+Retisはkernel datapathそのものではなく、eBPF、tracepoints、BTF、
+`skb_drop_reason`、`struct sk_buff` metadataなど、kernel側で発達した
+observability
+primitivesを統合する代表的なconsumer/toolとして位置付ける。
+
+## B.1 Counters/interface capture → kernel-internal observation
+
+従来はinterface statistics、MIB/SNMP counters、ethtool statistics、
+tcpdump/AF_PACKETなどが中心だった。これらではcounter増加と特定packetを
+対応付けたり、kernel内部のどのfunctionをどう通ったかを追うのが難しい。
+
+tracepoint、kprobe/fentry、eBPFにより:
+
+``` text
+NIC
+ ↓
+netif_receive_skb()  ← probe
+ ↓
+IP                   ← probe
+ ↓
+netfilter / OVS      ← probe
+ ↓
+TCP/UDP              ← probe
+ ↓
+socket
+```
+
+のようなkernel datapath内部の観測が可能になった。
+
+## B.2 BTF --- running kernel as typed data
+
+BTFはrunning kernelのtype informationをmachine-readableにする。
+
+``` text
+kernel types/enums/layout
+          ↓
+         BTF
+          ↓
+eBPF observability tools
+```
+
+CO-REだけでなく、runtime kernel introspectionという意味でも重要である。
+
+## B.3 Linux 5.17 --- `skb_drop_reason`
+
+v5.17のcommit `c504e5c2f964`で`kfree_skb_reason()`が導入された。
+
+``` text
+before:
+tcp_v4_rcv → kfree_skb
+             "where"は分かっても"why"が弱い
+
+after:
+tcp_v4_rcv
+  → kfree_skb_reason(skb, SKB_DROP_REASON_NO_SOCKET)
+  → skb:kfree_skb tracepoint
+       location = tcp_v4_rcv
+       reason   = NO_SOCKET
+```
+
+重要なのはnetwork stack自身がdrop decisionの意味をstructured
+metadataとして trace infrastructureへ渡すようになった点である。
+
+## B.4 Coverage expands beyond core networking
+
+drop-reason
+coverageは段階的にIP、neighbour、TCP、qdisc/device/XDP関連pathへ
+拡大した。さらにnon-core reasonのruntime registrationにより、mac80211や
+Open vSwitchのようなsubsystem固有reasonも表現可能になった。
+
+``` text
+core skb reasons
+      ↓
+protocol/path-specific reasons
+      ↓
+subsystem-specific semantic reasons
+```
+
+## B.5 Raw enum values are not stable ABI
+
+`skb_drop_reason`はkernel internal enumであり、numeric valueをstable
+userspace ABI として扱うべきではない。
+
+``` text
+raw integer
+   ↓
+running-kernel definition required
+   ↓
+BTF-aware decoding
+```
+
+ここがRetisとBTFが強く結び付く理由の一つ。
+
+## B.6 Retis --- observability primitivesのintegrator
+
+概念的には:
+
+``` text
+eBPF --------------------------┐
+tracepoints/kprobes/fentry ----┤
+BTF ---------------------------┤
+skb_drop_reason ---------------┤
+struct sk_buff metadata -------┤
+conntrack / OVS state ---------┤
+                               ▼
+                             Retis
+                               ├─ packet inspection
+                               ├─ drop monitoring
+                               ├─ stack/context
+                               ├─ metadata filtering
+                               └─ packet tracking
+```
+
+RetisはBTFを使ってrunning kernelのdrop-reason definitionを解釈するため、
+kernel versionごとのraw enum値を固定tableとして仮定しない。
+
+## B.7 Drop monitoring → packet journey
+
+Retisの本質はdropwatchの高機能版だけではない。複数のskb-aware
+function/tracepointを同時に観測し、tracking logicによって:
+
+``` text
+event A
+event B
+event C
+event D
+   ↓
+same logical packet:
+A → B → C → D
+```
+
+へ再構成する方向にある。
+
+tracking IDはkernelのuniversal ABIではなくRetis側のtracking
+mechanismである、 という区別は重要。
+
+## B.8 Header filtering → kernel-metadata filtering
+
+pcap-style packet filterに加え、BTFを利用して:
+
+``` text
+skb->dev->name
+skb->mark
+network namespace
+nested skb/kernel metadata
+```
+
+などでfilterできる。
+
+``` text
+packet header filter
+       +
+kernel metadata filter
+       ↓
+first matching probe
+       ↓
+start tracking
+       ↓
+follow packet through later probes
+```
+
+となり、interface packet captureとは異なる観測modelになる。
+
+## B.9 cBPF → eBPFという歴史の再接続
+
+Retisのpcap-style filteringは、classic BPF由来のpacket-filter modelを
+modern eBPF probeへ橋渡しする。
+
+``` text
+pcap-filter syntax
+      ↓
+classic BPF representation
+      ↓
+eBPF
+      ↓
+kernel-internal probes
+```
+
+Linux networking史の:
+
+``` text
+classic BPF → eBPF → TC/XDP/socket BPF → BPF tracing/BTF
+```
+
+がobservability tool内で再接続されている例と見ることができる。
+
+## B.10 Why this matters for OVN/OVS/container networking
+
+v3.x〜v4.xでnetwork datapathは:
+
+``` text
+netns / veth / tap
+      ↓
+OVS / OVN
+      ↓
+conntrack / netfilter
+      ↓
+routing / VRF
+      ↓
+VXLAN/Geneve
+      ↓
+physical NIC
+```
+
+のように複雑化した。
+
+programmability、virtualization、offloadがnetworkingを強力にした一方で、
+packetが「どこを通り、なぜdropされたか」を理解する難易度も上がった。
+Retis型observabilityはこの複雑化への回答と位置付けられる。
+
+## B.11 Performance evolution creates an observability requirement
+
+``` text
+virtualization / overlays
+        ↓
+OVS / conntrack / namespaces
+        ↓
+XDP / programmable BPF paths
+        ↓
+offload / zero-copy / device memory
+        ↓
+faster but more complex datapath
+        ↓
+eBPF tracing + BTF
+        ↓
+structured drop reasons
+        ↓
+Retis-style packet journey tracing
+```
+
+observabilityは付加的なdebug機能ではなく、programmable/heterogeneousな
+network datapathを運用するためのarchitecture
+capabilityへ発展したと考えられる。
+
+## B.12 Updated five-axis model
+
+``` text
+PERFORMANCE
+BQL → TSQ → pacing → BIG TCP → device memory
+
+PROGRAMMABILITY
+eBPF → XDP → AF_XDP → struct_ops → netkit
+
+MEMORY
+page_pool → netmem → Device Memory TCP / io_uring ZCRX
+
+CONTROL PLANE
+rtnetlink → YNL → per-netns/fine-grained RTNL
+
+OBSERVABILITY / EXPLAINABILITY
+tracepoints + eBPF
+ → BTF
+ → skb_drop_reason
+ → subsystem-specific reasons
+ → arbitrary-point packet inspection
+ → metadata filtering + packet journey reconstruction
+```
+
+## B.13 Retis source trail
+
+この系譜のRetis側の主要資料として以下を扱う。
+
+-   Red Hat Developer (2023-07-19): *How to retrieve packet drop reasons
+    in the Linux kernel*
+-   Red Hat Developer (2024-01-04): *An update on packet drop reasons in
+    Linux*
+-   Red Hat Developer (2025-01-09): *Dumping packets from anywhere in
+    the networking stack*
+-   Red Hat Developer (2025-10-02): *Filtering packets from anywhere in
+    the networking stack*
+
+kernel側の中心anchorはv5.17の`kfree_skb_reason()` /
+`skb_drop_reason`であり、 その後もsubsystem
+coverageが継続して拡張される。
+
+------------------------------------------------------------------------
+
 # Existing v4.0→7.x audited material
 
 # Linux Networking Evolution --- Linux v4.0 から 7.x まで
