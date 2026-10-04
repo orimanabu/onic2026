@@ -1,27 +1,45 @@
-# Linux Networking Evolution --- Linux v3.0 から 7.x まで
+# Linux Networking Evolution — Linux v3.0 から 7.x まで
 
-**対象:** Linux v3.0〜7.x の networking architecture / performance / API
-/ virtual networking / routing / netfilter / BPF・XDP / transport /
-zero-copy / device-memory / control-plane scalability\
-**調査時点:** 2026-10-02
+**調査基準日:** 2026-10-02  
+**構成改訂:** 2026-10-03
 
-v3.xを追加監査すると、modern Linux networkingの基礎はv4.xよりさらに前に
-形成されていたことが分かる。特にv3.xは、
+この文書は、Linux networking の変化を「調査した順」ではなく、
+**kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
-``` text
-namespace/container foundations
-bufferbloat control
-datacenter overlays
-multicore socket scaling
-nftables
-eBPF
+## この文書の読み方
+
+本文は次の流れで構成する。
+
+```text
+Part I    v3.x → v5.1
+          modern Linux networking の基礎形成
+
+Part II   v5.2 → 7.x
+          expansion / scale / memory ownership への発展
+
+Part III  thematic lineages
+          packet aggregation / memory / XDP / BPF /
+          virtual networking / transport / control plane
+
+Part IV   observability / explainability
+          eBPF + BTF → skb_drop_reason → Retis / pwru
+
+Part V    synthesis
+          release間比較と全体architecture map
+
+Appendix  LWN / upstream commits / conference provenance /
+          completeness・verification audit
 ```
 
-が成立した時代である。
+重要な方針は、release chronology と feature lineage を分離すること。
+まず年代順に「何がいつ形成されたか」を読み、その後で同じ技術を
+長期lineageとして横断的に追う。
 
-------------------------------------------------------------------------
+---
 
-# A. v3.x Executive timeline
+# Part I — Foundations: Linux v3.x → v5.1
+
+## 1. Linux v3.x — scalability, virtualization, programmability の誕生
 
 ``` text
 3.0   setns() / namespace FD
@@ -58,7 +76,7 @@ eBPF
 
 ------------------------------------------------------------------------
 
-# A.1 v3.0 --- namespace control becomes practical
+### 1.1 v3.0 --- namespace control becomes practical
 
 v3.0でnamespace file descriptorと`setns()`がmainline化した。
 
@@ -90,7 +108,7 @@ CNI / Kubernetes networking
 
 ------------------------------------------------------------------------
 
-# A.2 v3.2 --- Byte Queue Limits: bufferbloatをdriver queueから削る
+### 1.2 v3.2 --- Byte Queue Limits: bufferbloatをdriver queueから削る
 
 BQL (Byte Queue Limits) はNIC TX queueへ過剰なdataを押し込まないよう、
 driver queueの適正なbyte量を動的に制御する。
@@ -127,7 +145,7 @@ BBR / EDT
 
 ------------------------------------------------------------------------
 
-# A.3 v3.3 --- networking cgroups and interface aggregation
+### 1.3 v3.3 --- networking cgroups and interface aggregation
 
 v3.3では:
 
@@ -151,7 +169,7 @@ modelを提供した。
 
 ------------------------------------------------------------------------
 
-# A.4 v3.5 --- CoDel / fq_codel
+### 1.4 v3.5 --- CoDel / fq_codel
 
 bufferbloat対策はdevice queueだけでは不十分。
 
@@ -178,11 +196,11 @@ flows
 
 ------------------------------------------------------------------------
 
-# A.5 v3.6 --- TCP Small Queues, TFO, route-cache removal
+### 1.5 v3.6 --- TCP Small Queues, TFO, route-cache removal
 
 v3.6はv3.x networkingの大きなmilestone。
 
-## TCP Small Queues (TSQ)
+### TCP Small Queues (TSQ)
 
 BQLがdevice queueを制御するのに対してTSQは**per TCP socket**で
 qdisc/deviceへ溜められるdata量を抑える。
@@ -209,12 +227,12 @@ driver/NIC : BQL
 
 という複数layerへ広がった。
 
-## TCP Fast Open client
+### TCP Fast Open client
 
 TCP handshake中にapplication dataを送るTFO client supportが入った。
 server supportは次のv3.7。
 
-## IPv4 route cache removal
+### IPv4 route cache removal
 
 従来のIPv4 route cacheはtraffic
 pattern依存のperformanceとDoS問題を持ち、 v3.6で長年のroute-cache
@@ -228,14 +246,14 @@ FIB lookup + scalable caching strategies
 
 現在のLinux routing scalabilityを理解する重要なarchitecture change。
 
-## netfilter namespace work
+### netfilter namespace work
 
 多数のnetfilter modulesがnetwork namespaceに対応し、 container
 isolationへの準備が進んだ。
 
 ------------------------------------------------------------------------
 
-# A.6 v3.7 --- VXLAN
+### 1.6 v3.7 --- VXLAN
 
 v3.7でVXLANがmainline化。
 
@@ -264,7 +282,7 @@ cloud virtual networking
 
 ------------------------------------------------------------------------
 
-# A.7 v3.9 --- multicore server socket scaling
+### 1.7 v3.9 --- multicore server socket scaling
 
 `SO_REUSEPORT` がTCP/UDPへ導入された。
 
@@ -295,7 +313,7 @@ programmable socket dispatch
 
 ------------------------------------------------------------------------
 
-# A.8 v3.12 --- TCP pacing / FQ lineage
+### 1.8 v3.12 --- TCP pacing / FQ lineage
 
 v3.x前半の:
 
@@ -325,7 +343,7 @@ infrastructureを 利用する。
 
 ------------------------------------------------------------------------
 
-# A.9 v3.13 --- nftables
+### 1.9 v3.13 --- nftables
 
 v3.13でnftablesがmainline化。
 
@@ -355,7 +373,7 @@ planeを考える上でv3.x最大級のmilestoneの一つ。
 
 ------------------------------------------------------------------------
 
-# A.10 v3.14--v3.17 --- BPF transformation
+### 1.10 v3.14--v3.17 --- BPF transformation
 
 classic BPFはsocket packet filterを中心とした小さなVMだった。
 
@@ -376,7 +394,7 @@ BPF、struct_ops、netkitはない。
 
 ------------------------------------------------------------------------
 
-# A.11 v3.18 --- eBPF core API arrives
+### 1.11 v3.18 --- eBPF core API arrives
 
 v3.18で`bpf()` syscallがmainline化。
 
@@ -402,7 +420,7 @@ bpf()
 
 への決定的なarchitecture change。
 
-## DCTCP
+### DCTCP
 
 Data Center TCP congestion controlもv3.18で導入された。
 
@@ -418,14 +436,14 @@ cwnd adjustment
 
 後のdatacenter transport/AccECN lineageの重要な前史。
 
-## Geneve and Foo-over-UDP
+### Geneve and Foo-over-UDP
 
 GeneveとFoo-over-UDPも入り、overlay/tunnel infrastructureが
 VXLANだけでなくより一般的に発展した。
 
 ------------------------------------------------------------------------
 
-# A.12 v3.19 --- eBPF meets networking again
+### 1.12 v3.19 --- eBPF meets networking again
 
 v3.18でloadできるようになったeBPF
 programを、v3.19ではsocketへattach可能に なった。
@@ -451,7 +469,7 @@ socket eBPF
 
 へ続く。
 
-## ipvlan
+### ipvlan
 
 v3.19では`ipvlan`もmainline化。
 
@@ -469,9 +487,9 @@ networkingの重要なbuilding blockとなる。
 
 ------------------------------------------------------------------------
 
-# A.13 v3.xを追加したことで見える長期lineage
+### 1.13 v3.xを追加したことで見える長期lineage
 
-## Latency / bufferbloat / pacing
+### Latency / bufferbloat / pacing
 
 ``` text
 BQL (3.2)
@@ -491,7 +509,7 @@ EDT (5.0)
 
 これはLinux TX performance史で最も重要な一本のlineage。
 
-## Cloud virtual networking
+### Cloud virtual networking
 
 ``` text
 netns + setns (3.0)
@@ -507,7 +525,7 @@ BPF LWT / SRv6
 OVS/OVN / Kubernetes / UDN
 ```
 
-## Programmability
+### Programmability
 
 ``` text
 classic BPF
@@ -531,7 +549,7 @@ AF_XDP
 struct_ops / SK_LOOKUP / netkit
 ```
 
-## Firewall
+### Firewall
 
 ``` text
 iptables family
@@ -545,7 +563,7 @@ hardware offload
 nftables + BPF complementary model
 ```
 
-## Datacenter transport
+### Datacenter transport
 
 ``` text
 TCP Fast Open (3.6/3.7)
@@ -558,7 +576,7 @@ MPTCP / BIG TCP / AccECN
 
 ------------------------------------------------------------------------
 
-# A.14 Revised generation model
+### 1.14 Revised generation model
 
 v3.xを含めると、Linux networking
 evolutionは4世代に分けると分かりやすい。
@@ -593,1106 +611,7 @@ per-netns RTNL
 
 ------------------------------------------------------------------------
 
-# B. Observability / Explainability evolution
-
-Linux networkingの進化には、performance、programmability、memory/control
-planeに加えて **observability / explainability**
-という独立した軸がある。
-
-``` text
-"What happened?"
-      ↓
-"Where did it happen?"
-      ↓
-"Why did this packet drop?"
-      ↓
-"What path did this packet take through the kernel?"
-```
-
-Retisはkernel datapathそのものではなく、eBPF、tracepoints、BTF、
-`skb_drop_reason`、`struct sk_buff` metadataなど、kernel側で発達した
-observability
-primitivesを統合する代表的なconsumer/toolとして位置付ける。
-
-## B.1 Counters/interface capture → kernel-internal observation
-
-従来はinterface statistics、MIB/SNMP counters、ethtool statistics、
-tcpdump/AF_PACKETなどが中心だった。これらではcounter増加と特定packetを
-対応付けたり、kernel内部のどのfunctionをどう通ったかを追うのが難しい。
-
-tracepoint、kprobe/fentry、eBPFにより:
-
-``` text
-NIC
- ↓
-netif_receive_skb()  ← probe
- ↓
-IP                   ← probe
- ↓
-netfilter / OVS      ← probe
- ↓
-TCP/UDP              ← probe
- ↓
-socket
-```
-
-のようなkernel datapath内部の観測が可能になった。
-
-## B.2 BTF --- running kernel as typed data
-
-BTFはrunning kernelのtype informationをmachine-readableにする。
-
-``` text
-kernel types/enums/layout
-          ↓
-         BTF
-          ↓
-eBPF observability tools
-```
-
-CO-REだけでなく、runtime kernel introspectionという意味でも重要である。
-
-## B.3 Linux 5.17 --- `skb_drop_reason`
-
-v5.17のcommit `c504e5c2f964`で`kfree_skb_reason()`が導入された。
-
-``` text
-before:
-tcp_v4_rcv → kfree_skb
-             "where"は分かっても"why"が弱い
-
-after:
-tcp_v4_rcv
-  → kfree_skb_reason(skb, SKB_DROP_REASON_NO_SOCKET)
-  → skb:kfree_skb tracepoint
-       location = tcp_v4_rcv
-       reason   = NO_SOCKET
-```
-
-重要なのはnetwork stack自身がdrop decisionの意味をstructured
-metadataとして trace infrastructureへ渡すようになった点である。
-
-## B.4 Coverage expands beyond core networking
-
-drop-reason
-coverageは段階的にIP、neighbour、TCP、qdisc/device/XDP関連pathへ
-拡大した。さらにnon-core reasonのruntime registrationにより、mac80211や
-Open vSwitchのようなsubsystem固有reasonも表現可能になった。
-
-``` text
-core skb reasons
-      ↓
-protocol/path-specific reasons
-      ↓
-subsystem-specific semantic reasons
-```
-
-## B.5 Raw enum values are not stable ABI
-
-`skb_drop_reason`はkernel internal enumであり、numeric valueをstable
-userspace ABI として扱うべきではない。
-
-``` text
-raw integer
-   ↓
-running-kernel definition required
-   ↓
-BTF-aware decoding
-```
-
-ここがRetisとBTFが強く結び付く理由の一つ。
-
-## B.6 Retis --- observability primitivesのintegrator
-
-概念的には:
-
-``` text
-eBPF --------------------------┐
-tracepoints/kprobes/fentry ----┤
-BTF ---------------------------┤
-skb_drop_reason ---------------┤
-struct sk_buff metadata -------┤
-conntrack / OVS state ---------┤
-                               ▼
-                             Retis
-                               ├─ packet inspection
-                               ├─ drop monitoring
-                               ├─ stack/context
-                               ├─ metadata filtering
-                               └─ packet tracking
-```
-
-RetisはBTFを使ってrunning kernelのdrop-reason definitionを解釈するため、
-kernel versionごとのraw enum値を固定tableとして仮定しない。
-
-## B.7 Drop monitoring → packet journey
-
-Retisの本質はdropwatchの高機能版だけではない。複数のskb-aware
-function/tracepointを同時に観測し、tracking logicによって:
-
-``` text
-event A
-event B
-event C
-event D
-   ↓
-same logical packet:
-A → B → C → D
-```
-
-へ再構成する方向にある。
-
-tracking IDはkernelのuniversal ABIではなくRetis側のtracking
-mechanismである、 という区別は重要。
-
-## B.8 Header filtering → kernel-metadata filtering
-
-pcap-style packet filterに加え、BTFを利用して:
-
-``` text
-skb->dev->name
-skb->mark
-network namespace
-nested skb/kernel metadata
-```
-
-などでfilterできる。
-
-``` text
-packet header filter
-       +
-kernel metadata filter
-       ↓
-first matching probe
-       ↓
-start tracking
-       ↓
-follow packet through later probes
-```
-
-となり、interface packet captureとは異なる観測modelになる。
-
-## B.9 cBPF → eBPFという歴史の再接続
-
-Retisのpcap-style filteringは、classic BPF由来のpacket-filter modelを
-modern eBPF probeへ橋渡しする。
-
-``` text
-pcap-filter syntax
-      ↓
-classic BPF representation
-      ↓
-eBPF
-      ↓
-kernel-internal probes
-```
-
-Linux networking史の:
-
-``` text
-classic BPF → eBPF → TC/XDP/socket BPF → BPF tracing/BTF
-```
-
-がobservability tool内で再接続されている例と見ることができる。
-
-## B.10 Why this matters for OVN/OVS/container networking
-
-v3.x〜v4.xでnetwork datapathは:
-
-``` text
-netns / veth / tap
-      ↓
-OVS / OVN
-      ↓
-conntrack / netfilter
-      ↓
-routing / VRF
-      ↓
-VXLAN/Geneve
-      ↓
-physical NIC
-```
-
-のように複雑化した。
-
-programmability、virtualization、offloadがnetworkingを強力にした一方で、
-packetが「どこを通り、なぜdropされたか」を理解する難易度も上がった。
-Retis型observabilityはこの複雑化への回答と位置付けられる。
-
-## B.11 Performance evolution creates an observability requirement
-
-``` text
-virtualization / overlays
-        ↓
-OVS / conntrack / namespaces
-        ↓
-XDP / programmable BPF paths
-        ↓
-offload / zero-copy / device memory
-        ↓
-faster but more complex datapath
-        ↓
-eBPF tracing + BTF
-        ↓
-structured drop reasons
-        ↓
-Retis-style packet journey tracing
-```
-
-observabilityは付加的なdebug機能ではなく、programmable/heterogeneousな
-network datapathを運用するためのarchitecture
-capabilityへ発展したと考えられる。
-
-## B.12 Updated five-axis model
-
-``` text
-PERFORMANCE
-BQL → TSQ → pacing → BIG TCP → device memory
-
-PROGRAMMABILITY
-eBPF → XDP → AF_XDP → struct_ops → netkit
-
-MEMORY
-page_pool → netmem → Device Memory TCP / io_uring ZCRX
-
-CONTROL PLANE
-rtnetlink → YNL → per-netns/fine-grained RTNL
-
-OBSERVABILITY / EXPLAINABILITY
-tracepoints + eBPF
- → BTF
- → skb_drop_reason
- → subsystem-specific reasons
- → arbitrary-point packet inspection
- → metadata filtering + packet journey reconstruction
-```
-
-## B.14 2023 OVSCon --- Retis as an OVS kernel/userspace correlator
-
-OVSCon 2023のRetis発表は、Retisを単なるgeneric Linux tracing
-toolとしてではなく、 OVS datapath
-troubleshootingのための統合observability toolとして理解する重要資料。
-
-発表ではnetwork tracingの問題を三つに整理している。
-
-``` text
-packet mutates
-    → tracking is required
-
-many places/components
-    → modular collectors are required
-
-many packets
-    → filtering is required
-```
-
-2023時点でRetisはOVS kernel datapathをfirst-class targetとして扱い、
-`openvswitch:ovs_dp_upcall`などのkernel tracepointに加え、
-`ovs-vswitchd`側のUSDT probesを利用してupcallを追跡していた。
-
-``` text
-OVS kernel datapath
-       │
-       │ flow miss
-       ▼
-ovs_dp_upcall                ← kernel tracepoint
-       │
-       ▼
-netlink socket
-       │
-       ▼
-ovs-vswitchd handler
-       │
-       ▼
-upcall_recv                  ← USDT
-       │
-       ▼
-classification / translation
-       │
-       ▼
-flow_put / flow_exec         ← USDT
-       │
-       ▼
-kernel datapath
-       │
-       ▼
-ovs_execute_actions
-```
-
-この点は重要で、eBPF/kprobe/tracepointだけではkernel→userspace→kernelという
-OVS slow path全体を一つのpacket journeyとして相関しにくい。
-Retisはkernel probesとUSDTを組み合わせてこの境界を越える。
-
-2023資料ではcollector modelも明確になっている。
-
-``` text
-skb          packet/skb information
-skb-tracking logical packet ID, clone/modification tracking
-skb-drop     drop reason
-ovs          OVS datapath + upcall tracking
-ct           conntrack state
-nft          nftables table/chain/verdict
-```
-
-したがってRetisは単なるpacket dumperではなく、 **multiple networking
-subsystemsのcontextを同じevent streamへ載せる** architectureを持つ。
-
-------------------------------------------------------------------------
-
-## B.15 OVS tracking --- packet identity is harder than skb identity
-
-OVSCon
-2023資料ではRetisのtrackingが`struct sk_buff *`だけに依存しないことも
-重要である。
-
-packetは:
-
-``` text
-NAT
-clone
-encapsulation
-userspace upcall
-```
-
-などでrepresentationやidentityが変化する。
-
-Retisはskb tracking ID、packet contentのhash、thread/event
-orderingなどを 状況に応じて利用してOVS upcallを相関する。
-
-これは:
-
-``` text
-same skb pointer
-      ≠
-same logical network packet
-```
-
-というnetwork observability上の本質的問題への対応である。
-
-したがってpacket trackingはkernel ABIではなくtool-side
-heuristic/correlation logicであり、各tracking
-boundaryにはassumptionがあることを明示する。
-
-------------------------------------------------------------------------
-
-## B.16 2024 OVSCon --- from upcall tracing to flow enrichment
-
-OVSCon 2024では2023年のarchitectureを維持しつつ、Retisはさらに:
-
-``` text
-skb
-ct
-ovs
-nft
-skb-drop
-packet filters
-metadata filters
-stack traces
-pcap
-Python bindings
-```
-
-を統合する方向へ進んでいる。
-
-OVS-specificな重要な進展が **OVS flow enrichment**。
-
-Retisはkernel datapathの`ovs_flow_tbl_lookup_stats`を(kret)probeし、
-
-``` text
-UFID
-flow pointer
-actions pointer
-lookup result
-```
-
-を取得する。
-
-さらにruntimeでOVS unixctlへ問い合わせ:
-
-``` text
-dpctl/get-flow
-ofproto/detrace
-```
-
-などを使ってkernel datapath flowをOVS/OpenFlow
-representationへ関連付ける。
-
-概念的には:
-
-``` text
-actual packet
-    ↓
-kernel networking event
-    ↓
-OVS datapath lookup
-    ↓
-UFID / sw_flow / actions
-    ↓
-Retis flow enrichment
-    ↓
-ODP flow/actions
-    ↓
-OpenFlow representation
-```
-
-となる。
-
-これは単なる「packetはOVSを通った」という観測から、
-
-**そのpacketがどのdatapath flow/actionと対応したか**
-
-を説明する方向への進化。
-
-ただし2024資料自身がflow deletion/update
-trackingやupcall時のflow表示などに
-制約があることを明示しており、完全なOVS state reconstructionではない。
-
-------------------------------------------------------------------------
-
-## B.17 `ofproto/trace` and Retis --- simulation vs live observation
-
-OVSには以前から`ofproto/trace`という強力なtroubleshooting
-mechanismがある。
-
-役割を単純化すると:
-
-``` text
-ofproto/trace
-      │
-      ▼
-given/synthetic packet
-      │
-      ▼
-simulate OVS/OpenFlow processing
-      │
-      ▼
-"OVS pipeline should do this"
-```
-
-Retisは:
-
-``` text
-actual packet
-      │
-      ▼
-live kernel/userspace probes
-      │
-      ▼
-observe real execution
-      │
-      ▼
-"this packet actually did this"
-```
-
-という役割。
-
-両者は競合するというより補完的。
-
-``` text
-               OVS troubleshooting
-
-             ┌──────────────────┐
-             │ expected behavior │
-             │   ofproto/trace   │
-             └────────┬─────────┘
-                      │ compare
-             ┌────────▼─────────┐
-             │ actual behavior   │
-             │      Retis        │
-             └──────────────────┘
-```
-
-特にconntrack state、kernel datapath behavior、upcall、runtime
-stateなどを含む 問題ではlive observationが重要になる。
-
-一方、OpenFlow pipeline logicそのものを理解するにはsimulation-based
-traceも 依然として有用。
-
-------------------------------------------------------------------------
-
-## B.18 2025 --- arbitrary-point packet dumping becomes user-facing
-
-2025年1月のRed Hat Developer記事は、Retisのgeneric Linux
-networking側の価値を 明確に説明している。
-
-traditional capture:
-
-``` text
-NIC driver
-    │
-    ├── PF_PACKET / tcpdump
-    │
-network stack
-```
-
-では基本的にdriverとnetwork stackの境界付近のpacket stateを観測する。
-
-Retis:
-
-``` text
-netif_receive_skb()   ← dump
-       ↓
-IP                    ← dump
-       ↓
-netfilter             ← dump
-       ↓
-OVS                   ← dump
-       ↓
-TCP/UDP               ← dump
-       ↓
-net_dev_start_xmit    ← dump
-```
-
-ではskb-aware kernel function/tracepointをcapture
-pointとして選択できる。
-
-さらに複数probeを同時に使い、packet trackingによってflowを再構成できる。
-
-Retisで収集したpacketを`pcap`へ変換しtcpdump/Wiresharkへ渡せる点も重要。
-
-``` text
-kernel-internal capture
-        ↓
-      Retis
-        ↓
-       pcap
-        ↓
-tcpdump / Wireshark
-```
-
-つまり新しいkernel observabilityを既存packet-analysis
-ecosystemへ橋渡ししている。
-
-------------------------------------------------------------------------
-
-## B.19 Revised Retis evolution
-
-追加資料を踏まえるとRetisの発展は次のように整理できる。
-
-``` text
-Linux kernel foundations
-
-tracepoints / kprobes
-        +
-       eBPF
-        +
-       BTF
-        +
-skb_drop_reason
-        │
-        ▼
-2023 Retis / OVSCon
-        │
-        ├─ arbitrary kernel probes
-        ├─ skb tracking
-        ├─ skb-drop
-        ├─ conntrack / nftables
-        └─ OVS upcall tracking
-             kernel ↔ ovs-vswitchd
-        │
-        ▼
-2024 Retis / OVSCon
-        │
-        ├─ metadata filtering
-        ├─ richer post-processing
-        ├─ Python integration
-        └─ OVS flow enrichment
-             actual packet
-                ↔ datapath flow
-                ↔ OpenFlow
-        │
-        ▼
-2025 Retis
-        │
-        ├─ arbitrary-point packet dumping
-        ├─ pcap export
-        └─ kernel metadata filtering
-        │
-        ▼
-network-stack journey analysis
-```
-
-------------------------------------------------------------------------
-
-## B.20 Observability evolution --- final interpretation
-
-この資料全体ではRetisを次の位置に置く。
-
-``` text
-COUNTERS
-"something happened"
-      ↓
-PACKET CAPTURE
-"this packet crossed this interface"
-      ↓
-KERNEL TRACING
-"this code path handled this packet"
-      ↓
-STRUCTURED REASONS
-"this is why it was dropped"
-      ↓
-PACKET TRACKING
-"these events belong to the same logical packet"
-      ↓
-CROSS-SUBSYSTEM CORRELATION
-"the packet crossed IP/NF/CT/OVS..."
-      ↓
-KERNEL ↔ USERSPACE CORRELATION
-"the OVS upcall went to ovs-vswitchd and came back"
-      ↓
-FLOW ENRICHMENT
-"this actual packet corresponds to this OVS/OpenFlow state"
-```
-
-この意味でRetisはLinux kernel networkingの新しいforwarding
-architectureではない。
-
-**Linux networking stackが長年かけて獲得したprogrammability、typed
-metadata、 tracepoints、structured drop
-semanticsを統合し、複雑化したdatapathを explainableにするtooling layer**
-
-として扱うのが最も正確。
-
-------------------------------------------------------------------------
-
-## B.21 Retis source trail
-
-この系譜のRetis側の主要資料として以下を扱う。
-
--   Red Hat Developer (2023-07-19): *How to retrieve packet drop reasons
-    in the Linux kernel*
--   Red Hat Developer (2024-01-04): *An update on packet drop reasons in
-    Linux*
--   Red Hat Developer (2025-01-09): *Dumping packets from anywhere in
-    the networking stack*
--   Red Hat Developer (2025-10-02): *Filtering packets from anywhere in
-    the networking stack*
-
-kernel側の中心anchorはv5.17の`kfree_skb_reason()` /
-`skb_drop_reason`であり、 その後もsubsystem
-coverageが継続して拡張される。
-
-------------------------------------------------------------------------
-
-# C. pwru and Retis --- two packet-journey observability models
-
-pwruとRetisは競合する部分を持つが、単純な「軽量版/高機能版」という関係ではない。
-両者は同じmodern Linux kernel
-observability基盤から異なる探索戦略を取る。
-
-``` text
-                 eBPF + BTF
-                     │
-          ┌──────────┴──────────┐
-          │                     │
-          ▼                     ▼
-        pwru                   Retis
-          │                     │
- broad automatic          selected probes
- function tracing         + semantic collectors
-          │                     │
-          ▼                     ▼
- kernel function          enriched/correlated
- trajectory               packet journey
-```
-
-## C.1 pwru --- start broad when you do not know where to look
-
-pwruの中心的アイデアは、kernel
-BTFから`struct sk_buff *`をargumentとして取る
-functionsを発見し、それらへeBPF probeを広くattachすること。
-
-``` text
-kernel BTF
-    ↓
-find skb-accepting functions
-    ↓
-kprobe / kprobe-multi
-    ↓
-filter target packet
-    ↓
-print functions actually traversed
-```
-
-このmodelは、
-
-``` text
-"packetはinterfaceまで来ている"
-        ↓
-"でもstackのどこで問題が起きたか見当がつかない"
-```
-
-という初動調査に特に強い。
-
-FOSDEM 2024では約1,500個規模のfunctionsへprobeをattachする例が示され、
-pcap filterで対象packetだけを選択してtrajectoryを表示している。
-
-## C.2 pwru is more than a simple skb-pointer tracer
-
-pwruはskb pointerを表示するだけではない。
-
-current architectureには:
-
--   skb clone/copy tracking
--   skb lifetime termination handling
--   stack-based tracking
--   veth/XDP→skb tracking
--   skb/netns/interface/mark filtering
--   BTF-based full skb output
--   skb metadata expressions
--   call stack/caller output
--   tunnel tuple output
--   TC/XDP BPF program visibility
--   kprobe-multi backend
-
-などが含まれる。
-
-したがって:
-
-``` text
-pwru = "all skb functionsにprobeするだけ"
-```
-
-と表現するのは不正確。
-
-本質は **broad discovery-oriented tracing** にある。
-
-## C.3 Retis --- start from events and enrich their meaning
-
-Retisはcollector architectureを使ってeventへsubsystem
-contextを追加する。
-
-``` text
-probe/event
-    │
-    ├─ skb
-    ├─ skb tracking
-    ├─ drop reason
-    ├─ conntrack
-    ├─ nftables
-    ├─ OVS
-    ├─ stack
-    └─ packet
-          ↓
-     enriched event
-          ↓
- sort/correlate/reconstruct
-```
-
-特にOVSではkernel datapathだけでなくuserspace upcallとの相関を行うため、
-単一kernel function trajectoryを越えたsubsystem-specific
-semanticsを扱う。
-
-## C.4 Same foundation, different use of BTF
-
-両者ともBTFが重要だが、使い方の重点が異なる。
-
-``` text
-pwru
-BTF
- ├─ discover functions accepting skb
- ├─ understand kernel types
- └─ print skb/kernel state
-
-Retis
-BTF
- ├─ understand kernel types/enums
- ├─ decode version-dependent metadata
- └─ metadata filtering/introspection
-```
-
-この違いはBTFが単なるCO-RE portability mechanismではなく、 network
-observability infrastructureへ発展したことを示す。
-
-## C.5 pcap filter: classic BPF history reconnects to eBPF tracing
-
-pwruのFOSDEM 2024資料はfilter compilation pathを明示している。
-
-``` text
-pcap-filter syntax
-       ↓
-     libpcap
-       ↓
- cBPF bytecode
-       ↓
-     cbpfc
-       ↓
- eBPF bytecode
-       ↓
- tracing program
-```
-
-Retisにもpcap-style packet filteringがあり、両者は歴史的なclassic BPFの
-packet-filter modelをmodern eBPF observabilityへ再接続している。
-
-``` text
-classic BPF
-  │
-  ├─ tcpdump / libpcap
-  │
-  ▼
-eBPF
-  │
-  ├─ TC/XDP datapath programmability
-  │
-  └─ tracing
-       │
-       ├─ pwru
-       └─ Retis
-```
-
-BPFは「packetをfilterする技術」から「network
-datapathをprogramする技術」へ進化し、 さらにそのprogrammable
-datapath自身を観測する技術としても使われるようになった。
-
-## C.6 Tracking comparison
-
-両者ともtrackingを行えるため、
-
-``` text
-pwru = trackingなし
-Retis = trackingあり
-```
-
-という比較は誤り。
-
-違いはtrackingの目的とcorrelation scopeにある。
-
-``` text
-pwru
-packet/skbを追いながら
-kernel function trajectoryを明らかにする
-          │
-          ▼
-"where in the kernel?"
-
-Retis
-packet eventを追いながら
-subsystem metadata/stateをcorrelateする
-          │
-          ▼
-"what happened, where, and in which subsystem context?"
-```
-
-どちらもclone、representation change、XDP↔skbなどpacket
-identityが変化する 境界にはtool-side logic/assumptionが必要になる。
-
-## C.7 OVS is the clearest architectural difference
-
-OVS troubleshootingでは違いが分かりやすい。
-
-``` text
-                pwru
-
-packet
-  ↓
-OVS kernel functions
-  ↓
-ovs_flow_tbl_lookup...
-  ↓
-ovs_execute_actions...
-  ↓
-kernel function trajectory
-```
-
-Retis:
-
-``` text
-packet
-  ↓
-OVS kernel datapath
-  ↓
-flow miss
-  ↓
-ovs_dp_upcall
-  ↓
-       kernel/userspace boundary
-  ↓
-ovs-vswitchd USDT
-  ↓
-translation / flow install
-  ↓
-kernel datapath
-  ↓
-OVS flow enrichment
-```
-
-pwruでもOVS kernel functionsを観測できるが、 RetisのOVS
-collectorはOVS固有のupcall semanticsやuserspace correlationを
-明示的にmodel化する。
-
-ここが「generic broad tracing」と「subsystem-aware
-correlation」の典型的な差。
-
-## C.8 Comparison matrix
-
-  -----------------------------------------------------------------------
-  Aspect                  pwru                    Retis
-  ----------------------- ----------------------- -----------------------
-  Primary model           broad kernel-function   event/collector-based
-                          tracing                 correlation
-
-  Starting point          target packet, location probes/events +
-                          unknown                 collectors
-
-  Probe discovery         BTFからskb              configured/selected
-                          functionsを広く発見     probes and profiles
-
-  kprobe-multi            supported               different probe
-                                                  architecture
-
-  Packet filter           pcap-style              pcap-style
-
-  Kernel metadata         skb/BTF/expressions     skb/BTF metadata
-                                                  filters
-
-  skb tracking            yes                     yes
-
-  clone handling          yes                     tracking/correlation
-                                                  logic
-
-  XDP tracking            supported               XDP/kernel probes
-                                                  depending on collection
-
-  Drop reason             can observe/output      dedicated skb-drop
-                          relevant path/state     semantics
-
-  Conntrack               generic tracing/state   dedicated collector
-                          inspection possible     
-
-  nftables                generic kernel          dedicated semantic
-                          trajectory              collector
-
-  OVS kernel path         visible                 dedicated OVS collector
-
-  OVS userspace upcall    not the central model   explicit
-                                                  kernel↔ovs-vswitchd
-                                                  correlation
-
-  Post-processing         trajectory-oriented     collect → store →
-                          output/JSON             sort/reconstruct
-
-  Best first question     "where did this packet  "what happened in this
-                          go?"                    subsystem context?"
-  -----------------------------------------------------------------------
-
-この表は絶対的な機能境界ではない。両projectとも進化しており、
-overlapする機能は多い。比較軸は「できる/できない」より**design
-center**。
-
-## C.9 Practical troubleshooting model
-
-典型的には次のような使い分けが理解しやすい。
-
-``` text
-connectivity failure
-       ↓
-location completely unknown
-       ↓
-      pwru
-       ↓
-discover suspicious region:
- nf_hook_slow?
- ovs_execute_actions?
- routing?
- kfree_skb_reason?
-       ↓
-subsystem identified
-       ↓
-Retis or subsystem-specific tools
-       ↓
-enrich with:
- skb/drop reason
- conntrack
- nftables
- OVS/upcall
- netns/device
-```
-
-ただしこれは必須workflowではない。
-Retisだけで最初から追跡することも、pwruだけでroot
-causeへ到達することもある。
-
-## C.10 Evolutionary interpretation
-
-Linux networking historyの観点では両者を同じbranchに置く。
-
-``` text
-classic BPF
-    ↓
-eBPF
-    ↓
-BTF + CO-RE + tracing infrastructure
-    ↓
-kernel becomes dynamically introspectable
-    │
-    ├─────────────────────┐
-    ▼                     ▼
-  pwru                  Retis
-    │                     │
-discover broadly      correlate semantically
-    │                     │
-    └──────────┬──────────┘
-               ▼
-       packet journey debugging
-```
-
-これはmodern Linux networkingの重要な変化。
-
-``` text
-programmable datapath
-        ↓
-datapath complexity increases
-        ↓
-BPF/BTF-based observability
-        ↓
-tools can discover and explain
-the running kernel dynamically
-```
-
-つまりpwru/Retisはkernel networking featureそのものではないが、
-**eBPF/BTFによってLinux kernelが「実行中に探索可能なnetwork platform」へ
-変化したことを象徴するtools** と位置付けられる。
-
-## C.11 Conference provenance
-
-pwruについては特に以下をdesign/architecture evidenceとして扱う。
-
--   FOSDEM 2024, Quentin Monnet: *Packet, where are you? Track in the
-    stack with pwru*
--   Linux Plumbers Conference 2024: pwru architecture/evolution
-    presentation
-
-Retisについては前章の:
-
--   OVSCon 2023
--   OVS/OVN Conf 2024
--   Red Hat Developer 2023--2025
-
-と対にして扱う。
-
-この組み合わせによりconference provenanceも:
-
-``` text
-FOSDEM/LPC
-   pwru generic kernel tracing
-          │
-          ├── eBPF/BTF foundation ──┐
-          │                         │
-OVSCon                              │
-   Retis OVS-aware correlation ─────┘
-          │
-          ▼
-Linux networking observability evolution
-```
-
-として整理できる。
-
-------------------------------------------------------------------------
-
-# Existing v4.0→7.x audited material
-
-# Linux Networking Evolution --- Linux v4.0 から 7.x まで
+## 2. Linux v4.x — programmable fast path の形成
 
 **調査時点:** 2026-10-02
 
@@ -1700,7 +619,7 @@ Linux networking observability evolution
 は単一の release から始まったのではなく、v4.x の複数の milestone
 で形成された。
 
-## v4.x milestone map
+### v4.x milestone map
 
 ``` text
 4.3   VRF / lightweight tunnel / OVS conntrack
@@ -1721,7 +640,7 @@ Linux networking observability evolution
       UDP GRO / UDP MSG_ZEROCOPY
 ```
 
-### v4.3 --- cloud/virtual networking foundation
+#### v4.3 --- cloud/virtual networking foundation
 
 VRF、lightweight tunnel、OVS conntrack が同じ release に入った。
 
@@ -1733,18 +652,18 @@ OVS + conntrack → switching + stateful flow processing
 
 現在の Linux routing / OVN-OVS / cloud networking の重要な前史である。
 
-### v4.6 --- devlink and namespace scalability
+#### v4.6 --- devlink and namespace scalability
 
 devlink が導入され、netdevとは別にdevice-wide networking
 resourceを管理する control plane が形成され始めた。多数のTCP/network
 sysctlもnetns-awareになった。
 
-### v4.7 --- BPF becomes a practical datapath language
+#### v4.7 --- BPF becomes a practical datapath language
 
 TC cls_bpf/act_bpf がpacket dataを直接参照可能になり、BPF tracepoint
 attachmentも mainline化した。
 
-### v4.8 --- XDP
+#### v4.8 --- XDP
 
 ``` text
 NIC → driver RX → XDP/BPF → skb allocation → normal stack
@@ -1753,23 +672,23 @@ NIC → driver RX → XDP/BPF → skb allocation → normal stack
 skb生成前のprogrammable hookという現在まで続く大きなarchitecture
 change。
 
-### v4.9 --- BBR
+#### v4.9 --- BBR
 
 delivery rateとRTpropを利用するmodel-based congestion
 controlがmainline化。 後のpacing/EDT/BPF congestion-control
 lineageの重要な節目。
 
-### v4.10 --- cgroup BPF / BPF LWT / SRv6
+#### v4.10 --- cgroup BPF / BPF LWT / SRv6
 
 container identity、programmable policy、programmable
 routing/tunnelが接続される。
 
-### v4.12 --- generic XDP
+#### v4.12 --- generic XDP
 
 driver-native XDPを持たないdeviceにもXDP
 semanticsを広げ、XDPを一般的なLinux networking APIへ近づけた。
 
-### v4.13 --- socket BPF and kTLS
+#### v4.13 --- socket BPF and kTLS
 
 BPF_PROG_TYPE_SOCK_OPSによりBPFがsocket lifecycleへ入り、kTLS
 TXもmainline化。
@@ -1778,12 +697,12 @@ TXもmainline化。
 packet programmability → socket/protocol programmability
 ```
 
-### v4.14--4.17 --- socket datapath and BPF ecosystem
+#### v4.14--4.17 --- socket datapath and BPF ecosystem
 
 SOCKMAP、bpftool、BPF-to-BPF calls、netdevsim、cgroup bind/connect
 hooks、 sendmsg filtering、kTLS RXなどが続く。
 
-### v4.18 --- AF_XDP and TCP zero-copy RX
+#### v4.18 --- AF_XDP and TCP zero-copy RX
 
 ``` text
 NIC queue → XDP → XSKMAP → AF_XDP → shared UMEM → userspace
@@ -1792,17 +711,17 @@ NIC queue → XDP → XSKMAP → AF_XDP → shared UMEM → userspace
 AF_XDP multi-buffer、virtio-net AF_XDP、netkit queue
 leasingへ続く直接的な祖先。 同時にTCP zero-copy receiveも入った。
 
-### v4.19 --- time-aware transmission
+#### v4.19 --- time-aware transmission
 
 time-based packet transmissionとCAKEが入り、packet
 schedulingは単純なqueue managementからtime-aware schedulingへ拡大した。
 
-### v5.0 --- foundationからbaselineへ
+#### v5.0 --- foundationからbaselineへ
 
 v5.0はmodern networkingの開始点ではなく、v4.xで形成された技術が成熟した
 baselineと位置付ける。
 
-## Long-term lineage
+### Long-term lineage
 
 ``` text
 Programmability:
@@ -1822,7 +741,7 @@ BBR → time-based TX → EDT → BPF struct_ops CC
 → BIG TCP → AccECN
 ```
 
-## Three-generation interpretation
+### Three-generation interpretation
 
 ``` text
 Linux 4.x — FOUNDATIONS
@@ -1838,9 +757,9 @@ netkit / queue leasing / per-netns RTNL
 
 ------------------------------------------------------------------------
 
-# Existing v5.0→7.x audited material
+## 3. Linux v5.0–v5.1 — v4.x innovations が baseline へ収束
 
-# 1. Linux v5.0 を baseline にする
+## Linux v5.0 を baseline にする
 
 Linux v5.0 時点ですでに
 TCP/UDP、GRO/GSO、qdisc/TC、netfilter/conntrack、 rtnetlink、network
@@ -1903,14 +822,14 @@ large-scale container / VM networking
 
 ------------------------------------------------------------------------
 
-# 1A. v5.0 / v5.1 deep audit --- baseline を5.2以降と同じ粒度にする
+## Linux v5.0 / v5.1 deep audit
 
 この節は、当初の監査範囲（2019-05-07以降）より前に位置する Linux v5.0 と
 v5.1 を、後続 release と同じ観点で追加監査した結果である。
 
-## Linux v5.0 --- modern high-speed networking の baseline
+### Linux v5.0 --- modern high-speed networking の baseline
 
-### 1A.1 TCP EDT pacing
+#### 1A.1 TCP EDT pacing
 
 v5.0 の重要な networking change の一つが TCP pacing の **Earliest
 Departure Time (EDT)** model への移行である。
@@ -1941,7 +860,7 @@ container networking に重要な baseline となる。
 
 **LWN:** `4.20/5.0 Merge window part 1`
 
-### 1A.2 BPF programmable flow dissector
+#### 1A.2 BPF programmable flow dissector
 
 v5.0 では network flow dissector を BPF program
 として実装できるようになった。
@@ -1980,7 +899,7 @@ BPF packet parsing
 
 という programmable-network-stack lineage の初期段階として位置付ける。
 
-### 1A.3 rtnetlink strict checking
+#### 1A.3 rtnetlink strict checking
 
 rtnetlink に strict checking option が追加された。
 
@@ -1998,7 +917,7 @@ YAML/YNL
 
 という control-plane API modernization の前史として記録する。
 
-### 1A.4 UDP GRO
+#### 1A.4 UDP GRO
 
 plain UDP socket に GRO が導入された。
 
@@ -2017,7 +936,7 @@ fewer receive operations / lower per-packet cost
 これは後年の UDP receive optimization、QUIC/high-rate UDP、 tunnel
 aggregation を理解する重要な baseline である。
 
-### 1A.5 UDP MSG_ZEROCOPY
+#### 1A.5 UDP MSG_ZEROCOPY
 
 `MSG_ZEROCOPY` が UDP socket でも利用可能になった。
 
@@ -2037,7 +956,7 @@ device-memory networking
 
 と長い時間軸で見るべきである。
 
-### 1A.6 taprio
+#### 1A.6 taprio
 
 Time-Aware Priority Scheduler (`taprio`) も v5.0 の重要な qdisc change。
 
@@ -2045,7 +964,7 @@ Time-Aware Priority Scheduler (`taprio`) も v5.0 の重要な qdisc change。
 異なるが、TC/qdisc が単なる best-effort queue management から
 time-sensitive scheduling へ広がった節目として残す。
 
-### v5.0 canonical summary
+#### v5.0 canonical summary
 
   Area        v5.0 change                   Later lineage
   ----------- ----------------------------- -------------------------------
@@ -2058,9 +977,9 @@ time-sensitive scheduling へ広がった節目として残す。
 
 ------------------------------------------------------------------------
 
-## Linux v5.1 --- observability, BPF state and the io_uring substrate
+### Linux v5.1 --- observability, BPF state and the io_uring substrate
 
-### 1A.7 BPF spinlocks
+#### 1A.7 BPF spinlocks
 
 BPF map values gained spinlock-based concurrency control.
 
@@ -2078,13 +997,13 @@ Networking BPF programs increasingly maintain flow/state information, so
 this is an important enabling primitive even though it is not
 network-specific.
 
-### 1A.8 BPF verifier dead-code elimination
+#### 1A.8 BPF verifier dead-code elimination
 
 The verifier gained dead-code detection/removal. This belongs to the BPF
 execution infrastructure lineage that made increasingly complex
 networking programs practical.
 
-### 1A.9 SO_BINDTOIFINDEX
+#### 1A.9 SO_BINDTOIFINDEX
 
 `SO_BINDTOIFINDEX` provides interface binding by ifindex rather than
 interface name.
@@ -2097,7 +1016,7 @@ SO_BINDTOIFINDEX → stable kernel interface identifier
 It is a relatively small socket API change, but useful in
 namespace-heavy and programmatic network management environments.
 
-### 1A.10 Y2038-safe socket timestamps
+#### 1A.10 Y2038-safe socket timestamps
 
 socket timestamp APIs gained Y2038-safe variants.
 
@@ -2105,7 +1024,7 @@ This is primarily ABI maintenance, but timestamping is fundamental to
 packet capture, latency measurement, pacing and observability, so it
 belongs in the networking API history.
 
-### 1A.11 devlink health
+#### 1A.11 devlink health
 
 devlink gained a health-reporting mechanism for network devices.
 
@@ -2121,7 +1040,7 @@ standardized device health / recovery / observability
 
 and later devlink became a major NIC/switch management interface.
 
-### 1A.12 Wi-Fi airtime fairness
+#### 1A.12 Wi-Fi airtime fairness
 
 mac80211 gained airtime-aware fairness support. Unlike byte/packet
 fairness, wireless capacity is fundamentally constrained by airtime:
@@ -2135,7 +1054,7 @@ fairness unit → airtime
 This is an important networking scheduler concept even though it is
 Wi-Fi-specific.
 
-### 1A.13 io_uring appears
+#### 1A.13 io_uring appears
 
 Linux v5.1 introduced io_uring.
 
@@ -2161,7 +1080,7 @@ Therefore the networking evolution timeline should mark **5.1 as the
 origin of the io_uring branch**, while distinguishing that from the
 later networking-specific features.
 
-### v5.1 canonical summary
+#### v5.1 canonical summary
 
   ----------------------------------------------------------------------
   Area                  v5.1 change           Later lineage
@@ -2187,7 +1106,7 @@ later networking-specific features.
 
 ------------------------------------------------------------------------
 
-## 1A.14 Corrected starting graph
+### 1A.14 Corrected starting graph
 
 v5.0/v5.1 を追加すると、この文書の evolution graph
 は次のように補正できる。
@@ -2227,15 +1146,18 @@ baseline** として扱える。
 
 ------------------------------------------------------------------------
 
-# 2. 進化を5つの時代で見る
 
-## Phase 0 --- v5.0 baseline (2019)
+# Part II — Expansion: Linux v5.2 → 7.x release chronology
+
+## 2. 進化を5つの時代で見る
+
+### Phase 0 --- v5.0 baseline (2019)
 
 100--400Gb/s NIC の普及で packet processing だけでなく RX buffer の
 allocation/recycling が bottleneck として顕在化した。ここから
 `page_pool → netmem → device-memory networking` が始まる。
 
-## Phase 1 --- programmable network stack (2019--2021)
+### Phase 1 --- programmable network stack (2019--2021)
 
 ``` text
 XDP / TC BPF
@@ -2251,7 +1173,7 @@ TCP algorithm / socket behavior まで programmable
 
 v5.6 では MPTCP、WireGuard、BPF `struct_ops` が大きな節目となる。
 
-## Phase 2 --- aggregate more, copy less (2021--2023)
+### Phase 2 --- aggregate more, copy less (2021--2023)
 
 ``` text
 TCP zero-copy RX
@@ -2266,7 +1188,7 @@ AF_XDP multi-buffer
 高速化の中心が packet-per-second だけでなく、 **aggregation / copy
 reduction / syscall reduction** へ移る。
 
-## Phase 3 --- packet memory becomes architecture (2023--2025)
+### Phase 3 --- packet memory becomes architecture (2023--2025)
 
 ``` text
 page_pool
@@ -2281,7 +1203,7 @@ memory-provider abstraction
 `network buffer = normal RAM の struct page` という前提が崩れ、
 networking と memory management が不可分になる。
 
-## Phase 4 --- queue ownership + scalable control plane (2024--2026)
+### Phase 4 --- queue ownership + scalable control plane (2024--2026)
 
 ``` text
 netkit → queue leasing → AF_XDP/userspace/VMM
@@ -2303,285 +1225,7 @@ subsystem-specific locking
 
 ------------------------------------------------------------------------
 
-# 3. Packet aggregation --- GRO/GSO → BIG TCP
-
-v5.0 ですでに GRO/GSO/TSO は成熟していたが、高速 NIC では per-packet
-metadata processing が支配的になる。
-
-``` text
-wire packets
-    ↓ GRO
-large skb
-    ↓ GSO/TSO
-wire packets
-```
-
-v5.19 BIG TCP は kernel internal GRO/GSO aggregate の 64KiB
-制約を緩和した。
-
-``` text
-GRO/GSO
-  ↓
-BIG TCP (5.19 IPv6)
-  ↓
-IPv4 BIG TCP (6.3)
-  ↓
-AF_XDP multi-buffer (6.6)
-  ↓
-VXLAN / GENEVE BIG TCP (7.x)
-```
-
-BIG TCP は wire MTU を巨大化する機能ではなく、 **kernel 内部の
-packet-processing unit を大きくする機能**として理解する。
-
-------------------------------------------------------------------------
-
-# 4. Packet memory --- page_pool → netmem → Device Memory TCP
-
-``` text
-old RX:
-NIC → allocate page → stack → free page
-
-page_pool:
-NIC → recycled page → stack ─┐
-      ↑                      │
-      └──────────────────────┘
-```
-
-その後、device memory を扱うため `struct page`
-前提を弱める必要が生じる。
-
-``` text
-network memory
-      ↓
-    netmem
-   /      \
-RAM      device memory
-```
-
-v6.12 Device Memory TCP RX:
-
-``` text
-traditional:
-NIC → system RAM → CPU/copy/mapping → GPU
-
-devmem:
-NIC ─────────────→ device memory → GPU/accelerator
-```
-
-v6.16 では TX 側も mainline に入る。
-
-**DIBS はこの直系ではない。** `page_pool → netmem → DIBS` ではなく、
-shared-memory transport 側の別 lineage として扱う。
-
-------------------------------------------------------------------------
-
-# 5. XDP / AF_XDP
-
-v5.0 時点で XDP/AF_XDP は存在した。その後の本質は周辺 infrastructure
-の成熟。
-
-``` text
-XDP
-├─ redirect
-├─ page_pool
-├─ link/lifecycle
-└─ AF_XDP
-    ├─ zero-copy
-    ├─ multi-buffer (6.6)
-    ├─ virtio-net ZC
-    └─ queue ownership / netkit integration
-```
-
-v6.6 AF_XDP multi-buffer は:
-
-``` text
-one packet = one buffer
-```
-
-から:
-
-``` text
-one packet
-├─ buffer 1
-├─ buffer 2
-└─ buffer N (EOP)
-```
-
-への重要な変更である。
-
-------------------------------------------------------------------------
-
-# 6. BPF --- packet filter から stack extension へ
-
-``` text
-v5.0: XDP / TC / cgroup BPF
-          ↓
-5.3–5.4: socket hooks / SYN-cookie integration
-          ↓
-5.6: struct_ops → tcp_congestion_ops
-          ↓
-5.9: SK_LOOKUP
-          ↓
-6.x: MPTCP / defrag / timestamp / netkit / BPF qdisc
-```
-
-つまり:
-
-``` text
-packet programmability
- → socket programmability
- → protocol algorithm programmability
- → virtual-device programmability
- → queue/datapath programmability
-```
-
-へ拡大した。
-
-------------------------------------------------------------------------
-
-# 7. Virtual networking --- veth/virtio → netkit/queue ownership
-
-v5.0 の典型:
-
-``` text
-container → veth → host stack → NIC
-
-guest virtio-net → QEMU/vhost/TAP → bridge/OVS → NIC
-```
-
-現在は複数の branch がある。
-
-``` text
-virtio-net
-├─ vhost
-├─ vDPA
-├─ SR-IOV/VFIO
-└─ AF_XDP zero-copy
-
-container:
-veth → netkit → BPF-native datapath → queue leasing
-```
-
-v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、2026 の netkit queue leasing
-は 「full kernel bypass」よりも、
-
-**kernel が ownership/control を保持し、data movement を最小化する**
-
-方向として読むと理解しやすい。
-
-------------------------------------------------------------------------
-
-# 8. TCP / UDP / transport
-
-## TCP
-
-``` text
-v5.0 EDT pacing
-  ├─ BPF congestion control
-  ├─ MPTCP (5.6)
-  ├─ TCP zero-copy RX
-  ├─ BIG TCP (5.19)
-  ├─ TCP-AO/security
-  ├─ Device Memory TCP
-  ├─ TCP_RTO_MAX_MS
-  └─ AccECN
-```
-
-MPTCP は initial upstream から multi-subflow、userspace path manager、
-Generic Netlink、BPF integration へ進化した。
-
-## UDP
-
-v5.0 自体が `MSG_ZEROCOPY` と GRO の節目。その後は GRO/GSO、
-tunnel/encapsulation、high packet-rate RX、receive-buffer scaling
-が進む。 QUIC や overlay networking の基盤として UDP の重要性も増した。
-
-------------------------------------------------------------------------
-
-# 9. Routing / Netlink / RTNL
-
-routing は nexthop object により:
-
-``` text
-route → embedded nexthop
-```
-
-だけでなく:
-
-``` text
-route → reusable nexthop object → group / resilient group
-```
-
-へ進んだ。
-
-Netlink は YNL により:
-
-``` text
-YAML specification
-├─ UAPI
-├─ policy
-├─ generated helper
-├─ documentation
-└─ userspace client
-```
-
-という machine-readable API の方向へ進む。
-
-RTNL は:
-
-``` text
-global RTNL
- → unlocked operations
- → RCU readers
- → per-netns RTNL
- → subsystem locks/refcounts
-```
-
-という長期的な scalability 改善が続く。
-
-------------------------------------------------------------------------
-
-# 10. netfilter / nftables / conntrack
-
-``` text
-iptables/netfilter
-      ↓
-nftables maturation
-      ↓
-flowtable
-      ↓
-hardware offload
-```
-
-一方で BPF と nftables は単純な新旧置換ではない。
-
-conntrack では performance だけでなく lifetime/GC、per-netns
-scalability、 hardware flow offload race、BPF kfunc access
-が重要なテーマとなった。
-
-------------------------------------------------------------------------
-
-# 11. io_uring networking
-
-``` text
-sendmsg / recvmsg
-      ↓
-zero-copy TX
-      ↓
-multishot / registered buffers
-      ↓
-zero-copy RX (6.15)
-      ↓
-memory-provider / device-memory integration
-```
-
-目標は syscall reduction だけではなく、 NICからuserspaceまでの buffer
-ownership/lifetime の効率化にある。
-
-------------------------------------------------------------------------
-
-# 12. Linux v5.0 → 7.x release map
+## 12. Linux v5.0 → 7.x release map
 
   ---------------------------------------------------------------------
   Kernel                             Major networking evolution
@@ -2678,7 +1322,1391 @@ ownership/lifetime の効率化にある。
 
 ------------------------------------------------------------------------
 
-# 13. v5.0 と 2026 を比較する
+
+# Part III — Long-term feature lineages
+
+## 3. Packet aggregation --- GRO/GSO → BIG TCP
+
+v5.0 ですでに GRO/GSO/TSO は成熟していたが、高速 NIC では per-packet
+metadata processing が支配的になる。
+
+``` text
+wire packets
+    ↓ GRO
+large skb
+    ↓ GSO/TSO
+wire packets
+```
+
+v5.19 BIG TCP は kernel internal GRO/GSO aggregate の 64KiB
+制約を緩和した。
+
+``` text
+GRO/GSO
+  ↓
+BIG TCP (5.19 IPv6)
+  ↓
+IPv4 BIG TCP (6.3)
+  ↓
+AF_XDP multi-buffer (6.6)
+  ↓
+VXLAN / GENEVE BIG TCP (7.x)
+```
+
+BIG TCP は wire MTU を巨大化する機能ではなく、 **kernel 内部の
+packet-processing unit を大きくする機能**として理解する。
+
+------------------------------------------------------------------------
+
+## 4. Packet memory --- page_pool → netmem → Device Memory TCP
+
+``` text
+old RX:
+NIC → allocate page → stack → free page
+
+page_pool:
+NIC → recycled page → stack ─┐
+      ↑                      │
+      └──────────────────────┘
+```
+
+その後、device memory を扱うため `struct page`
+前提を弱める必要が生じる。
+
+``` text
+network memory
+      ↓
+    netmem
+   /      \
+RAM      device memory
+```
+
+v6.12 Device Memory TCP RX:
+
+``` text
+traditional:
+NIC → system RAM → CPU/copy/mapping → GPU
+
+devmem:
+NIC ─────────────→ device memory → GPU/accelerator
+```
+
+v6.16 では TX 側も mainline に入る。
+
+**DIBS はこの直系ではない。** `page_pool → netmem → DIBS` ではなく、
+shared-memory transport 側の別 lineage として扱う。
+
+------------------------------------------------------------------------
+
+## 5. XDP / AF_XDP
+
+v5.0 時点で XDP/AF_XDP は存在した。その後の本質は周辺 infrastructure
+の成熟。
+
+``` text
+XDP
+├─ redirect
+├─ page_pool
+├─ link/lifecycle
+└─ AF_XDP
+    ├─ zero-copy
+    ├─ multi-buffer (6.6)
+    ├─ virtio-net ZC
+    └─ queue ownership / netkit integration
+```
+
+v6.6 AF_XDP multi-buffer は:
+
+``` text
+one packet = one buffer
+```
+
+から:
+
+``` text
+one packet
+├─ buffer 1
+├─ buffer 2
+└─ buffer N (EOP)
+```
+
+への重要な変更である。
+
+------------------------------------------------------------------------
+
+## 6. BPF --- packet filter から stack extension へ
+
+``` text
+v5.0: XDP / TC / cgroup BPF
+          ↓
+5.3–5.4: socket hooks / SYN-cookie integration
+          ↓
+5.6: struct_ops → tcp_congestion_ops
+          ↓
+5.9: SK_LOOKUP
+          ↓
+6.x: MPTCP / defrag / timestamp / netkit / BPF qdisc
+```
+
+つまり:
+
+``` text
+packet programmability
+ → socket programmability
+ → protocol algorithm programmability
+ → virtual-device programmability
+ → queue/datapath programmability
+```
+
+へ拡大した。
+
+------------------------------------------------------------------------
+
+## 7. Virtual networking --- veth/virtio → netkit/queue ownership
+
+v5.0 の典型:
+
+``` text
+container → veth → host stack → NIC
+
+guest virtio-net → QEMU/vhost/TAP → bridge/OVS → NIC
+```
+
+現在は複数の branch がある。
+
+``` text
+virtio-net
+├─ vhost
+├─ vDPA
+├─ SR-IOV/VFIO
+└─ AF_XDP zero-copy
+
+container:
+veth → netkit → BPF-native datapath → queue leasing
+```
+
+v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、2026 の netkit queue leasing
+は 「full kernel bypass」よりも、
+
+**kernel が ownership/control を保持し、data movement を最小化する**
+
+方向として読むと理解しやすい。
+
+------------------------------------------------------------------------
+
+## 8. TCP / UDP / transport
+
+### TCP
+
+``` text
+v5.0 EDT pacing
+  ├─ BPF congestion control
+  ├─ MPTCP (5.6)
+  ├─ TCP zero-copy RX
+  ├─ BIG TCP (5.19)
+  ├─ TCP-AO/security
+  ├─ Device Memory TCP
+  ├─ TCP_RTO_MAX_MS
+  └─ AccECN
+```
+
+MPTCP は initial upstream から multi-subflow、userspace path manager、
+Generic Netlink、BPF integration へ進化した。
+
+### UDP
+
+v5.0 自体が `MSG_ZEROCOPY` と GRO の節目。その後は GRO/GSO、
+tunnel/encapsulation、high packet-rate RX、receive-buffer scaling
+が進む。 QUIC や overlay networking の基盤として UDP の重要性も増した。
+
+------------------------------------------------------------------------
+
+## 9. Routing / Netlink / RTNL
+
+routing は nexthop object により:
+
+``` text
+route → embedded nexthop
+```
+
+だけでなく:
+
+``` text
+route → reusable nexthop object → group / resilient group
+```
+
+へ進んだ。
+
+Netlink は YNL により:
+
+``` text
+YAML specification
+├─ UAPI
+├─ policy
+├─ generated helper
+├─ documentation
+└─ userspace client
+```
+
+という machine-readable API の方向へ進む。
+
+RTNL は:
+
+``` text
+global RTNL
+ → unlocked operations
+ → RCU readers
+ → per-netns RTNL
+ → subsystem locks/refcounts
+```
+
+という長期的な scalability 改善が続く。
+
+------------------------------------------------------------------------
+
+## 10. netfilter / nftables / conntrack
+
+``` text
+iptables/netfilter
+      ↓
+nftables maturation
+      ↓
+flowtable
+      ↓
+hardware offload
+```
+
+一方で BPF と nftables は単純な新旧置換ではない。
+
+conntrack では performance だけでなく lifetime/GC、per-netns
+scalability、 hardware flow offload race、BPF kfunc access
+が重要なテーマとなった。
+
+------------------------------------------------------------------------
+
+## 11. io_uring networking
+
+``` text
+sendmsg / recvmsg
+      ↓
+zero-copy TX
+      ↓
+multishot / registered buffers
+      ↓
+zero-copy RX (6.15)
+      ↓
+memory-provider / device-memory integration
+```
+
+目標は syscall reduction だけではなく、 NICからuserspaceまでの buffer
+ownership/lifetime の効率化にある。
+
+------------------------------------------------------------------------
+
+
+# Part IV — Observability / Explainability
+
+## B. Observability / Explainability evolution
+
+Linux networkingの進化には、performance、programmability、memory/control
+planeに加えて **observability / explainability**
+という独立した軸がある。
+
+``` text
+"What happened?"
+      ↓
+"Where did it happen?"
+      ↓
+"Why did this packet drop?"
+      ↓
+"What path did this packet take through the kernel?"
+```
+
+Retisはkernel datapathそのものではなく、eBPF、tracepoints、BTF、
+`skb_drop_reason`、`struct sk_buff` metadataなど、kernel側で発達した
+observability
+primitivesを統合する代表的なconsumer/toolとして位置付ける。
+
+### B.1 Counters/interface capture → kernel-internal observation
+
+従来はinterface statistics、MIB/SNMP counters、ethtool statistics、
+tcpdump/AF_PACKETなどが中心だった。これらではcounter増加と特定packetを
+対応付けたり、kernel内部のどのfunctionをどう通ったかを追うのが難しい。
+
+tracepoint、kprobe/fentry、eBPFにより:
+
+``` text
+NIC
+ ↓
+netif_receive_skb()  ← probe
+ ↓
+IP                   ← probe
+ ↓
+netfilter / OVS      ← probe
+ ↓
+TCP/UDP              ← probe
+ ↓
+socket
+```
+
+のようなkernel datapath内部の観測が可能になった。
+
+### B.2 BTF --- running kernel as typed data
+
+BTFはrunning kernelのtype informationをmachine-readableにする。
+
+``` text
+kernel types/enums/layout
+          ↓
+         BTF
+          ↓
+eBPF observability tools
+```
+
+CO-REだけでなく、runtime kernel introspectionという意味でも重要である。
+
+### B.3 Linux 5.17 --- `skb_drop_reason`
+
+v5.17のcommit `c504e5c2f964`で`kfree_skb_reason()`が導入された。
+
+``` text
+before:
+tcp_v4_rcv → kfree_skb
+             "where"は分かっても"why"が弱い
+
+after:
+tcp_v4_rcv
+  → kfree_skb_reason(skb, SKB_DROP_REASON_NO_SOCKET)
+  → skb:kfree_skb tracepoint
+       location = tcp_v4_rcv
+       reason   = NO_SOCKET
+```
+
+重要なのはnetwork stack自身がdrop decisionの意味をstructured
+metadataとして trace infrastructureへ渡すようになった点である。
+
+### B.4 Coverage expands beyond core networking
+
+drop-reason
+coverageは段階的にIP、neighbour、TCP、qdisc/device/XDP関連pathへ
+拡大した。さらにnon-core reasonのruntime registrationにより、mac80211や
+Open vSwitchのようなsubsystem固有reasonも表現可能になった。
+
+``` text
+core skb reasons
+      ↓
+protocol/path-specific reasons
+      ↓
+subsystem-specific semantic reasons
+```
+
+### B.5 Raw enum values are not stable ABI
+
+`skb_drop_reason`はkernel internal enumであり、numeric valueをstable
+userspace ABI として扱うべきではない。
+
+``` text
+raw integer
+   ↓
+running-kernel definition required
+   ↓
+BTF-aware decoding
+```
+
+ここがRetisとBTFが強く結び付く理由の一つ。
+
+### B.6 Retis --- observability primitivesのintegrator
+
+概念的には:
+
+``` text
+eBPF --------------------------┐
+tracepoints/kprobes/fentry ----┤
+BTF ---------------------------┤
+skb_drop_reason ---------------┤
+struct sk_buff metadata -------┤
+conntrack / OVS state ---------┤
+                               ▼
+                             Retis
+                               ├─ packet inspection
+                               ├─ drop monitoring
+                               ├─ stack/context
+                               ├─ metadata filtering
+                               └─ packet tracking
+```
+
+RetisはBTFを使ってrunning kernelのdrop-reason definitionを解釈するため、
+kernel versionごとのraw enum値を固定tableとして仮定しない。
+
+### B.7 Drop monitoring → packet journey
+
+Retisの本質はdropwatchの高機能版だけではない。複数のskb-aware
+function/tracepointを同時に観測し、tracking logicによって:
+
+``` text
+event A
+event B
+event C
+event D
+   ↓
+same logical packet:
+A → B → C → D
+```
+
+へ再構成する方向にある。
+
+tracking IDはkernelのuniversal ABIではなくRetis側のtracking
+mechanismである、 という区別は重要。
+
+### B.8 Header filtering → kernel-metadata filtering
+
+pcap-style packet filterに加え、BTFを利用して:
+
+``` text
+skb->dev->name
+skb->mark
+network namespace
+nested skb/kernel metadata
+```
+
+などでfilterできる。
+
+``` text
+packet header filter
+       +
+kernel metadata filter
+       ↓
+first matching probe
+       ↓
+start tracking
+       ↓
+follow packet through later probes
+```
+
+となり、interface packet captureとは異なる観測modelになる。
+
+### B.9 cBPF → eBPFという歴史の再接続
+
+Retisのpcap-style filteringは、classic BPF由来のpacket-filter modelを
+modern eBPF probeへ橋渡しする。
+
+``` text
+pcap-filter syntax
+      ↓
+classic BPF representation
+      ↓
+eBPF
+      ↓
+kernel-internal probes
+```
+
+Linux networking史の:
+
+``` text
+classic BPF → eBPF → TC/XDP/socket BPF → BPF tracing/BTF
+```
+
+がobservability tool内で再接続されている例と見ることができる。
+
+### B.10 Why this matters for OVN/OVS/container networking
+
+v3.x〜v4.xでnetwork datapathは:
+
+``` text
+netns / veth / tap
+      ↓
+OVS / OVN
+      ↓
+conntrack / netfilter
+      ↓
+routing / VRF
+      ↓
+VXLAN/Geneve
+      ↓
+physical NIC
+```
+
+のように複雑化した。
+
+programmability、virtualization、offloadがnetworkingを強力にした一方で、
+packetが「どこを通り、なぜdropされたか」を理解する難易度も上がった。
+Retis型observabilityはこの複雑化への回答と位置付けられる。
+
+### B.11 Performance evolution creates an observability requirement
+
+``` text
+virtualization / overlays
+        ↓
+OVS / conntrack / namespaces
+        ↓
+XDP / programmable BPF paths
+        ↓
+offload / zero-copy / device memory
+        ↓
+faster but more complex datapath
+        ↓
+eBPF tracing + BTF
+        ↓
+structured drop reasons
+        ↓
+Retis-style packet journey tracing
+```
+
+observabilityは付加的なdebug機能ではなく、programmable/heterogeneousな
+network datapathを運用するためのarchitecture
+capabilityへ発展したと考えられる。
+
+### B.12 Updated five-axis model
+
+``` text
+PERFORMANCE
+BQL → TSQ → pacing → BIG TCP → device memory
+
+PROGRAMMABILITY
+eBPF → XDP → AF_XDP → struct_ops → netkit
+
+MEMORY
+page_pool → netmem → Device Memory TCP / io_uring ZCRX
+
+CONTROL PLANE
+rtnetlink → YNL → per-netns/fine-grained RTNL
+
+OBSERVABILITY / EXPLAINABILITY
+tracepoints + eBPF
+ → BTF
+ → skb_drop_reason
+ → subsystem-specific reasons
+ → arbitrary-point packet inspection
+ → metadata filtering + packet journey reconstruction
+```
+
+### B.14 2023 OVSCon --- Retis as an OVS kernel/userspace correlator
+
+OVSCon 2023のRetis発表は、Retisを単なるgeneric Linux tracing
+toolとしてではなく、 OVS datapath
+troubleshootingのための統合observability toolとして理解する重要資料。
+
+発表ではnetwork tracingの問題を三つに整理している。
+
+``` text
+packet mutates
+    → tracking is required
+
+many places/components
+    → modular collectors are required
+
+many packets
+    → filtering is required
+```
+
+2023時点でRetisはOVS kernel datapathをfirst-class targetとして扱い、
+`openvswitch:ovs_dp_upcall`などのkernel tracepointに加え、
+`ovs-vswitchd`側のUSDT probesを利用してupcallを追跡していた。
+
+``` text
+OVS kernel datapath
+       │
+       │ flow miss
+       ▼
+ovs_dp_upcall                ← kernel tracepoint
+       │
+       ▼
+netlink socket
+       │
+       ▼
+ovs-vswitchd handler
+       │
+       ▼
+upcall_recv                  ← USDT
+       │
+       ▼
+classification / translation
+       │
+       ▼
+flow_put / flow_exec         ← USDT
+       │
+       ▼
+kernel datapath
+       │
+       ▼
+ovs_execute_actions
+```
+
+この点は重要で、eBPF/kprobe/tracepointだけではkernel→userspace→kernelという
+OVS slow path全体を一つのpacket journeyとして相関しにくい。
+Retisはkernel probesとUSDTを組み合わせてこの境界を越える。
+
+2023資料ではcollector modelも明確になっている。
+
+``` text
+skb          packet/skb information
+skb-tracking logical packet ID, clone/modification tracking
+skb-drop     drop reason
+ovs          OVS datapath + upcall tracking
+ct           conntrack state
+nft          nftables table/chain/verdict
+```
+
+したがってRetisは単なるpacket dumperではなく、 **multiple networking
+subsystemsのcontextを同じevent streamへ載せる** architectureを持つ。
+
+------------------------------------------------------------------------
+
+### B.15 OVS tracking --- packet identity is harder than skb identity
+
+OVSCon
+2023資料ではRetisのtrackingが`struct sk_buff *`だけに依存しないことも
+重要である。
+
+packetは:
+
+``` text
+NAT
+clone
+encapsulation
+userspace upcall
+```
+
+などでrepresentationやidentityが変化する。
+
+Retisはskb tracking ID、packet contentのhash、thread/event
+orderingなどを 状況に応じて利用してOVS upcallを相関する。
+
+これは:
+
+``` text
+same skb pointer
+      ≠
+same logical network packet
+```
+
+というnetwork observability上の本質的問題への対応である。
+
+したがってpacket trackingはkernel ABIではなくtool-side
+heuristic/correlation logicであり、各tracking
+boundaryにはassumptionがあることを明示する。
+
+------------------------------------------------------------------------
+
+### B.16 2024 OVSCon --- from upcall tracing to flow enrichment
+
+OVSCon 2024では2023年のarchitectureを維持しつつ、Retisはさらに:
+
+``` text
+skb
+ct
+ovs
+nft
+skb-drop
+packet filters
+metadata filters
+stack traces
+pcap
+Python bindings
+```
+
+を統合する方向へ進んでいる。
+
+OVS-specificな重要な進展が **OVS flow enrichment**。
+
+Retisはkernel datapathの`ovs_flow_tbl_lookup_stats`を(kret)probeし、
+
+``` text
+UFID
+flow pointer
+actions pointer
+lookup result
+```
+
+を取得する。
+
+さらにruntimeでOVS unixctlへ問い合わせ:
+
+``` text
+dpctl/get-flow
+ofproto/detrace
+```
+
+などを使ってkernel datapath flowをOVS/OpenFlow
+representationへ関連付ける。
+
+概念的には:
+
+``` text
+actual packet
+    ↓
+kernel networking event
+    ↓
+OVS datapath lookup
+    ↓
+UFID / sw_flow / actions
+    ↓
+Retis flow enrichment
+    ↓
+ODP flow/actions
+    ↓
+OpenFlow representation
+```
+
+となる。
+
+これは単なる「packetはOVSを通った」という観測から、
+
+**そのpacketがどのdatapath flow/actionと対応したか**
+
+を説明する方向への進化。
+
+ただし2024資料自身がflow deletion/update
+trackingやupcall時のflow表示などに
+制約があることを明示しており、完全なOVS state reconstructionではない。
+
+------------------------------------------------------------------------
+
+### B.17 `ofproto/trace` and Retis --- simulation vs live observation
+
+OVSには以前から`ofproto/trace`という強力なtroubleshooting
+mechanismがある。
+
+役割を単純化すると:
+
+``` text
+ofproto/trace
+      │
+      ▼
+given/synthetic packet
+      │
+      ▼
+simulate OVS/OpenFlow processing
+      │
+      ▼
+"OVS pipeline should do this"
+```
+
+Retisは:
+
+``` text
+actual packet
+      │
+      ▼
+live kernel/userspace probes
+      │
+      ▼
+observe real execution
+      │
+      ▼
+"this packet actually did this"
+```
+
+という役割。
+
+両者は競合するというより補完的。
+
+``` text
+               OVS troubleshooting
+
+             ┌──────────────────┐
+             │ expected behavior │
+             │   ofproto/trace   │
+             └────────┬─────────┘
+                      │ compare
+             ┌────────▼─────────┐
+             │ actual behavior   │
+             │      Retis        │
+             └──────────────────┘
+```
+
+特にconntrack state、kernel datapath behavior、upcall、runtime
+stateなどを含む 問題ではlive observationが重要になる。
+
+一方、OpenFlow pipeline logicそのものを理解するにはsimulation-based
+traceも 依然として有用。
+
+------------------------------------------------------------------------
+
+### B.18 2025 --- arbitrary-point packet dumping becomes user-facing
+
+2025年1月のRed Hat Developer記事は、Retisのgeneric Linux
+networking側の価値を 明確に説明している。
+
+traditional capture:
+
+``` text
+NIC driver
+    │
+    ├── PF_PACKET / tcpdump
+    │
+network stack
+```
+
+では基本的にdriverとnetwork stackの境界付近のpacket stateを観測する。
+
+Retis:
+
+``` text
+netif_receive_skb()   ← dump
+       ↓
+IP                    ← dump
+       ↓
+netfilter             ← dump
+       ↓
+OVS                   ← dump
+       ↓
+TCP/UDP               ← dump
+       ↓
+net_dev_start_xmit    ← dump
+```
+
+ではskb-aware kernel function/tracepointをcapture
+pointとして選択できる。
+
+さらに複数probeを同時に使い、packet trackingによってflowを再構成できる。
+
+Retisで収集したpacketを`pcap`へ変換しtcpdump/Wiresharkへ渡せる点も重要。
+
+``` text
+kernel-internal capture
+        ↓
+      Retis
+        ↓
+       pcap
+        ↓
+tcpdump / Wireshark
+```
+
+つまり新しいkernel observabilityを既存packet-analysis
+ecosystemへ橋渡ししている。
+
+------------------------------------------------------------------------
+
+### B.19 Revised Retis evolution
+
+追加資料を踏まえるとRetisの発展は次のように整理できる。
+
+``` text
+Linux kernel foundations
+
+tracepoints / kprobes
+        +
+       eBPF
+        +
+       BTF
+        +
+skb_drop_reason
+        │
+        ▼
+2023 Retis / OVSCon
+        │
+        ├─ arbitrary kernel probes
+        ├─ skb tracking
+        ├─ skb-drop
+        ├─ conntrack / nftables
+        └─ OVS upcall tracking
+             kernel ↔ ovs-vswitchd
+        │
+        ▼
+2024 Retis / OVSCon
+        │
+        ├─ metadata filtering
+        ├─ richer post-processing
+        ├─ Python integration
+        └─ OVS flow enrichment
+             actual packet
+                ↔ datapath flow
+                ↔ OpenFlow
+        │
+        ▼
+2025 Retis
+        │
+        ├─ arbitrary-point packet dumping
+        ├─ pcap export
+        └─ kernel metadata filtering
+        │
+        ▼
+network-stack journey analysis
+```
+
+------------------------------------------------------------------------
+
+### B.20 Observability evolution --- final interpretation
+
+この資料全体ではRetisを次の位置に置く。
+
+``` text
+COUNTERS
+"something happened"
+      ↓
+PACKET CAPTURE
+"this packet crossed this interface"
+      ↓
+KERNEL TRACING
+"this code path handled this packet"
+      ↓
+STRUCTURED REASONS
+"this is why it was dropped"
+      ↓
+PACKET TRACKING
+"these events belong to the same logical packet"
+      ↓
+CROSS-SUBSYSTEM CORRELATION
+"the packet crossed IP/NF/CT/OVS..."
+      ↓
+KERNEL ↔ USERSPACE CORRELATION
+"the OVS upcall went to ovs-vswitchd and came back"
+      ↓
+FLOW ENRICHMENT
+"this actual packet corresponds to this OVS/OpenFlow state"
+```
+
+この意味でRetisはLinux kernel networkingの新しいforwarding
+architectureではない。
+
+**Linux networking stackが長年かけて獲得したprogrammability、typed
+metadata、 tracepoints、structured drop
+semanticsを統合し、複雑化したdatapathを explainableにするtooling layer**
+
+として扱うのが最も正確。
+
+------------------------------------------------------------------------
+
+### B.21 Retis source trail
+
+この系譜のRetis側の主要資料として以下を扱う。
+
+-   Red Hat Developer (2023-07-19): *How to retrieve packet drop reasons
+    in the Linux kernel*
+-   Red Hat Developer (2024-01-04): *An update on packet drop reasons in
+    Linux*
+-   Red Hat Developer (2025-01-09): *Dumping packets from anywhere in
+    the networking stack*
+-   Red Hat Developer (2025-10-02): *Filtering packets from anywhere in
+    the networking stack*
+
+kernel側の中心anchorはv5.17の`kfree_skb_reason()` /
+`skb_drop_reason`であり、 その後もsubsystem
+coverageが継続して拡張される。
+
+------------------------------------------------------------------------
+
+## C. pwru and Retis --- two packet-journey observability models
+
+pwruとRetisは競合する部分を持つが、単純な「軽量版/高機能版」という関係ではない。
+両者は同じmodern Linux kernel
+observability基盤から異なる探索戦略を取る。
+
+``` text
+                 eBPF + BTF
+                     │
+          ┌──────────┴──────────┐
+          │                     │
+          ▼                     ▼
+        pwru                   Retis
+          │                     │
+ broad automatic          selected probes
+ function tracing         + semantic collectors
+          │                     │
+          ▼                     ▼
+ kernel function          enriched/correlated
+ trajectory               packet journey
+```
+
+### C.1 pwru --- start broad when you do not know where to look
+
+pwruの中心的アイデアは、kernel
+BTFから`struct sk_buff *`をargumentとして取る
+functionsを発見し、それらへeBPF probeを広くattachすること。
+
+``` text
+kernel BTF
+    ↓
+find skb-accepting functions
+    ↓
+kprobe / kprobe-multi
+    ↓
+filter target packet
+    ↓
+print functions actually traversed
+```
+
+このmodelは、
+
+``` text
+"packetはinterfaceまで来ている"
+        ↓
+"でもstackのどこで問題が起きたか見当がつかない"
+```
+
+という初動調査に特に強い。
+
+FOSDEM 2024では約1,500個規模のfunctionsへprobeをattachする例が示され、
+pcap filterで対象packetだけを選択してtrajectoryを表示している。
+
+### C.2 pwru is more than a simple skb-pointer tracer
+
+pwruはskb pointerを表示するだけではない。
+
+current architectureには:
+
+-   skb clone/copy tracking
+-   skb lifetime termination handling
+-   stack-based tracking
+-   veth/XDP→skb tracking
+-   skb/netns/interface/mark filtering
+-   BTF-based full skb output
+-   skb metadata expressions
+-   call stack/caller output
+-   tunnel tuple output
+-   TC/XDP BPF program visibility
+-   kprobe-multi backend
+
+などが含まれる。
+
+したがって:
+
+``` text
+pwru = "all skb functionsにprobeするだけ"
+```
+
+と表現するのは不正確。
+
+本質は **broad discovery-oriented tracing** にある。
+
+### C.3 Retis --- start from events and enrich their meaning
+
+Retisはcollector architectureを使ってeventへsubsystem
+contextを追加する。
+
+``` text
+probe/event
+    │
+    ├─ skb
+    ├─ skb tracking
+    ├─ drop reason
+    ├─ conntrack
+    ├─ nftables
+    ├─ OVS
+    ├─ stack
+    └─ packet
+          ↓
+     enriched event
+          ↓
+ sort/correlate/reconstruct
+```
+
+特にOVSではkernel datapathだけでなくuserspace upcallとの相関を行うため、
+単一kernel function trajectoryを越えたsubsystem-specific
+semanticsを扱う。
+
+### C.4 Same foundation, different use of BTF
+
+両者ともBTFが重要だが、使い方の重点が異なる。
+
+``` text
+pwru
+BTF
+ ├─ discover functions accepting skb
+ ├─ understand kernel types
+ └─ print skb/kernel state
+
+Retis
+BTF
+ ├─ understand kernel types/enums
+ ├─ decode version-dependent metadata
+ └─ metadata filtering/introspection
+```
+
+この違いはBTFが単なるCO-RE portability mechanismではなく、 network
+observability infrastructureへ発展したことを示す。
+
+### C.5 pcap filter: classic BPF history reconnects to eBPF tracing
+
+pwruのFOSDEM 2024資料はfilter compilation pathを明示している。
+
+``` text
+pcap-filter syntax
+       ↓
+     libpcap
+       ↓
+ cBPF bytecode
+       ↓
+     cbpfc
+       ↓
+ eBPF bytecode
+       ↓
+ tracing program
+```
+
+Retisにもpcap-style packet filteringがあり、両者は歴史的なclassic BPFの
+packet-filter modelをmodern eBPF observabilityへ再接続している。
+
+``` text
+classic BPF
+  │
+  ├─ tcpdump / libpcap
+  │
+  ▼
+eBPF
+  │
+  ├─ TC/XDP datapath programmability
+  │
+  └─ tracing
+       │
+       ├─ pwru
+       └─ Retis
+```
+
+BPFは「packetをfilterする技術」から「network
+datapathをprogramする技術」へ進化し、 さらにそのprogrammable
+datapath自身を観測する技術としても使われるようになった。
+
+### C.6 Tracking comparison
+
+両者ともtrackingを行えるため、
+
+``` text
+pwru = trackingなし
+Retis = trackingあり
+```
+
+という比較は誤り。
+
+違いはtrackingの目的とcorrelation scopeにある。
+
+``` text
+pwru
+packet/skbを追いながら
+kernel function trajectoryを明らかにする
+          │
+          ▼
+"where in the kernel?"
+
+Retis
+packet eventを追いながら
+subsystem metadata/stateをcorrelateする
+          │
+          ▼
+"what happened, where, and in which subsystem context?"
+```
+
+どちらもclone、representation change、XDP↔skbなどpacket
+identityが変化する 境界にはtool-side logic/assumptionが必要になる。
+
+### C.7 OVS is the clearest architectural difference
+
+OVS troubleshootingでは違いが分かりやすい。
+
+``` text
+                pwru
+
+packet
+  ↓
+OVS kernel functions
+  ↓
+ovs_flow_tbl_lookup...
+  ↓
+ovs_execute_actions...
+  ↓
+kernel function trajectory
+```
+
+Retis:
+
+``` text
+packet
+  ↓
+OVS kernel datapath
+  ↓
+flow miss
+  ↓
+ovs_dp_upcall
+  ↓
+       kernel/userspace boundary
+  ↓
+ovs-vswitchd USDT
+  ↓
+translation / flow install
+  ↓
+kernel datapath
+  ↓
+OVS flow enrichment
+```
+
+pwruでもOVS kernel functionsを観測できるが、 RetisのOVS
+collectorはOVS固有のupcall semanticsやuserspace correlationを
+明示的にmodel化する。
+
+ここが「generic broad tracing」と「subsystem-aware
+correlation」の典型的な差。
+
+### C.8 Comparison matrix
+
+  -----------------------------------------------------------------------
+  Aspect                  pwru                    Retis
+  ----------------------- ----------------------- -----------------------
+  Primary model           broad kernel-function   event/collector-based
+                          tracing                 correlation
+
+  Starting point          target packet, location probes/events +
+                          unknown                 collectors
+
+  Probe discovery         BTFからskb              configured/selected
+                          functionsを広く発見     probes and profiles
+
+  kprobe-multi            supported               different probe
+                                                  architecture
+
+  Packet filter           pcap-style              pcap-style
+
+  Kernel metadata         skb/BTF/expressions     skb/BTF metadata
+                                                  filters
+
+  skb tracking            yes                     yes
+
+  clone handling          yes                     tracking/correlation
+                                                  logic
+
+  XDP tracking            supported               XDP/kernel probes
+                                                  depending on collection
+
+  Drop reason             can observe/output      dedicated skb-drop
+                          relevant path/state     semantics
+
+  Conntrack               generic tracing/state   dedicated collector
+                          inspection possible     
+
+  nftables                generic kernel          dedicated semantic
+                          trajectory              collector
+
+  OVS kernel path         visible                 dedicated OVS collector
+
+  OVS userspace upcall    not the central model   explicit
+                                                  kernel↔ovs-vswitchd
+                                                  correlation
+
+  Post-processing         trajectory-oriented     collect → store →
+                          output/JSON             sort/reconstruct
+
+  Best first question     "where did this packet  "what happened in this
+                          go?"                    subsystem context?"
+  -----------------------------------------------------------------------
+
+この表は絶対的な機能境界ではない。両projectとも進化しており、
+overlapする機能は多い。比較軸は「できる/できない」より**design
+center**。
+
+### C.9 Practical troubleshooting model
+
+典型的には次のような使い分けが理解しやすい。
+
+``` text
+connectivity failure
+       ↓
+location completely unknown
+       ↓
+      pwru
+       ↓
+discover suspicious region:
+ nf_hook_slow?
+ ovs_execute_actions?
+ routing?
+ kfree_skb_reason?
+       ↓
+subsystem identified
+       ↓
+Retis or subsystem-specific tools
+       ↓
+enrich with:
+ skb/drop reason
+ conntrack
+ nftables
+ OVS/upcall
+ netns/device
+```
+
+ただしこれは必須workflowではない。
+Retisだけで最初から追跡することも、pwruだけでroot
+causeへ到達することもある。
+
+### C.10 Evolutionary interpretation
+
+Linux networking historyの観点では両者を同じbranchに置く。
+
+``` text
+classic BPF
+    ↓
+eBPF
+    ↓
+BTF + CO-RE + tracing infrastructure
+    ↓
+kernel becomes dynamically introspectable
+    │
+    ├─────────────────────┐
+    ▼                     ▼
+  pwru                  Retis
+    │                     │
+discover broadly      correlate semantically
+    │                     │
+    └──────────┬──────────┘
+               ▼
+       packet journey debugging
+```
+
+これはmodern Linux networkingの重要な変化。
+
+``` text
+programmable datapath
+        ↓
+datapath complexity increases
+        ↓
+BPF/BTF-based observability
+        ↓
+tools can discover and explain
+the running kernel dynamically
+```
+
+つまりpwru/Retisはkernel networking featureそのものではないが、
+**eBPF/BTFによってLinux kernelが「実行中に探索可能なnetwork platform」へ
+変化したことを象徴するtools** と位置付けられる。
+
+### C.11 Conference provenance
+
+pwruについては特に以下をdesign/architecture evidenceとして扱う。
+
+-   FOSDEM 2024, Quentin Monnet: *Packet, where are you? Track in the
+    stack with pwru*
+-   Linux Plumbers Conference 2024: pwru architecture/evolution
+    presentation
+
+Retisについては前章の:
+
+-   OVSCon 2023
+-   OVS/OVN Conf 2024
+-   Red Hat Developer 2023--2025
+
+と対にして扱う。
+
+この組み合わせによりconference provenanceも:
+
+``` text
+FOSDEM/LPC
+   pwru generic kernel tracing
+          │
+          ├── eBPF/BTF foundation ──┐
+          │                         │
+OVSCon                              │
+   Retis OVS-aware correlation ─────┘
+          │
+          ▼
+Linux networking observability evolution
+```
+
+として整理できる。
+
+------------------------------------------------------------------------
+
+
+# Part V — Synthesis: v3.x → 7.x を一つの進化として見る
+
+## 13. v5.0 と 2026 を比較する
 
 ``` text
                      v5.0                    2026
@@ -2699,7 +2727,7 @@ async I/O             conventional     →      io_uring ZC TX/RX
 
 ------------------------------------------------------------------------
 
-# 14. Evolution map
+## 14. Evolution map
 
 ``` text
                     Linux v5.0
@@ -2737,7 +2765,7 @@ single network model ────→ multi-network / VM-aware networking
 
 ------------------------------------------------------------------------
 
-# 15. 読み方
+## 15. 読み方
 
 この後には、元の
 `linux-networking-lwn-change-log-2019-2026-unified-audited.md` を
@@ -2752,9 +2780,16 @@ single network model ────→ multi-network / VM-aware networking
 
 ------------------------------------------------------------------------
 
-# Research Appendix --- original audited material
 
-# Linux Networking Change Log --- LWN / Upstream Cross-Reference
+# Appendix — Research provenance and audit material
+
+ここから先は本文を支える調査資料である。LWN記事、upstream patch series、
+mainline commit、conference資料、status correction、completeness auditを保持する。
+
+本文を読むだけならこのAppendixを順番に読む必要はない。
+特定featureの根拠、commit、conference provenanceを確認するときに参照する。
+
+## Linux Networking Change Log --- LWN / Upstream Cross-Reference
 
 **対象期間:** 2019-05-07 ～ 2026-10-02\
 **対象:** Linux networking
@@ -2778,7 +2813,7 @@ documentation、upstream patch/commit history
 
 ------------------------------------------------------------------------
 
-## 1. Executive timeline
+### 1. Executive timeline
 
 Linux networking の 2019～2026
 年の変化は、大きく次の流れとして読むことができる。
@@ -2807,11 +2842,11 @@ Linux networking の 2019～2026
 
 ------------------------------------------------------------------------
 
-# 2. Release chronology
+## 2. Release chronology
 
-## 2019
+### 2019
 
-### Linux 5.2
+#### Linux 5.2
 
 **Tags:** `netdev`, `XDP`, `memory-management`, `high-speed-networking`
 
@@ -2827,7 +2862,7 @@ Linux networking の 2019～2026
 -   LWN feature: *Memory management for 400Gb/s interfaces*（LWN Kernel
     Index から参照）
 
-### Linux 5.3
+#### Linux 5.3
 
 **Tags:** `BPF`, `socket`, `TCP`, `IPv4`
 
@@ -2835,7 +2870,7 @@ Linux networking の 2019～2026
 filter/XDP program ではなく、socket behavior や TCP stack を
 programmable にする方向へ進む。
 
-### Linux 5.4
+#### Linux 5.4
 
 **Tags:** `BPF`, `XDP`, `TCP`, `SYN-cookie`
 
@@ -2844,9 +2879,9 @@ protection/load-balancing を BPF datapath 側へ寄せる流れの一部。
 
 ------------------------------------------------------------------------
 
-## 2020
+### 2020
 
-### Linux 5.6 --- BPF `struct_ops` / WireGuard
+#### Linux 5.6 --- BPF `struct_ops` / WireGuard
 
 **Tags:** `BPF`, `TCP`, `congestion-control`, `WireGuard`,
 `ethtool-netlink`
@@ -2884,7 +2919,7 @@ tcp_congestion_ops
 -   LWN: [The 5.6 kernel has been
     released](https://lwn.net/Articles/816213/)
 
-### Linux 5.7--5.8
+#### Linux 5.7--5.8
 
 **Tags:** `XDP`, `TC`, `tunnel`, `bridge`, `offload`
 
@@ -2892,7 +2927,7 @@ tcp_congestion_ops
 周辺の infrastructure が継続的に拡張された。後の AF_XDP multi-buffer や
 BIG TCP と合わせて読むとよい。
 
-### Linux 5.9 --- BPF socket lookup
+#### Linux 5.9 --- BPF socket lookup
 
 **Tags:** `BPF`, `socket`, `TCP`, `UDP`
 
@@ -2900,7 +2935,7 @@ BPF が TCP/UDP socket lookup に介入できる方向へ進展。container/serv
 datapath を iptables/nftables の NAT
 だけに依存せず実装する基礎の一つとなる。
 
-### Linux 5.10 --- MPTCP / BPF TCP options
+#### Linux 5.10 --- MPTCP / BPF TCP options
 
 **Tags:** `MPTCP`, `BPF`, `TCP-options`
 
@@ -2909,9 +2944,9 @@ processing の接点も増加した。
 
 ------------------------------------------------------------------------
 
-# 3. 2021--2022: zero-copy と BIG TCP
+## 3. 2021--2022: zero-copy と BIG TCP
 
-## Linux 5.11 --- TCP zero-copy receive
+### Linux 5.11 --- TCP zero-copy receive
 
 **Tags:** `TCP`, `zero-copy`, `performance`
 
@@ -2919,17 +2954,17 @@ TCP receive path で user-space への不要な copy
 を削減する系列が進む。このテーマは後に io_uring zero-copy RX と Device
 Memory TCP に発展する。
 
-## Linux 5.14--5.18
+### Linux 5.14--5.18
 
 **Tags:** `MPTCP`, `routing`, `TC`, `offload`, `BPF`
 
 MPTCP、routing、TC offload、BPF integration が継続的に改善された時期。
 
-## Linux 5.19 --- BIG TCP
+### Linux 5.19 --- BIG TCP
 
 **Tags:** `TCP`, `IPv6`, `GRO`, `GSO`, `performance`, `BIG-TCP`
 
-### Motivation
+#### Motivation
 
 高速 datapath では wire 上の MTU よりも、kernel 内部で一度に処理できる
 packet aggregate の大きさが CPU overhead に強く影響する。
@@ -2959,19 +2994,19 @@ many wire packets
 per-packet CPU overhead ↓
 ```
 
-### Mainline
+#### Mainline
 
 Linux 5.19 merge window で BIG TCP patch set が mainline 化されたことを
 LWN が明記している。
 
-### References
+#### References
 
 -   LWN: [5.19 Merge window, part 1](https://lwn.net/Articles/896140/)
 -   LWN feature: [Going big with TCP
     packets](https://lwn.net/Articles/884104/)
 -   LWN: [Linux 5.19 release status](https://lwn.net/Articles/903696/)
 
-### Follow-ups
+#### Follow-ups
 
 BIG TCP
 は単独の機能ではなく、後の以下の変更と組み合わせて見るべきである。
@@ -2988,9 +3023,9 @@ BIG TCP
 
 ------------------------------------------------------------------------
 
-# 4. 2023: AF_XDP multi-buffer と netkit
+## 4. 2023: AF_XDP multi-buffer と netkit
 
-## Linux 6.6 --- AF_XDP multi-buffer
+### Linux 6.6 --- AF_XDP multi-buffer
 
 **Tags:** `AF_XDP`, `XDP`, `multi-buffer`, `MPTCP`, `BPF`
 
@@ -3011,7 +3046,7 @@ AF_XDP が複数 buffer にまたがる packet を扱えるようになった。
 -   LWN: [The first half of the 6.6 merge
     window](https://lwn.net/Articles/942954/)
 
-## Linux 6.7 --- netkit
+### Linux 6.7 --- netkit
 
 **Tags:** `BPF`, `netkit`, `container`, `virtual-networking`
 
@@ -3059,14 +3094,14 @@ container / VM
 
 ------------------------------------------------------------------------
 
-# 5. 2024: Device Memory TCP
+## 5. 2024: Device Memory TCP
 
-## Linux 6.12 --- Device Memory TCP RX
+### Linux 6.12 --- Device Memory TCP RX
 
 **Tags:** `TCP`, `zero-copy`, `DMA-BUF`, `page_pool`, `device-memory`,
 `GPU`
 
-### Problem
+#### Problem
 
 通常の receive path では、device が最終 consumer であっても system RAM
 が中継点になりやすい。
@@ -3096,7 +3131,7 @@ device memory
 GPU / accelerator
 ```
 
-### Mainline
+#### Mainline
 
 LWN の 6.12 merge-window coverage は Device Memory TCP patch set の
 merge を明記している。
@@ -3109,7 +3144,7 @@ merge を明記している。
 -   Kernel docs: [Device Memory
     TCP](https://docs.kernel.org/networking/devmem.html)
 
-### Development history
+#### Development history
 
 Device Memory TCP は一回の patch submission で完成した機能ではない。2023
 年から RFC/patch series が繰り返され、page-pool、netmem、DMA-BUF、TCP
@@ -3127,9 +3162,9 @@ change log では revision をすべて列挙するのではなく、
 
 ------------------------------------------------------------------------
 
-# 6. 2025: zero-copy RX / RTNL / AccECN / DIBS
+## 6. 2025: zero-copy RX / RTNL / AccECN / DIBS
 
-## Linux 6.15 --- io_uring zero-copy RX
+### Linux 6.15 --- io_uring zero-copy RX
 
 **Tags:** `io_uring`, `zero-copy`, `RX`, `TCP`, `RTNL`, `BPF`
 
@@ -3148,7 +3183,7 @@ Linux 6.15 では initial zero-copy receive support が io_uring
     window](https://lwn.net/Articles/1015414/)
 -   LWN: [Linux 6.15 released](https://lwn.net/Articles/1022457/)
 
-### 系譜
+#### 系譜
 
 ``` text
 TCP zero-copy RX
@@ -3162,7 +3197,7 @@ io_uring ZC RX     page_pool/netmem
       device-memory networking
 ```
 
-## Linux 6.18 --- AccECN / UDP RX / DIBS
+### Linux 6.18 --- AccECN / UDP RX / DIBS
 
 **Tags:** `TCP`, `AccECN`, `UDP`, `DIBS`, `socket-buffer`, `PSP`
 
@@ -3179,22 +3214,22 @@ LWN が networking section で挙げている主要変更:
 -   LWN: [6.18 merge window, part 1](https://lwn.net/Articles/1040203/)
 -   LWN: [Linux 6.18 released](https://lwn.net/Articles/1048703/)
 
-### UDP performance の注意
+#### UDP performance の注意
 
 LWN の「47%」という数字は、あらゆる UDP workload が一律
 47%高速化するという意味ではない。packet size、CPU、load、benchmark
 method に依存する測定値として扱う必要がある。
 
-### DIBS
+#### DIBS
 
 DIBS は networking buffer ownership/sharing の overhead
 を削減する系列として、page_pool/netmem と合わせて追う価値がある。
 
 ------------------------------------------------------------------------
 
-# 7. 主要技術系列
+## 7. 主要技術系列
 
-## 7.1 GRO / GSO / BIG TCP
+### 7.1 GRO / GSO / BIG TCP
 
 ``` text
 GRO/GSO
@@ -3212,7 +3247,7 @@ BIG TCP (5.19)
 
 **Primary tags:** `TCP`, `GRO`, `GSO`, `BIG-TCP`, `AF_XDP`
 
-## 7.2 XDP / AF_XDP
+### 7.2 XDP / AF_XDP
 
 ``` text
 XDP
@@ -3225,7 +3260,7 @@ XDP
        └── netkit
 ```
 
-## 7.3 BPF networking
+### 7.3 BPF networking
 
 ``` text
 packet filter
@@ -3246,7 +3281,7 @@ socket lookup / MPTCP steering
 netkit / qdisc / richer network-stack programmability
 ```
 
-## 7.4 zero-copy / memory
+### 7.4 zero-copy / memory
 
 ``` text
 skb/page allocation optimization
@@ -3262,7 +3297,7 @@ skb/page allocation optimization
        └── Device Memory TCP
 ```
 
-## 7.5 TCP evolution
+### 7.5 TCP evolution
 
 主な追跡対象:
 
@@ -3273,7 +3308,7 @@ skb/page allocation optimization
 -   AccECN
 -   TCP authentication/encryption extensions
 
-## 7.6 UDP
+### 7.6 UDP
 
 主な追跡対象:
 
@@ -3283,7 +3318,7 @@ skb/page allocation optimization
 -   UDP-based transports
 -   tunnel/overlay datapath
 
-## 7.7 RTNL scalability
+### 7.7 RTNL scalability
 
 古典的な RTNL は networking configuration path の広範囲を serialize
 する。
@@ -3303,7 +3338,7 @@ skb/page allocation optimization
 
 大規模 container/network-namespace 環境ほど影響が大きい。
 
-## 7.8 netfilter / nftables / conntrack
+### 7.8 netfilter / nftables / conntrack
 
 この系列では以下を別途 commit-level で追跡する。
 
@@ -3313,7 +3348,7 @@ skb/page allocation optimization
 -   conntrack scalability / observability
 -   BPF と traditional netfilter datapath の役割分担
 
-## 7.9 virtual networking / VM
+### 7.9 virtual networking / VM
 
 追跡対象:
 
@@ -3327,7 +3362,7 @@ skb/page allocation optimization
 
 ------------------------------------------------------------------------
 
-# 8. Release matrix
+## 8. Release matrix
 
   ---------------------------------------------------------------------
   Kernel                             Networking topics to track
@@ -3425,7 +3460,7 @@ skb/page allocation optimization
 
 ------------------------------------------------------------------------
 
-# 9. LWN reading list --- core articles
+## 9. LWN reading list --- core articles
 
 以下は、この期間の Linux networking
 の技術史を追う「幹」として特に有用な記事群である。順位付けではなく、時系列の学習経路として並べている。
@@ -3452,9 +3487,9 @@ skb/page allocation optimization
 
 ------------------------------------------------------------------------
 
-# 10. Tag index
+## 10. Tag index
 
-## `BPF`
+### `BPF`
 
 -   5.3 socket/cgroup hooks
 -   5.4 XDP/TC integration
@@ -3465,7 +3500,7 @@ skb/page allocation optimization
 -   6.7 netkit
 -   6.15 network timestamp callbacks
 
-## `TCP`
+### `TCP`
 
 -   zero-copy RX
 -   BPF congestion control
@@ -3475,21 +3510,21 @@ skb/page allocation optimization
 -   `TCP_RTO_MAX_MS`
 -   AccECN
 
-## `UDP`
+### `UDP`
 
 -   GRO/GSO
 -   high packet-rate receive optimization
 -   receive-buffer sizing
 -   UDP-based tunnel/transport work
 
-## `XDP` / `AF_XDP`
+### `XDP` / `AF_XDP`
 
 -   XDP buffer infrastructure
 -   AF_XDP
 -   AF_XDP multi-buffer
 -   netkit/BPF datapath
 
-## `zero-copy`
+### `zero-copy`
 
 -   TCP zero-copy
 -   io_uring zero-copy TX
@@ -3497,7 +3532,7 @@ skb/page allocation optimization
 -   Device Memory TCP
 -   DIBS
 
-## `virtual-networking`
+### `virtual-networking`
 
 -   veth
 -   tunnel/overlay
@@ -3507,7 +3542,7 @@ skb/page allocation optimization
 
 ------------------------------------------------------------------------
 
-# 11. Commit-level research status
+## 11. Commit-level research status
 
 この文書では commit hash を「それらしい hash」で埋めず、upstream tree /
 lore で照合できたものだけを確定情報として追加する。
@@ -3561,7 +3596,7 @@ Tags:
 
 ------------------------------------------------------------------------
 
-# 12. Sources / entry points
+## 12. Sources / entry points
 
 -   [LWN Kernel Index](https://lwn.net/Kernel/Index/)
 -   [LWN 5.2 first-half merge window](https://lwn.net/Articles/787963/)
@@ -3584,7 +3619,7 @@ Tags:
 
 ------------------------------------------------------------------------
 
-## Notes on completeness
+### Notes on completeness
 
 この change log は「LWN の記事タイトル一覧」ではなく、2019-05-07 以降の
 Linux networking
@@ -3597,14 +3632,14 @@ commit-level の項目は upstream で確認できたものから順次追加し
 
 ------------------------------------------------------------------------
 
-# 13. Commit-level history --- verified entries
+## 13. Commit-level history --- verified entries
 
 この章では、upstream patch archive / git history で commit ID
 まで確認できた系列を記録する。 短縮 hash
 だけが一次資料に掲載されている場合は短縮形をそのまま記載し、推測で full
 hash に展開しない。
 
-## 13.1 BIG TCP --- Linux 5.19
+### 13.1 BIG TCP --- Linux 5.19
 
 **Feature:** BIG TCP (initial IPv6 support)\
 **Kernel:** Linux 5.19\
@@ -3612,7 +3647,7 @@ hash に展開しない。
 **Primary motivation:** 64KiB を超える kernel-internal GRO/GSO aggregate
 を利用し、高速 TCP datapath の per-packet overhead を削減する。
 
-### Mainline evidence
+#### Mainline evidence
 
 5.19 の networking pull request は、IPv6 Jumbogram extension header
 を利用して 64KiB より大きな TCPv6 GSO super-segment
@@ -3623,7 +3658,7 @@ hash に展開しない。
 -   LWN feature: https://lwn.net/Articles/884104/
 -   LWN 5.19 merge-window coverage: https://lwn.net/Articles/896140/
 
-### Verified commits
+#### Verified commits
 
 後続の upstream/stable fix history から、少なくとも以下の initial BIG
 TCP commits を 確実に逆参照できる。
@@ -3641,7 +3676,7 @@ TCP commits を 確実に逆参照できる。
 > commit」と 解釈してはいけない。series 全体の exact commit list
 > は引き続き upstream tree と patch archive を照合する。
 
-### Later evolution
+#### Later evolution
 
 -   IPv4 BIG TCP
 -   GRO validation / HBH handling の再設計
@@ -3650,7 +3685,7 @@ TCP commits を 確実に逆参照できる。
 
 ------------------------------------------------------------------------
 
-## 13.2 AF_XDP multi-buffer --- Linux 6.6
+### 13.2 AF_XDP multi-buffer --- Linux 6.6
 
 **Feature:** AF_XDP multi-buffer RX/TX\
 **Kernel:** Linux 6.6\
@@ -3658,7 +3693,7 @@ TCP commits を 確実に逆参照できる。
 support\
 **Patch series:** `[PATCH v7 bpf-next 00/24] xsk: multi-buffer support`
 
-### Development
+#### Development
 
 v7 series は 24 patches から構成され、core AF_XDP support、zero-copy、
 driver support、documentation/selftests をまとめて導入した。
@@ -3667,7 +3702,7 @@ Patch series:
 
 -   https://lists.openwall.net/netdev/2023/07/19/282
 
-### Verified core commits
+#### Verified core commits
 
   ----------------------------------------------------------------------------------------------------
   Commit                                       Role
@@ -3689,7 +3724,7 @@ Acceptance record:
 
 -   https://lists.openwall.net/netdev/2023/07/19/358
 
-### Architecture
+#### Architecture
 
 ``` text
 従来 AF_XDP:
@@ -3712,7 +3747,7 @@ one packet
 これにより jumbo frame や大きな packet representation を AF_XDP
 で扱いやすくなる。
 
-### Important files
+#### Important files
 
 -   `net/xdp/xsk.c`
 -   `net/xdp/xsk_buff_pool.c`
@@ -3721,21 +3756,21 @@ one packet
 -   `Documentation/networking/af_xdp.rst`
 -   `Documentation/netlink/specs/netdev.yaml`
 
-### Follow-up / maintenance evidence
+#### Follow-up / maintenance evidence
 
 2026 年の修正でも `Fixes: cf24f5a5feea` が使われており、TX multi-buffer
 introduction point を独立に確認できる。
 
 ------------------------------------------------------------------------
 
-## 13.3 netkit --- Linux 6.7
+### 13.3 netkit --- Linux 6.7
 
 **Feature:** BPF-programmable `netkit` virtual network device\
 **Kernel:** Linux 6.7\
 **Author:** Daniel Borkmann\
 **Subsystem:** BPF / virtual networking / container datapath
 
-### Development
+#### Development
 
 merge 直前の series:
 
@@ -3743,7 +3778,7 @@ merge 直前の series:
 -   Date: 2023-10-24
 -   Patch: https://lists.openwall.net/netdev/2023/10/24/365
 
-### Verified mainline commit
+#### Verified mainline commit
 
 `35dfaad7188cdc043fde31709c796f5a692ba2bd`
 
@@ -3758,7 +3793,7 @@ netkit, bpf: Add bpf programmable net device
 に近づけること、 さらに物理 device へ直接 redirect する場合に per-CPU
 backlog queue を経由しない ことが目的として説明されている。
 
-### Datapath implication
+#### Datapath implication
 
 ``` text
 veth-centric:
@@ -3787,14 +3822,14 @@ direct redirect
 NIC
 ```
 
-### References
+#### References
 
 -   LWN: https://lwn.net/Articles/949960/
 -   v4 patch: https://lists.openwall.net/netdev/2023/10/24/365
 -   commit mirror:
     https://git.zx2c4.com/linux-rng/commit/?id=35dfaad7188cdc043fde31709c796f5a692ba2bd
 
-### Follow-ups
+#### Follow-ups
 
 2026 年には netkit queue leasing と io_uring zero-copy RX の integration
 が進み、 network namespace 内の guest/VM datapath
@@ -3802,14 +3837,14 @@ NIC
 
 ------------------------------------------------------------------------
 
-## 13.4 Device Memory TCP RX --- Linux 6.12
+### 13.4 Device Memory TCP RX --- Linux 6.12
 
 **Feature:** Device Memory TCP receive\
 **Kernel:** Linux 6.12\
 **Authors:** Mina Almasry, Willem de Bruijn et al.\
 **Subsystem:** TCP / netdev / DMA-BUF / page-pool / device memory
 
-### Mainline state
+#### Mainline state
 
 Linux kernel documentation は Device Memory TCP を、TCP socket
 で受信した data を DMA-BUF-backed device memory
@@ -3819,7 +3854,7 @@ Linux kernel documentation は Device Memory TCP を、TCP socket
     https://kernel.org/doc/html/latest/networking/devmem.html
 -   LWN 6.12 merge window: https://lwn.net/Articles/990750/
 
-### Architecture
+#### Architecture
 
 ``` text
 traditional device-to-device transfer
@@ -3847,7 +3882,7 @@ DMA-BUF / device memory
 accelerator / GPU / SSD-side consumer
 ```
 
-### Source areas
+#### Source areas
 
 Current upstream tree contains Device Memory TCP infrastructure
 including:
@@ -3858,7 +3893,7 @@ including:
 -   TCP receive-side APIs
 -   `Documentation/networking/devmem.rst`
 
-### Commit verification status
+#### Commit verification status
 
 6.12 への feature merge 自体と source/documentation は確認済み。 ただし
 RX series は多数の preparatory commits に分割されているため、
@@ -3868,7 +3903,7 @@ RX series は多数の preparatory commits に分割されているため、
 
 ------------------------------------------------------------------------
 
-## 13.5 Device Memory TCP TX --- Linux 6.16
+### 13.5 Device Memory TCP TX --- Linux 6.16
 
 **Feature:** Device Memory TCP transmit\
 **Kernel:** Linux 6.16\
@@ -3878,7 +3913,7 @@ RX support は 6.12 に入ったが、TX support は review を分離して後�
 series となった。 2025-05 時点で TX patch set は net-next に queue
 され、6.16 cycle 向けとなった。
 
-### Significance
+#### Significance
 
 ``` text
 RX (6.12)
@@ -3891,7 +3926,7 @@ device memory → NIC → network
 これにより Device Memory TCP は device memory を network endpoint の
 data buffer として双方向に利用する方向へ進んだ。
 
-### Verification status
+#### Verification status
 
 -   RX が 6.12、TX が 6.16 という release separation は確認済み。
 -   TX series は多数 revision を経ている。
@@ -3899,7 +3934,7 @@ data buffer として双方向に利用する方向へ進んだ。
 
 ------------------------------------------------------------------------
 
-# 14. Verification rules used in this document
+## 14. Verification rules used in this document
 
 commit-level 情報は次の優先順位で検証する。
 
@@ -3915,7 +3950,7 @@ commit とみなさない。
 
 ------------------------------------------------------------------------
 
-# 15. Next commit-level passes
+## 15. Next commit-level passes
 
 次に同じ方法で以下を追加する。
 
@@ -3932,9 +3967,9 @@ commit とみなさない。
 
 ------------------------------------------------------------------------
 
-# 16. Commit-level pass 2 --- memory providers, io_uring ZC RX, RTNL, AccECN, DIBS
+## 16. Commit-level pass 2 --- memory providers, io_uring ZC RX, RTNL, AccECN, DIBS
 
-## 16.1 `page_pool` → `netmem` abstraction
+### 16.1 `page_pool` → `netmem` abstraction
 
 **Subsystem:** netdev memory management / XDP / page_pool\
 **Role:** Device Memory TCP と io_uring zero-copy RX の共通基盤
@@ -3956,7 +3991,7 @@ commit とみなさない。
 
 LWN archive: https://lwn.net/Articles/919663/
 
-### Device Memory TCP との接続
+#### Device Memory TCP との接続
 
 Device Memory TCP RFC v5 は major change として明示的に:
 
@@ -3988,14 +4023,14 @@ Device Memory TCP   io_uring ZC RX
 
 ------------------------------------------------------------------------
 
-## 16.2 io_uring zero-copy RX --- Linux 6.15
+### 16.2 io_uring zero-copy RX --- Linux 6.15
 
 **Feature:** io_uring zero-copy network receive\
 **Kernel:** Linux 6.15\
 **Authors:** David Wei et al.（mainline に至る系列）\
 **Subsystem:** io_uring / netdev / page_pool / netmem / TCP/UDP
 
-### Long development history
+#### Long development history
 
 zero-copy RX + io_uring の試み自体は 2022 年以前から存在する。
 
@@ -4022,7 +4057,7 @@ zero-copy RX + io_uring の試み自体は 2022 年以前から存在する。
 -   2025-02: net-next v13
     -   https://lwn.net/Articles/1008076/
 
-### Important architectural change
+#### Important architectural change
 
 RFC v4 以降、Device Memory TCP と共通 infrastructure
 を使う方向へ統合された。 v9 の changelog は、merged `net_iov + netmem`
@@ -4055,7 +4090,7 @@ NIC ──┘ DMA directly
 socket `read` は payload copy ではなく「どの userspace memory に data
 があるか」を 通知する操作へ近づく。
 
-### Mainline
+#### Mainline
 
 Linux 6.15 merge-window coverage は initial zero-copy reception via
 io_uring の merge を 明記している。
@@ -4063,7 +4098,7 @@ io_uring の merge を 明記している。
 -   https://lwn.net/Articles/1015414/
 -   release: https://lwn.net/Articles/1022457/
 
-### Relationship to Device Memory TCP
+#### Relationship to Device Memory TCP
 
 v13 patch description 自身が、
 
@@ -4089,7 +4124,7 @@ v13 patch description 自身が、
 
 ------------------------------------------------------------------------
 
-## 16.3 RTNL lock breakup / per-netns RTNL
+### 16.3 RTNL lock breakup / per-netns RTNL
 
 **Subsystem:** network-device configuration / scalability\
 **Primary issue:** global RTNL contention
@@ -4106,7 +4141,7 @@ container/network-namespace
 数が増えるほど、互いに独立しているはずの操作まで global lock
 上で競合する。
 
-### Linux 6.13
+#### Linux 6.13
 
 6.13 には RTNL を per-network-namespace lock にする work が入り、
 namespace-heavy workload の contention 削減を狙った。
@@ -4116,14 +4151,14 @@ namespace-heavy workload の contention 削減を狙った。
 
 LWN: https://lwn.net/Articles/998990/
 
-### Linux 6.15
+#### Linux 6.15
 
 6.15 でも RTNL breakup は継続しており、LWN はこれを "big networking
 lock" の contention bottleneck 解消作業として記録している。
 
 LWN: https://lwn.net/Articles/1015414/
 
-### Architecture direction
+#### Architecture direction
 
 ``` text
 global RTNL
@@ -4144,7 +4179,7 @@ commits に またがるため、単一 introduction commit として扱わな�
 
 ------------------------------------------------------------------------
 
-## 16.4 AccECN --- Linux 6.18 onward
+### 16.4 AccECN --- Linux 6.18 onward
 
 **Feature:** Accurate Explicit Congestion Notification\
 **Subsystem:** TCP / congestion signaling
@@ -4172,7 +4207,7 @@ AccECN は複数 release にまたがって deployment/default behavior
 
 ------------------------------------------------------------------------
 
-## 16.5 UDP receive-path optimization --- Linux 6.18
+### 16.5 UDP receive-path optimization --- Linux 6.18
 
 **Subsystem:** UDP / receive path / performance
 
@@ -4181,7 +4216,7 @@ performance 47% improvement が報告されている。
 
 LWN: https://lwn.net/Articles/1040203/
 
-### Interpretation warning
+#### Interpretation warning
 
 この `47%` は Linux UDP stack が全 workload で
 47%高速化したという意味ではない。 packet size、CPU、queue
@@ -4192,7 +4227,7 @@ commit-level change log では performance number と mechanism
 
 ------------------------------------------------------------------------
 
-## 16.6 Direct Internal Buffer Sharing (DIBS) --- Linux 6.18
+### 16.6 Direct Internal Buffer Sharing (DIBS) --- Linux 6.18
 
 **Feature:** Direct Internal Buffer Sharing\
 **Subsystem:** networking / shared-memory transports / s390 / SMC-D
@@ -4217,7 +4252,7 @@ v3:
 
 -   https://lwn.net/Articles/1040203/
 
-### Important correction to earlier classification
+#### Important correction to earlier classification
 
 以前の章では DIBS を `page_pool → netmem → DIBS`
 のように一続きに見える形で 記載していたが、これは技術的には粗すぎる。
@@ -4249,7 +4284,7 @@ ISM / SMC-D
 
 ------------------------------------------------------------------------
 
-# 17. Updated architecture map
+## 17. Updated architecture map
 
 今回の upstream 照合を反映すると、memory/zero-copy
 系列は以下のように整理するのが より正確。
@@ -4287,7 +4322,7 @@ ISM / SMC-D
 
 ------------------------------------------------------------------------
 
-# 18. Next commit-level pass
+## 18. Next commit-level pass
 
 残る優先系列:
 
@@ -4303,16 +4338,16 @@ ISM / SMC-D
 
 ------------------------------------------------------------------------
 
-# 19. Commit-level pass 3 --- io_uring ZC TX, BPF struct_ops, MPTCP/BPF, nftables/flowtable
+## 19. Commit-level pass 3 --- io_uring ZC TX, BPF struct_ops, MPTCP/BPF, nftables/flowtable
 
-## 19.1 io_uring zero-copy TX
+### 19.1 io_uring zero-copy TX
 
 **Subsystem:** io_uring / socket send path / `MSG_ZEROCOPY`
 infrastructure\
 **Mainline generation:** Linux 6.0 era\
 **Primary author:** Pavel Begunkov
 
-### Development timeline
+#### Development timeline
 
 -   2021-11-30: `[RFC 00/12] io_uring zerocopy send`
     -   https://lwn.net/Articles/877167/
@@ -4329,7 +4364,7 @@ infrastructure\
     per-request completion notifications.
     -   https://lwn.net/Articles/906803/
 
-### Design
+#### Design
 
 Normal send:
 
@@ -4366,7 +4401,7 @@ The v3 series identifies two networking-side changes in particular:
 2.  avoiding page-reference overhead for registered buffers where
     possible.
 
-### Mainline evidence
+#### Mainline evidence
 
 Linux 6.0 stable history contains fixes for the newly introduced
 io_uring ZC send path, including:
@@ -4376,7 +4411,7 @@ io_uring ZC send path, including:
 
 This places the first mainline generation in the Linux 6.0 timeframe.
 
-### Relationship to later ZC RX
+#### Relationship to later ZC RX
 
 TX and RX are related goals but architecturally different:
 
@@ -4393,12 +4428,12 @@ and memory-provider infrastructure shared with Device Memory TCP.
 
 ------------------------------------------------------------------------
 
-## 19.2 BPF `struct_ops` and TCP congestion control --- Linux 5.6
+### 19.2 BPF `struct_ops` and TCP congestion control --- Linux 5.6
 
 **Subsystem:** BPF / TCP congestion control\
 **Primary author:** Martin KaFai Lau
 
-### Development
+#### Development
 
 The BPF STRUCT_OPS series explicitly states that its first use case is
 implementing `struct tcp_congestion_ops` in BPF.
@@ -4412,7 +4447,7 @@ Important revisions:
 -   LWN feature: *Kernel operations structures in BPF*
     -   https://lwn.net/Articles/811631/
 
-### Architecture
+#### Architecture
 
 ``` text
 traditional:
@@ -4441,7 +4476,7 @@ This is an important transition in BPF networking: BPF is no longer only
 attached at packet/socket hooks; it can implement selected kernel
 operation tables.
 
-### Why it matters
+#### Why it matters
 
 The cover letter gives the motivation as combining faster algorithm
 iteration with the kernel's existing TCP stack, rather than moving
@@ -4452,7 +4487,7 @@ control, including network scheduling/qdisc-related experimentation.
 
 ------------------------------------------------------------------------
 
-## 19.3 MPTCP + BPF
+### 19.3 MPTCP + BPF
 
 **Subsystem:** MPTCP / socket selection / BPF
 
@@ -4479,7 +4514,7 @@ selection and MPTCP subflow behavior. Linux 6.6 is an important point in
 this lineage, with BPF support around protocol switching/selection and
 MPTCP use cases appearing in the merge-window work.
 
-### Classification rule
+#### Classification rule
 
 MPTCP changes are split into:
 
@@ -4490,7 +4525,7 @@ MPTCP changes are split into:
 This avoids treating every MPTCP bug fix or protocol extension as a
 separate architecture-level change.
 
-### Commit verification status
+#### Commit verification status
 
 The BPF/MPTCP work spans multiple hooks and commits. Exact individual
 hashes are left for a dedicated MPTCP pass rather than assigning one
@@ -4498,7 +4533,7 @@ commit as "the MPTCP+BPF commit".
 
 ------------------------------------------------------------------------
 
-## 19.4 Netfilter flowtable and hardware offload --- Linux 5.3 onward
+### 19.4 Netfilter flowtable and hardware offload --- Linux 5.3 onward
 
 **Subsystem:** netfilter / nftables / flowtable / NIC offload\
 **Primary contributor in the initial series:** Pablo Neira Ayuso
@@ -4514,7 +4549,7 @@ LWN:
 -   *Accelerating netfilter with hardware offload, part 2* --- indexed
     by LWN Kernel Index
 
-### Architecture
+#### Architecture
 
 ``` text
 without flow offload
@@ -4548,7 +4583,7 @@ Hardware typically supplies parser/classifier/action capabilities. The
 kernel work also had to reduce duplication among previously separate TC,
 ethtool, and netfilter offload paths.
 
-### Userspace milestone
+#### Userspace milestone
 
 nftables 0.9.9 (2021) exposed a flowtable `offload` flag to enable the
 hardware fast path.
@@ -4567,7 +4602,7 @@ Archive: https://lwn.net/Articles/857369/
 
 ------------------------------------------------------------------------
 
-## 19.5 nftables 1.0 --- 2021
+### 19.5 nftables 1.0 --- 2021
 
 **Subsystem:** netfilter / packet filtering / userspace ABI
 
@@ -4578,7 +4613,7 @@ machine and rule representation.
 
 LWN feature: https://lwn.net/Articles/867185/
 
-### Why it belongs in a kernel-networking change log
+#### Why it belongs in a kernel-networking change log
 
 The version number itself is userspace, but it marks the maturation of
 kernel/userspace nftables interfaces that had accumulated features such
@@ -4596,7 +4631,7 @@ milestone**, not as a single kernel commit.
 
 ------------------------------------------------------------------------
 
-# 20. Refined networking evolution map
+## 20. Refined networking evolution map
 
 The additional research makes it useful to separate three kinds of "fast
 path":
@@ -4637,7 +4672,7 @@ simply under "zero-copy" or "offload".
 
 ------------------------------------------------------------------------
 
-# 21. Next commit-level pass
+## 21. Next commit-level pass
 
 Remaining high-priority series:
 
@@ -4654,9 +4689,9 @@ Remaining high-priority series:
 
 ------------------------------------------------------------------------
 
-# 22. Commit-level pass 4 --- conntrack / GC / timeout / flowtable
+## 22. Commit-level pass 4 --- conntrack / GC / timeout / flowtable
 
-## 22.1 Scope
+### 22.1 Scope
 
 Conntrack は 2019--2026 の間に「一度の大規模
 rewrite」が入ったわけではない。 重要な変更は次の軸に分散している。
@@ -4681,7 +4716,7 @@ rewrite」が入ったわけではない。 重要な変更は次の軸に分散
 
 ------------------------------------------------------------------------
 
-## 22.2 2019 --- bridge conntrack
+### 22.2 2019 --- bridge conntrack
 
 2019 年には bridge datapath に connection tracking support
 を追加する系列が投稿された。
@@ -4706,7 +4741,7 @@ infrastructure として 使う方向を示す。
 
 ------------------------------------------------------------------------
 
-## 22.3 Conntrack timeout model
+### 22.3 Conntrack timeout model
 
 Current kernel documentation exposes protocol-specific defaults
 including:
@@ -4731,7 +4766,7 @@ flowtable entry が age out すると connection は classic conntrack path
 Kernel documentation:
 https://static.lwn.net/kerneldoc/networking/nf_conntrack-sysctl.html
 
-### Important distinction
+#### Important distinction
 
 ``` text
 conntrack timeout
@@ -4750,7 +4785,7 @@ flowtable timeout
 
 ------------------------------------------------------------------------
 
-## 22.4 2022 --- BPF can manipulate conntrack lifecycle
+### 22.4 2022 --- BPF can manipulate conntrack lifecycle
 
 2022-07 の v7 series は BPF/XDP/TC 側から conntrack を操作するための
 kfunc を拡張した。
@@ -4766,7 +4801,7 @@ bpf_ct_{set,change}_timeout()
 bpf_ct_{set,change}_status()
 ```
 
-### Significance
+#### Significance
 
 従来:
 
@@ -4798,7 +4833,7 @@ lifecycle の一部を programmable にできる方向へ進んだ。
 
 ------------------------------------------------------------------------
 
-## 22.5 2022 --- delayed TCP packets and timeout refresh semantics
+### 22.5 2022 --- delayed TCP packets and timeout refresh semantics
 
 Florian Westphal の 2022 series は、すでに ACK 済みの非常に遅れた TCP
 packet を conntrack がどう扱うべきかを修正した。
@@ -4831,7 +4866,7 @@ entry の expiry を延長する」ことが同義ではない好例。
 
 ------------------------------------------------------------------------
 
-## 22.6 UDP NEW offload and early-drop interaction
+### 22.6 UDP NEW offload and early-drop interaction
 
 UDP NEW connection を `act_ct`/flow offload へ載せる work では、
 conntrack table pressure 時の **early drop** と offloaded entry
@@ -4866,7 +4901,7 @@ table pressure
 
 ------------------------------------------------------------------------
 
-## 22.7 2024 --- conntrack userspace observability
+### 22.7 2024 --- conntrack userspace observability
 
 `libnetfilter_conntrack 1.1.0` では conntrack dump/flush filtering
 が改善され、 ctnetlink event BPF filtering も IPv6/zone matching
@@ -4879,7 +4914,7 @@ userspace から 観測・操作する API evolution として記録する。
 
 ------------------------------------------------------------------------
 
-## 22.8 2025 --- per-network-namespace conntrack hash-table RFC
+### 22.8 2025 --- per-network-namespace conntrack hash-table RFC
 
 2025-11 の RFC は conntrack hash table を global から per-netns
 に移すことを提案した。
@@ -4897,7 +4932,7 @@ Archive: https://lwn.net/Articles/1045157/
 -   non-init netns から resize を可能にする
 -   NAT bysource hash も per-netns 化
 
-### Motivation
+#### Motivation
 
 従来:
 
@@ -4927,7 +4962,7 @@ netns C ── conntrack hash C
 
 ------------------------------------------------------------------------
 
-## 22.9 2026 --- custom conntrack timeout policy lifetime
+### 22.9 2026 --- custom conntrack timeout policy lifetime
 
 2026-06 の `cttimeout` series は custom timeout policy の
 lifetime/refcount handling を 整理する。
@@ -4952,7 +4987,7 @@ Patch: https://lwn.net/Articles/1076158/
 
 ------------------------------------------------------------------------
 
-## 22.10 2026 --- flowtable GC partial-state race
+### 22.10 2026 --- flowtable GC partial-state race
 
 2026-08 の fix は、flow entry が hash table に publish された後、
 hardware-offload setup が完全に終わる前に GC が entry を観測できる狭い
@@ -4984,7 +5019,7 @@ NF_FLOW_CONFIRMED
 
 ------------------------------------------------------------------------
 
-## 22.11 2026 --- stale `skb->_nfct` revalidation
+### 22.11 2026 --- stale `skb->_nfct` revalidation
 
 TC/clsact/pedit など kernel 内で packet header が変更された場合、 skb
 にすでに付いている conntrack reference と現在の L3/L4 header
@@ -5014,7 +5049,7 @@ revalidate tuple/protocol
 
 ------------------------------------------------------------------------
 
-# 23. Conntrack GC / expiry model --- conceptual notes
+## 23. Conntrack GC / expiry model --- conceptual notes
 
 conntrack expiry を考えるとき、少なくとも次を分ける必要がある。
 
@@ -5066,7 +5101,7 @@ boundary を 通常 workload よりはるかに高頻度で踏むため、GC/ref
 
 ------------------------------------------------------------------------
 
-# 24. Conntrack-related source map
+## 24. Conntrack-related source map
 
 主な追跡対象:
 
@@ -5095,7 +5130,7 @@ net/bridge/netfilter/nf_conntrack_bridge.c
 
 ------------------------------------------------------------------------
 
-# 25. Next pass
+## 25. Next pass
 
 次の commit-level pass は以下を優先する。
 
@@ -5116,9 +5151,9 @@ net/bridge/netfilter/nf_conntrack_bridge.c
 
 ------------------------------------------------------------------------
 
-# 26. Commit-level pass 5 --- BIG TCP evolution, virtio-net/AF_XDP, netkit/KubeVirt
+## 26. Commit-level pass 5 --- BIG TCP evolution, virtio-net/AF_XDP, netkit/KubeVirt
 
-## 26.1 BIG TCP: IPv6 → IPv4 → tunnel/overlay
+### 26.1 BIG TCP: IPv6 → IPv4 → tunnel/overlay
 
 BIG TCP の発展は次の3段階に分けると理解しやすい。
 
@@ -5135,7 +5170,7 @@ IPv4 BIG TCP
 BIG TCP through VXLAN / GENEVE
 ```
 
-### Linux 5.19 --- initial IPv6 BIG TCP
+#### Linux 5.19 --- initial IPv6 BIG TCP
 
 初期 BIG TCP は IPv6 jumbogram の仕組みを利用し、64KiB を超える
 kernel-internal TCP/GSO packet を扱えるようにした。
@@ -5143,7 +5178,7 @@ kernel-internal TCP/GSO packet を扱えるようにした。
 この時点では IPv6-specific な仕組み、特に Hop-by-Hop (HBH) header
 を利用する 実装上の制約が残っていた。
 
-### Linux 6.3 --- IPv4 BIG TCP
+#### Linux 6.3 --- IPv4 BIG TCP
 
 Xin Long の IPv4 series は v2/v3 で 10 patches。
 
@@ -5163,7 +5198,7 @@ Linux 6.3 release note は IPv4 BIG TCP support を significant change
 
 -   https://lwn.net/Articles/929851/
 
-### IPv4 BIG TCP patch structure
+#### IPv4 BIG TCP patch structure
 
 系列には以下が含まれる。
 
@@ -5204,7 +5239,7 @@ length は16bitに収まる」と仮定していた複数 subsystem を BIG TCP-
 
 ------------------------------------------------------------------------
 
-## 26.2 2026 --- BIG TCP without IPv6 HBH
+### 26.2 2026 --- BIG TCP without IPv6 HBH
 
 Alice Mikityanska の 2026 series は IPv6 BIG TCP の設計を IPv4
 に近づけるため、 BIG TCP 用 Hop-by-Hop header を除去する。
@@ -5215,7 +5250,7 @@ Important revision:
 -   2026-02-02
 -   https://lwn.net/Articles/1057080/
 
-### Why remove HBH?
+#### Why remove HBH?
 
 従来:
 
@@ -5262,7 +5297,7 @@ BIG-TCP-specific `jumbo_remove` processing を除去する。
 
 ------------------------------------------------------------------------
 
-## 26.3 Linux 7.3 --- BIG TCP over VXLAN / GENEVE
+### 26.3 Linux 7.3 --- BIG TCP over VXLAN / GENEVE
 
 2026 年の follow-up series:
 
@@ -5278,7 +5313,7 @@ Linux 7.3 merge-window coverage は、
 
 -   https://lwn.net/Articles/1089791/
 
-### Patch architecture
+#### Patch architecture
 
 v9 series:
 
@@ -5294,7 +5329,7 @@ BIG TCP UDP tunnel では oversized internal UDP packet の length field に
 通常の16bit表現をそのまま使えないため、`len=0` handling と validation
 が重要になる。
 
-### Evolution
+#### Evolution
 
 ``` text
 IPv6 BIG TCP (5.19)
@@ -5320,9 +5355,9 @@ BIG TCP through UDP tunnel
 
 ------------------------------------------------------------------------
 
-# 27. virtio-net and AF_XDP zero-copy
+## 27. virtio-net and AF_XDP zero-copy
 
-## 27.1 Why virtio-net is special
+### 27.1 Why virtio-net is special
 
 物理 NIC driver の AF_XDP zero-copy は比較的直接的である。
 
@@ -5362,7 +5397,7 @@ guest
 
 ------------------------------------------------------------------------
 
-## 27.2 2023 --- initial large AF_XDP zero-copy series
+### 27.2 2023 --- initial large AF_XDP zero-copy series
 
 Xuan Zhuo の初期 series:
 
@@ -5380,7 +5415,7 @@ Xuan Zhuo の初期 series:
 
 ------------------------------------------------------------------------
 
-## 27.3 2024 --- series decomposition
+### 27.3 2024 --- series decomposition
 
 2024 年には series を分割し、preparatory work と TX zero-copy を段階的に
 review する形へ移行した。
@@ -5403,7 +5438,7 @@ TX-specific series:
 -   2024-08-20
 -   https://lwn.net/Articles/986516/
 
-### Important design constraint
+#### Important design constraint
 
 virtio-net は AF_XDP 専用に queue 数を自由に増やせないため、 AF_XDP と
 kernel networking が queue を共有する設計が必要になる。
@@ -5413,7 +5448,7 @@ driver にはない virtio-specific な問題もある。
 
 ------------------------------------------------------------------------
 
-## 27.4 2025 --- zero-copy multi-buffer XDP with mergeable buffers
+### 27.4 2025 --- zero-copy multi-buffer XDP with mergeable buffers
 
 RFC v2:
 
@@ -5446,9 +5481,9 @@ multi-buffer XDP
 
 ------------------------------------------------------------------------
 
-# 28. netkit queue leasing --- physical queue into a network namespace
+## 28. netkit queue leasing --- physical queue into a network namespace
 
-## 28.1 Problem
+### 28.1 Problem
 
 container/VM が network namespace 内にある場合、通常は host physical NIC
 の queue を直接 reconfigure できない。
@@ -5469,7 +5504,7 @@ container / VM netns
 
 ------------------------------------------------------------------------
 
-## 28.2 Queue leasing
+### 28.2 Queue leasing
 
 Daniel Borkmann の 2026 netkit series は **queue leasing** を導入する。
 
@@ -5510,7 +5545,7 @@ ifindex + queue_id
 
 を指定し、operation は underlying physical queue へ proxy される。
 
-### Tested hardware
+#### Tested hardware
 
 series description では少なくとも以下で testing したと記載されている。
 
@@ -5519,7 +5554,7 @@ series description では少なくとも以下で testing したと記載され�
 
 ------------------------------------------------------------------------
 
-# 29. Why this matters to KubeVirt
+## 29. Why this matters to KubeVirt
 
 2026 LSFMM+BPF summit の LWN report は KubeVirt を具体的な use case
 として挙げている。
@@ -5581,7 +5616,7 @@ packet reception を提供できる段階まで進んだと報告している。
 
 ------------------------------------------------------------------------
 
-# 30. Combined VM/networking evolution
+## 30. Combined VM/networking evolution
 
 今回までの調査を統合すると、VM/container datapath
 は次のような流れになる。
@@ -5646,7 +5681,7 @@ physical NIC RX queue
 
 ------------------------------------------------------------------------
 
-# 31. Cross-series relationship
+## 31. Cross-series relationship
 
 ``` text
 GRO/GSO
@@ -5695,7 +5730,7 @@ page_pool
 
 ------------------------------------------------------------------------
 
-# 32. Verification status and next pass
+## 32. Verification status and next pass
 
 今回確認できた release-level facts:
 
@@ -5719,9 +5754,9 @@ page_pool
 
 ------------------------------------------------------------------------
 
-# 33. Commit-level pass 6 --- AccECN, UDP RX, RTNL, MPTCP/BPF
+## 33. Commit-level pass 6 --- AccECN, UDP RX, RTNL, MPTCP/BPF
 
-## 33.1 AccECN core --- Linux 6.18
+### 33.1 AccECN core --- Linux 6.18
 
 **Feature:** Accurate Explicit Congestion Notification (AccECN)\
 **Core merge:** Linux 6.18\
@@ -5730,7 +5765,7 @@ page_pool
 **Primary development lineage:** Ilpo Järvinen's earlier AccECN work,
 later upstreamed/reworked by Chia-Yu Chang and reviewers.
 
-### Why AccECN exists
+#### Why AccECN exists
 
 Classic RFC3168 ECN mainly tells the sender that congestion was
 encountered. AccECN carries more detailed congestion-marking feedback,
@@ -5769,7 +5804,7 @@ This matters particularly for modern congestion-control/AQM work where
 the *amount* of congestion signaling is useful, not merely a binary
 indication.
 
-### Long review history
+#### Long review history
 
 The upstream protocol series went through unusually many revisions.
 
@@ -5791,7 +5826,7 @@ Selected milestones:
 -   2025-09-06: v16 / 14 patches
     -   https://lwn.net/Articles/1037055/
 
-### v16 core contents
+#### v16 core contents
 
 The v16 cover letter describes the series as covering:
 
@@ -5827,14 +5862,14 @@ Affected areas include:
 -   syncookies
 -   TCP sysctls/documentation
 
-### Merge
+#### Merge
 
 LWN's Linux 6.18 merge-window coverage explicitly records that AccECN
 was merged.
 
 -   https://lwn.net/Articles/1040203/
 
-### Important: 6.18 is not the end of the series
+#### Important: 6.18 is not the end of the series
 
 AccECN core merge did not mean all integration work was complete.
 
@@ -5851,7 +5886,7 @@ Example:
 -   2025-10 v4: https://lwn.net/Articles/1041621/
 -   2026-01 v7: https://lwn.net/Articles/1052707/
 
-### 2026 --- GRO/GSO / virtio offload integration
+#### 2026 --- GRO/GSO / virtio offload integration
 
 AccECN changes the meaning of TCP flag bits used in ACE signaling.
 Existing RFC3168 ECN offload assumptions can therefore corrupt AccECN
@@ -5874,7 +5909,7 @@ Affected code includes:
 This is particularly relevant to VM networking: AccECN must survive
 GRO/GSO and virtio metadata transport without CWR/ACE corruption.
 
-### Correct classification
+#### Correct classification
 
 ``` text
 6.18
@@ -5895,7 +5930,7 @@ completed"; it is the mainline core milestone.
 
 ------------------------------------------------------------------------
 
-# 34. UDP receive performance --- Linux 6.18
+## 34. UDP receive performance --- Linux 6.18
 
 LWN's 6.18 merge-window summary reports a **47% UDP receive performance
 improvement** according to Eric Dumazet's measurements.
@@ -5917,7 +5952,7 @@ packet size: 120 bytes
 scope: benchmark result, not universal UDP throughput improvement
 ```
 
-### Why this qualification matters
+#### Why this qualification matters
 
 Small-packet UDP receive is primarily a packet-rate/CPU-cost workload:
 
@@ -5942,7 +5977,7 @@ Thus a large percentage improvement in this test should not be
 extrapolated to jumbo frames, low-rate UDP, or application-limited
 workloads.
 
-### Commit verification status
+#### Commit verification status
 
 The 6.18 release-level performance claim is verified. Search did not
 produce a sufficiently authoritative mapping from the 47% figure to one
@@ -5953,9 +5988,9 @@ identified.
 
 ------------------------------------------------------------------------
 
-# 35. RTNL scalability --- exact series landmarks
+## 35. RTNL scalability --- exact series landmarks
 
-## 35.1 Problem
+### 35.1 Problem
 
 Classic RTNL is a broad global serialization mechanism.
 
@@ -5976,7 +6011,7 @@ The modern work proceeds along **two complementary directions**:
 
 ------------------------------------------------------------------------
 
-## 35.2 RTNL-less qdisc dumps --- 2024
+### 35.2 RTNL-less qdisc dumps --- 2024
 
 Eric Dumazet posted:
 
@@ -6019,7 +6054,7 @@ remove RTNL dependency
 
 ------------------------------------------------------------------------
 
-## 35.3 Linux 6.13 --- per-network-namespace RTNL
+### 35.3 Linux 6.13 --- per-network-namespace RTNL
 
 LWN confirms that Linux 6.13 contains work turning RTNL into a
 per-network-namespace lock.
@@ -6055,7 +6090,7 @@ independent netns operations are common.
 
 ------------------------------------------------------------------------
 
-## 35.4 Link creation and namespace semantics
+### 35.4 Link creation and namespace semantics
 
 Xiao Liang's 2024 v5 series:
 
@@ -6080,9 +6115,9 @@ protects creation?" must be well-defined.
 
 ------------------------------------------------------------------------
 
-# 36. MPTCP + BPF --- exact development landmarks
+## 36. MPTCP + BPF --- exact development landmarks
 
-## 36.1 Problem: enabling MPTCP for unmodified applications
+### 36.1 Problem: enabling MPTCP for unmodified applications
 
 An application normally opts into MPTCP with:
 
@@ -6102,7 +6137,7 @@ kernel/BPF policy path.
 
 ------------------------------------------------------------------------
 
-## 36.2 2023 --- `update_socket_protocol()` / "Force to MPTCP"
+### 36.2 2023 --- `update_socket_protocol()` / "Force to MPTCP"
 
 Important revision:
 
@@ -6150,7 +6185,7 @@ This avoids requiring the application binary to know about MPTCP.
 
 ------------------------------------------------------------------------
 
-## 36.3 MPTCP subflow visibility from BPF
+### 36.3 MPTCP subflow visibility from BPF
 
 Later work expands BPF from protocol selection to **inspection/iteration
 of MPTCP subflows**.
@@ -6177,7 +6212,7 @@ kfuncs and adding the subflow iterator:
 
 -   https://lwn.net/Articles/1014990/
 
-### Evolution
+#### Evolution
 
 ``` text
 MPTCP protocol implementation
@@ -6200,7 +6235,7 @@ whole feature to a single release.
 
 ------------------------------------------------------------------------
 
-# 37. Cross-feature interaction: AccECN × virtio × BPF × MPTCP
+## 37. Cross-feature interaction: AccECN × virtio × BPF × MPTCP
 
 The separate series increasingly meet in common metadata and
 virtual-network paths.
@@ -6239,7 +6274,7 @@ flag bits participate in AccECN signaling.
 
 ------------------------------------------------------------------------
 
-# 38. Next pass
+## 38. Next pass
 
 Remaining high-priority items:
 
@@ -6258,7 +6293,7 @@ Remaining high-priority items:
 
 ------------------------------------------------------------------------
 
-# 39. Completeness audit --- LWN networking topics missing from the first thematic passes
+## 39. Completeness audit --- LWN networking topics missing from the first thematic passes
 
 この章は「mainline に入った大機能」だけを追う前章までの方式を補完する。
 LWN の networking coverage
@@ -6275,7 +6310,7 @@ Linux networking の技術史を理解するには C も重要である。 例�
 
 ------------------------------------------------------------------------
 
-## 39.1 2020 --- IPv6 extension-header processing
+### 39.1 2020 --- IPv6 extension-header processing
 
 LWN feature:
 
@@ -6306,7 +6341,7 @@ BIG TCP が HBH dependency を取り除く方向へ
 
 ------------------------------------------------------------------------
 
-## 39.2 2020 --- threaded NAPI
+### 39.2 2020 --- threaded NAPI
 
 LWN feature:
 
@@ -6364,9 +6399,9 @@ processingをどのexecution contextで実行するか**を変える。
 
 ------------------------------------------------------------------------
 
-## 39.3 2020 → 2025 --- bpfilter: failed in-kernel experiment and later userspace revival
+### 39.3 2020 → 2025 --- bpfilter: failed in-kernel experiment and later userspace revival
 
-### 2020
+#### 2020
 
 LWN:
 
@@ -6380,7 +6415,7 @@ compatibility を BPF-based firewallへ変換する構想だった。
 しかし開発停滞と user-mode helper infrastructure 自体への懸念から、
 kernel-side experiment は失敗した方向として扱われた。
 
-### 2025
+#### 2025
 
 LWN:
 
@@ -6408,7 +6443,7 @@ bpfilter later project
 
 ------------------------------------------------------------------------
 
-## 39.4 2021 --- `SO_REUSEPORT` connection-failure semantics
+### 39.4 2021 --- `SO_REUSEPORT` connection-failure semantics
 
 LWN feature:
 
@@ -6443,7 +6478,7 @@ selection, together with BPF `SK_REUSEPORT` and socket-lookup hooks.
 
 ------------------------------------------------------------------------
 
-## 39.5 2022 --- `skb_drop_reason`: packet-drop observability
+### 39.5 2022 --- `skb_drop_reason`: packet-drop observability
 
 LWN coverage and patch archives show a broad effort to replace opaque
 `kfree_skb()` sites with explicit drop reasons.
@@ -6494,7 +6529,7 @@ It should therefore be treated as a networking observability milestone.
 
 ------------------------------------------------------------------------
 
-## 39.6 2022 --- in-kernel TLS handshake
+### 39.6 2022 --- in-kernel TLS handshake
 
 LWN:
 
@@ -6540,7 +6575,7 @@ QUIC-related kernel work.
 
 ------------------------------------------------------------------------
 
-## 39.7 2024 --- P4TC as an important *non-merged* architecture proposal
+### 39.7 2024 --- P4TC as an important *non-merged* architecture proposal
 
 LWN:
 
@@ -6580,7 +6615,7 @@ introducing another programmable network pipeline/API.
 
 ------------------------------------------------------------------------
 
-## 39.8 2025 --- BPF qdisc with `struct_ops`
+### 39.8 2025 --- BPF qdisc with `struct_ops`
 
 Patch series:
 
@@ -6632,7 +6667,7 @@ among networking changes:
 
 ------------------------------------------------------------------------
 
-## 39.9 2025 --- DCCP removal
+### 39.9 2025 --- DCCP removal
 
 Patch series:
 
@@ -6667,7 +6702,7 @@ removal**, not just feature addition.
 
 ------------------------------------------------------------------------
 
-# 40. Completeness audit: classification table
+## 40. Completeness audit: classification table
 
   ------------------------------------------------------------------------
   Topic                      Year Classification       Why it matters
@@ -6707,11 +6742,11 @@ removal**, not just feature addition.
 
 ------------------------------------------------------------------------
 
-# 41. Audit finding: article list vs kernel-change list
+## 41. Audit finding: article list vs kernel-change list
 
 The document now intentionally contains **two overlapping indexes**.
 
-## Kernel-change index
+### Kernel-change index
 
 Use this when the question is:
 
@@ -6719,7 +6754,7 @@ Use this when the question is:
 
 It prioritizes merged changes and release mapping.
 
-## LWN-history index
+### LWN-history index
 
 Use this when the question is:
 
@@ -6759,7 +6794,7 @@ DCCP removal
 
 ------------------------------------------------------------------------
 
-# 42. Next completeness-audit pass
+## 42. Next completeness-audit pass
 
 The next audit should focus on categories that broad year searches can
 miss:
@@ -6782,9 +6817,9 @@ the release matrix to produce a final "coverage gaps" section.
 
 ------------------------------------------------------------------------
 
-# 43. Completeness audit pass 2 --- routing, Netlink/YNL, bridge, MCTP, SRv6, socket APIs, QUIC
+## 43. Completeness audit pass 2 --- routing, Netlink/YNL, bridge, MCTP, SRv6, socket APIs, QUIC
 
-## 43.1 2019 --- nexthop objects and FIB scalability
+### 43.1 2019 --- nexthop objects and FIB scalability
 
 David Ahern's nexthop-object work separates the nexthop lifecycle from
 route-prefix objects.
@@ -6828,7 +6863,7 @@ separately from generic "routing improvements".
 
 ------------------------------------------------------------------------
 
-## 43.2 2022--2024 --- Netlink specifications and YNL
+### 43.2 2022--2024 --- Netlink specifications and YNL
 
 Netlink historically has a large amount of manually maintained:
 
@@ -6840,12 +6875,12 @@ Netlink historically has a large amount of manually maintained:
 
 Jakub Kicinski's YAML specification work changes this model.
 
-### 2022 documentation groundwork
+#### 2022 documentation groundwork
 
 -   *docs: netlink: basic introduction to Netlink*
 -   https://lwn.net/Articles/905079/
 
-### 2023 mergeable protocol-spec series
+#### 2023 mergeable protocol-spec series
 
 -   `[PATCH net-next v3 0/8] Netlink protocol specs`
 -   https://lwn.net/Articles/920499/
@@ -6881,7 +6916,7 @@ YNL/spec model:
 This is one of the most important networking-UAPI maintainability
 changes in the period.
 
-### Follow-up adoption
+#### Follow-up adoption
 
 MPTCP conversion:
 
@@ -6896,7 +6931,7 @@ generation, and YNL library/client.
 
 ------------------------------------------------------------------------
 
-## 43.3 2021 --- bridge per-VLAN multicast snooping
+### 43.3 2021 --- bridge per-VLAN multicast snooping
 
 Nikolay Aleksandrov's series adds per-VLAN multicast contexts to Linux
 bridge.
@@ -6939,7 +6974,7 @@ by VLAN rather than globally across the bridge.
 
 ------------------------------------------------------------------------
 
-## 43.4 2021 --- Management Component Transport Protocol (MCTP)
+### 43.4 2021 --- Management Component Transport Protocol (MCTP)
 
 Initial MCTP series:
 
@@ -6971,7 +7006,7 @@ management-controller/device communication, but it is a genuine Linux
 networking protocol stack and therefore belongs in a broad networking
 history.
 
-### Follow-ups
+#### Follow-ups
 
 2022:
 
@@ -6988,13 +7023,13 @@ history.
 
 ------------------------------------------------------------------------
 
-## 43.5 SRv6 evolution after initial mainline support
+### 43.5 SRv6 evolution after initial mainline support
 
 SRv6 itself predates this document's start date (initial Linux support
 appeared in Linux 4.10), but substantial capability growth occurs inside
 the audit period.
 
-### 2022 --- Headend Reduced
+#### 2022 --- Headend Reduced
 
 -   `[net-next v5 0/4] seg6: add support for SRv6 Headend Reduced`
 -   https://lwn.net/Articles/902806/
@@ -7002,12 +7037,12 @@ the audit period.
 Reduced encapsulation avoids carrying an unnecessary first segment in
 the SRH in cases where the IPv6 destination already represents it.
 
-### 2023 --- PSP flavor
+#### 2023 --- PSP flavor
 
 -   `seg6: add PSP flavor support for SRv6 End behavior`
 -   https://lwn.net/Articles/923380/
 
-### 2023 --- NEXT-C-SID
+#### 2023 --- NEXT-C-SID
 
 -   `seg6: add NEXT-C-SID support for SRv6 End.X behavior`
 -   https://lwn.net/Articles/939830/
@@ -7015,12 +7050,12 @@ the SRH in cases where the IPv6 destination already represents it.
 Compressed SID mechanisms address the overhead of carrying many 128-bit
 SIDs in an SRH.
 
-### 2026 --- Mobile User Plane
+#### 2026 --- Mobile User Plane
 
 -   `seg6: add SRv6 Mobile User Plane (RFC 9433) behaviors`
 -   https://lwn.net/Articles/1070981/
 
-### 2026 --- L2 VPN RFC
+#### 2026 --- L2 VPN RFC
 
 -   End.DT2U + `srl2` Ethernet pseudowire device
 -   https://lwn.net/Articles/1064184/
@@ -7030,7 +7065,7 @@ not automatically a merged feature.
 
 ------------------------------------------------------------------------
 
-## 43.6 2023 --- `SCM_PIDFD` and `SO_PEERPIDFD`
+### 43.6 2023 --- `SCM_PIDFD` and `SO_PEERPIDFD`
 
 Alexander Mikhalitsyn's series adds pidfd-based peer/process
 identification to Unix/socket APIs.
@@ -7070,15 +7105,15 @@ where PID reuse makes a numeric PID a weak identity token.
 
 ------------------------------------------------------------------------
 
-## 43.7 2024--2026 --- in-kernel QUIC
+### 43.7 2024--2026 --- in-kernel QUIC
 
-### 2024 initial implementation proposal
+#### 2024 initial implementation proposal
 
 -   `[PATCH net-next 0/5] net: implement the QUIC protocol in linux kernel`
 -   2024-09-09
 -   https://lwn.net/Articles/989623/
 
-### 2025 LWN feature
+#### 2025 LWN feature
 
 -   *QUIC for the kernel*
 -   2025-07-22
@@ -7096,7 +7131,7 @@ QUIC provides:
 -   low-latency connection establishment;
 -   path/connection migration.
 
-### 2025 redesign
+#### 2025 redesign
 
 The later series splits out core infrastructure/subcomponents:
 
@@ -7130,7 +7165,7 @@ This distinction is essential for the final completeness table.
 
 ------------------------------------------------------------------------
 
-## 43.8 2026 --- BPF access across network namespaces
+### 43.8 2026 --- BPF access across network namespaces
 
 LWN:
 
@@ -7167,7 +7202,7 @@ allow explicitly delegated high-performance / observability operations
 
 ------------------------------------------------------------------------
 
-# 44. Updated completeness matrix
+## 44. Updated completeness matrix
 
   Area                 Important audit additions
   -------------------- -----------------------------------------------
@@ -7185,7 +7220,7 @@ allow explicitly delegated high-performance / observability operations
 
 ------------------------------------------------------------------------
 
-# 45. Coverage status
+## 45. Coverage status
 
 After this pass, the largest remaining audit gaps are narrower:
 
@@ -7220,9 +7255,9 @@ and compare that inventory against the thematic chapters above.
 
 ------------------------------------------------------------------------
 
-# 46. Completeness audit pass 3 --- IOAM, ethtool-netlink, TC offload, socket memory, KTLS, removals
+## 46. Completeness audit pass 3 --- IOAM, ethtool-netlink, TC offload, socket memory, KTLS, removals
 
-## 46.1 2021 --- IPv6 IOAM
+### 46.1 2021 --- IPv6 IOAM
 
 Initial upstream series:
 
@@ -7261,7 +7296,7 @@ solve different problems.
 
 ------------------------------------------------------------------------
 
-## 46.2 2019--2025 --- ethtool ioctl → Generic Netlink
+### 46.2 2019--2025 --- ethtool ioctl → Generic Netlink
 
 The ethtool userspace/kernel interface historically used ioctl
 structures.
@@ -7307,7 +7342,7 @@ Generic Netlink family "ethtool"
 Kernel code was split into `net/ethtool/`, with dedicated netlink
 handlers and documentation.
 
-### Continued migration
+#### Continued migration
 
 The conversion was intentionally incremental.
 
@@ -7322,7 +7357,7 @@ By 2025 RSS configuration was being completed over Netlink:
 The latter series states that, for RSS configuration, all functionality
 available via ioctl had then become available through Netlink.
 
-### Relationship to YNL
+#### Relationship to YNL
 
 The later YNL/specification work changes the implementation again:
 
@@ -7348,9 +7383,9 @@ hand-maintained artifacts.
 
 ------------------------------------------------------------------------
 
-# 47. TC / hardware-offload evolution
+## 47. TC / hardware-offload evolution
 
-## 47.1 Shared `flow_rule` / `flow_action` representation
+### 47.1 Shared `flow_rule` / `flow_action` representation
 
 A key precursor predates the start date but is essential context:
 drivers were moved away from parsing TC-native action layouts directly
@@ -7374,7 +7409,7 @@ Archive: https://lwn.net/Articles/775046/
 
 ------------------------------------------------------------------------
 
-## 47.2 2021 --- standalone TC action hardware offload
+### 47.2 2021 --- standalone TC action hardware offload
 
 Series:
 
@@ -7411,7 +7446,7 @@ The series also adds:
 
 ------------------------------------------------------------------------
 
-## 47.3 2023 --- partial hardware offload and software continuation
+### 47.3 2023 --- partial hardware offload and software continuation
 
 Series:
 
@@ -7438,9 +7473,9 @@ all-or-nothing offloadable.
 
 ------------------------------------------------------------------------
 
-# 48. Socket memory and receive-buffer evolution
+## 48. Socket memory and receive-buffer evolution
 
-## 48.1 Linux 5.16 --- `SO_RESERVE_MEM`
+### 48.1 Linux 5.16 --- `SO_RESERVE_MEM`
 
 LWN 5.16 merge-window:
 
@@ -7473,7 +7508,7 @@ socket-memory guarantees, rather than simply tuning a sysctl.
 
 ------------------------------------------------------------------------
 
-## 48.2 2025 --- TCP receive-side autotuning work
+### 48.2 2025 --- TCP receive-side autotuning work
 
 Eric Dumazet's 2025 series:
 
@@ -7507,7 +7542,7 @@ These should not be treated as interchangeable knobs.
 
 ------------------------------------------------------------------------
 
-## 48.3 Linux 6.18 --- default socket receive buffer raised to 4MB
+### 48.3 Linux 6.18 --- default socket receive buffer raised to 4MB
 
 LWN's 6.18 merge-window explicitly records:
 
@@ -7521,7 +7556,7 @@ distinct layers.
 
 ------------------------------------------------------------------------
 
-# 49. KTLS / kernel-handshake follow-up
+## 49. KTLS / kernel-handshake follow-up
 
 Earlier chapters covered the 2022 effort to let kernel socket consumers
 request TLS handshakes.
@@ -7551,7 +7586,7 @@ KTLS-enabled kernel socket
 This avoids requiring each kernel consumer to invent a separate
 userspace upcall protocol.
 
-### NVMe/TCP TLS
+#### NVMe/TCP TLS
 
 After the handshake upcall and `tls_read_sock()` work landed, NVMe/TCP
 could build on the common infrastructure.
@@ -7560,7 +7595,7 @@ could build on the common infrastructure.
 -   2023-08
 -   https://lwn.net/Articles/941139/
 
-### 2026 continuation
+#### 2026 continuation
 
 Kernel consumers of `read_sock` still had limitations around TLS control
 records.
@@ -7576,9 +7611,9 @@ like ordinary kernel-consumable transport streams.
 
 ------------------------------------------------------------------------
 
-# 50. Protocol retirement as network-stack optimization
+## 50. Protocol retirement as network-stack optimization
 
-## 50.1 DECnet --- Linux 6.1
+### 50.1 DECnet --- Linux 6.1
 
 LWN 6.1 merge-window:
 
@@ -7599,7 +7634,7 @@ remove implementation
 
 ------------------------------------------------------------------------
 
-## 50.2 DCCP --- 2025
+### 50.2 DCCP --- 2025
 
 Covered earlier.
 
@@ -7608,7 +7643,7 @@ become TCP-specific after the protocol disappeared.
 
 ------------------------------------------------------------------------
 
-## 50.3 UDP-Lite --- Linux 7.1
+### 50.3 UDP-Lite --- Linux 7.1
 
 Removal series:
 
@@ -7659,11 +7694,11 @@ work**.
 
 ------------------------------------------------------------------------
 
-# 51. Audit synthesis --- three recurring modernization patterns
+## 51. Audit synthesis --- three recurring modernization patterns
 
 The newly audited items reveal three broad patterns.
 
-## 51.1 Fixed UAPI → extensible, generated Netlink
+### 51.1 Fixed UAPI → extensible, generated Netlink
 
 ``` text
 ioctl structs
@@ -7682,7 +7717,7 @@ Examples:
 -   nftables;
 -   other netdev APIs.
 
-## 51.2 Software-only pipeline → common representation → partial hardware offload
+### 51.2 Software-only pipeline → common representation → partial hardware offload
 
 ``` text
 TC-specific representation
@@ -7700,7 +7735,7 @@ NIC hardware
       └── software continuation on miss
 ```
 
-## 51.3 Add protocols → later prune unused protocol complexity
+### 51.3 Add protocols → later prune unused protocol complexity
 
 ``` text
 large monolithic network stack
@@ -7718,7 +7753,7 @@ packet-rate gains.
 
 ------------------------------------------------------------------------
 
-# 52. Remaining audit before canonical inventory
+## 52. Remaining audit before canonical inventory
 
 At this point the broad architectural categories are substantially
 covered.
@@ -7761,9 +7796,9 @@ This table will become the basis for the final completeness check.
 
 ------------------------------------------------------------------------
 
-# 53. Final sweep --- late socket, multipath, tunnel, and removal items
+## 53. Final sweep --- late socket, multipath, tunnel, and removal items
 
-## 53.1 Linux 6.15 --- `TCP_RTO_MAX_MS`
+### 53.1 Linux 6.15 --- `TCP_RTO_MAX_MS`
 
 Eric Dumazet's series:
 
@@ -7796,7 +7831,7 @@ LWN's Linux 6.15 merge-window summary records the feature.
 
 ------------------------------------------------------------------------
 
-## 53.2 Linux 6.15 --- BPF network timestamp callbacks
+### 53.2 Linux 6.15 --- BPF network timestamp callbacks
 
 The 6.15 merge window also added BPF callbacks for obtaining timestamps
 at multiple points in the network stack.
@@ -7836,7 +7871,7 @@ BPF network timestamps
 
 ------------------------------------------------------------------------
 
-## 53.3 2025 --- local TCP multipath route selection
+### 53.3 2025 --- local TCP multipath route selection
 
 Willem de Bruijn's series:
 
@@ -7867,7 +7902,7 @@ multipath hash policy
 
 ------------------------------------------------------------------------
 
-## 53.4 2026 --- double UDP tunnel GRO/GSO
+### 53.4 2026 --- double UDP tunnel GRO/GSO
 
 Paolo Abeni's series:
 
@@ -7925,13 +7960,13 @@ late-period changes.
 
 ------------------------------------------------------------------------
 
-# 54. 2026 merge-window reconciliation
+## 54. 2026 merge-window reconciliation
 
 A final pass over LWN's 2026 merge-window summaries found additional
 items that need to appear in the canonical inventory even when they do
 not require full thematic chapters.
 
-## Linux 7.0
+### Linux 7.0
 
 LWN records:
 
@@ -7941,13 +7976,13 @@ LWN records:
 
 Merge-window: https://lwn.net/Articles/1058664/
 
-### CAKE multiqueue
+#### CAKE multiqueue
 
 The CAKE qdisc can distribute shaping work across multiple queues/CPUs.
 This is a scalability evolution of an existing sophisticated qdisc
 rather than a new qdisc API.
 
-### VSOCK network namespaces
+#### VSOCK network namespaces
 
 VSOCK is commonly used for host/guest communication. Adding
 network-namespace awareness makes it fit containerized virtualization
@@ -7955,7 +7990,7 @@ environments more naturally.
 
 ------------------------------------------------------------------------
 
-## Linux 7.1
+### Linux 7.1
 
 LWN records:
 
@@ -7977,7 +8012,7 @@ networking feature.
 
 ------------------------------------------------------------------------
 
-## Linux 7.2
+### Linux 7.2
 
 LWN records:
 
@@ -7988,7 +8023,7 @@ LWN records:
 
 Merge-window: https://lwn.net/Articles/1078068/
 
-### TCP-AO → libcrypto
+#### TCP-AO → libcrypto
 
 TCP-AO itself entered the kernel earlier; the 7.2 change is an
 implementation modernization:
@@ -8004,14 +8039,14 @@ kernel libcrypto
    └── fewer supported/unused algorithms
 ```
 
-### MPTCP 8 → 64 subflows
+#### MPTCP 8 → 64 subflows
 
 This is a useful scalability milestone and belongs in the
 release-by-release MPTCP map.
 
 ------------------------------------------------------------------------
 
-## Linux 7.3
+### Linux 7.3
 
 As of 2026-10-02 Linux 7.3 is still in the release-candidate phase; the
 merge window is complete but the final release has not yet occurred.
@@ -8033,7 +8068,7 @@ rather than simply "Linux 7.3 released".
 
 ------------------------------------------------------------------------
 
-# 55. Canonical LWN networking inventory
+## 55. Canonical LWN networking inventory
 
 The following table is the normalized inventory assembled from the
 thematic research and the completeness audits. It is intentionally
@@ -8306,47 +8341,47 @@ U   userspace/kernel-interface milestone
 
 ------------------------------------------------------------------------
 
-# 56. Canonical status rules
+## 56. Canonical status rules
 
 To avoid overstating upstream state, the inventory uses the following
 rules.
 
-### `merged`
+#### `merged`
 
 Verified as present in a mainline release or mainline development tree.
 
-### `merged-follow-up`
+#### `merged-follow-up`
 
 Not the introduction of a feature; modifies/scales/fixes an already
 merged architecture.
 
-### `RFC` / `under-review`
+#### `RFC` / `under-review`
 
 LWN or mailing-list coverage exists, but this document has not
 established that the complete feature was merged.
 
-### `stalled`
+#### `stalled`
 
 A significant design effort whose proposed architecture did not become
 the expected mainline solution.
 
-### `removed`
+#### `removed`
 
 Code/protocol/subsystem removed from mainline.
 
-### `userspace-milestone`
+#### `userspace-milestone`
 
 Primarily a userspace release or userspace/kernel-interface maturity
 milestone.
 
-### `design-discussion`
+#### `design-discussion`
 
 Important for understanding Linux networking direction but not itself a
 kernel feature.
 
 ------------------------------------------------------------------------
 
-# 57. Coverage conclusion
+## 57. Coverage conclusion
 
 The audit now covers the major Linux networking architecture lines
 between 2019-05-07 and 2026-10-02:
@@ -8407,7 +8442,7 @@ and incomplete where evidence has not yet been verified.
 
 ------------------------------------------------------------------------
 
-# 58. Netdev conference cross-reference (2019-05-07--2026-10-02)
+## 58. Netdev conference cross-reference (2019-05-07--2026-10-02)
 
 Netdev Society の archive を 0x13--0x1A まで確認し、LWN/kernel change
 log と 技術的に対応する講演を cross-reference する。
@@ -8430,7 +8465,7 @@ Netdev archive: https://netdevconf.info/
 
 ------------------------------------------------------------------------
 
-## 58.1 Netdev 0x14 --- 2020
+### 58.1 Netdev 0x14 --- 2020
 
 Conference: https://netdevconf.info/0x14/
 
@@ -8500,11 +8535,11 @@ container HW offload
 
 ------------------------------------------------------------------------
 
-## 58.2 Netdev 0x15 --- 2021
+### 58.2 Netdev 0x15 --- 2021
 
 Accepted sessions: https://netdevconf.info/0x15/accepted-sessions.html
 
-### BIG TCP --- Eric Dumazet
+#### BIG TCP --- Eric Dumazet
 
 One of the strongest cross-references in this audit.
 
@@ -8533,7 +8568,7 @@ Linux 7.3 development
 VXLAN/GENEVE BIG TCP
 ```
 
-### Accelerating synproxy with XDP
+#### Accelerating synproxy with XDP
 
 Session:
 https://netdevconf.info/0x15/loadsessions/Accelerating-synproxy-with-XDP.html
@@ -8554,7 +8589,7 @@ XDP
 and is a useful precursor to the later BPF conntrack lifecycle kfunc
 work.
 
-### Resilient nexthop groups
+#### Resilient nexthop groups
 
 This directly follows the 2019 nexthop-object work and belongs in the
 routing/FIB lineage.
@@ -8569,13 +8604,13 @@ nexthop groups
 resilient groups
 ```
 
-### Rethinking Zero-Copy Networking with MAIO
+#### Rethinking Zero-Copy Networking with MAIO
 
 This is relevant as an alternative high-performance networking design in
 the same period that eventually produced stronger kernel-side zero-copy
 efforts around io_uring, page_pool/netmem and Device Memory TCP.
 
-### TC / ACL / BPF
+#### TC / ACL / BPF
 
 Relevant sessions include:
 
@@ -8599,11 +8634,11 @@ historical context for the later bpfilter/BPF-firewall discussions.
 
 ------------------------------------------------------------------------
 
-## 58.3 Netdev 0x16 --- 2022
+### 58.3 Netdev 0x16 --- 2022
 
 Conference: https://netdevconf.info/0x16/
 
-### Merging the Networking Worlds --- David Ahern, Shrijeet Mukherjee
+#### Merging the Networking Worlds --- David Ahern, Shrijeet Mukherjee
 
 Session:
 https://netdevconf.info/0x16/sessions/talk/merging-the-networking-worlds.html
@@ -8660,7 +8695,7 @@ io_uring ZCRX
 netkit queue leasing
 ```
 
-### Historical significance
+#### Historical significance
 
 For the change log this gives a useful design lineage:
 
@@ -8688,14 +8723,14 @@ io_uring ZC RX
 
 ------------------------------------------------------------------------
 
-## 58.4 Netdev 0x17 --- 2023
+### 58.4 Netdev 0x17 --- 2023
 
 Sessions: https://netdevconf.info/0x17/pages/sessions.html
 
 This edition has unusually strong overlap with the mainline networking
 developments covered in this document.
 
-### Device Memory TCP
+#### Device Memory TCP
 
 Speakers:
 
@@ -8707,7 +8742,7 @@ Speakers:
 This is the direct conference counterpart to the Device Memory TCP
 RFC/mainline lineage.
 
-### Fast ZC Rx Data Plane using io_uring / Zero Copy Receive using io_uring
+#### Fast ZC Rx Data Plane using io_uring / Zero Copy Receive using io_uring
 
 Session:
 https://netdevconf.info/0x17/sessions/talk/zero-copy-receive-using-io_uring.html
@@ -8723,7 +8758,7 @@ compares the kernel socket copy path with kernel bypass and RDMA.
 This is one of the most useful primary sources for the later Linux 6.15
 io_uring ZCRX feature.
 
-### eBPF Qdisc: a generic building block for traffic control
+#### eBPF Qdisc: a generic building block for traffic control
 
 Speakers:
 
@@ -8733,12 +8768,12 @@ Speakers:
 This is a direct precursor/context source for the later BPF qdisc /
 `struct_ops` development.
 
-### Integrating eBPF Into The P4TC Datapath
+#### Integrating eBPF Into The P4TC Datapath
 
 This provides the conference-side history for the P4TC proposal that
 later encountered maintainer resistance and was covered by LWN in 2024.
 
-### Netlink APIs to Expose/Configure Netdev Objects
+#### Netlink APIs to Expose/Configure Netdev Objects
 
 This belongs alongside:
 
@@ -8750,7 +8785,7 @@ YNL specifications
 modern netdev configuration APIs
 ```
 
-### Other relevant sessions
+#### Other relevant sessions
 
 -   NIC offloads at Hyperscale: experience, new offloads and validation
 -   SO_TIMESTAMPING: powering fleetwide RPC monitoring
@@ -8768,11 +8803,11 @@ The TLS handshake BoF is especially useful alongside the
 
 ------------------------------------------------------------------------
 
-## 58.5 Netdev 0x18 --- 2024
+### 58.5 Netdev 0x18 --- 2024
 
 Schedule: https://netdevconf.info/0x18/pages/schedule.html
 
-### Devmem TCP & io uring zero copy --- BoF
+#### Devmem TCP & io uring zero copy --- BoF
 
 Speakers include Willem de Bruijn et al.
 
@@ -8793,26 +8828,26 @@ The sequence is therefore:
 2025  Linux 6.15 io_uring ZC RX
 ```
 
-### The Future of AI Networks: Advancing TCP with Device Memory and Collective Communication
+#### The Future of AI Networks: Advancing TCP with Device Memory and Collective Communication
 
 This extends Device Memory TCP from a pure networking optimization into
 AI/GPU/collective communication use cases.
 
-### A new lightweight Zero-Copy Notification Mechanism in Linux
+#### A new lightweight Zero-Copy Notification Mechanism in Linux
 
 Relevant to the broader zero-copy TX/RX completion/lifetime problem.
 
-### Characterizing IOTLB Wall for Multi-100-Gbps Linux-based Networking
+#### Characterizing IOTLB Wall for Multi-100-Gbps Linux-based Networking
 
 Relevant to DMA/IOMMU overhead in high-speed networking and therefore
 complementary to page_pool/netmem/device-memory work.
 
-### Fine-grained TCP Tuning
+#### Fine-grained TCP Tuning
 
 Relevant to the growing set of per-socket TCP controls and later
 RTO/receive-side tuning changes.
 
-### Workshops/BoFs
+#### Workshops/BoFs
 
 -   Extension Headers Workshop
 -   TC Workshop
@@ -8820,7 +8855,7 @@ RTO/receive-side tuning changes.
 
 ------------------------------------------------------------------------
 
-## 58.6 Netdev 0x19 --- 2025
+### 58.6 Netdev 0x19 --- 2025
 
 Schedule: https://netdevconf.info/0x19/pages/schedule.html
 
@@ -8828,7 +8863,7 @@ Sessions: https://netdevconf.info/0x19/pages/sessions.html
 
 This edition maps closely to the 2025 chapters in the change log.
 
-### Diagnosing Page Pool Leaks
+#### Diagnosing Page Pool Leaks
 
 Directly relevant to:
 
@@ -8845,16 +8880,16 @@ netmem
 It is useful operational material because page_pool recycling/lifetime
 bugs are a key failure mode in modern RX-memory infrastructure.
 
-### MPTCP: present, future, and its development workflow
+#### MPTCP: present, future, and its development workflow
 
 Directly complements the MPTCP release/patch history.
 
-### SRv6 in Linux Kernel, FRR and eBPF
+#### SRv6 in Linux Kernel, FRR and eBPF
 
 Directly complements the SRv6 Headend Reduced / PSP / NEXT-C-SID
 evolution.
 
-### Communication via Internal Shared Memory (ISM) - Time to open up
+#### Communication via Internal Shared Memory (ISM) - Time to open up
 
 This is especially interesting in light of the later DIBS/shared-memory
 transport work.
@@ -8868,29 +8903,29 @@ ISM / SMC-D / local shared-memory transports
 DIBS / later shared-memory socket ideas
 ```
 
-### mq-cake: Scaling software rate limiting across CPU cores
+#### mq-cake: Scaling software rate limiting across CPU cores
 
 This is the conference-side precursor/context for CAKE multiqueue work
 that later appears in the Linux 7.0-era change log.
 
-### Linux Kernel Support for IOAM Direct Exporting
+#### Linux Kernel Support for IOAM Direct Exporting
 
 Follow-up to the earlier IPv6 IOAM implementation.
 
-### The Battle Of The ZCs: Who is the prettiest of them all?
+#### The Battle Of The ZCs: Who is the prettiest of them all?
 
 Useful comparison material for the multiple Linux zero-copy mechanisms
 that this document otherwise follows separately.
 
-### IRQ Suspension: a new, efficient mechanism for packet delivery
+#### IRQ Suspension: a new, efficient mechanism for packet delivery
 
 Relevant to the NAPI/softirq/busy-poll execution-model evolution.
 
-### The future of SO_TIMESTAMPING
+#### The future of SO_TIMESTAMPING
 
 Complements the packet/network timestamp observability lineage.
 
-### State of the union in TCP land --- Eric Dumazet
+#### State of the union in TCP land --- Eric Dumazet
 
 Useful cross-reference for contemporary TCP performance/API work,
 including the period around AccECN, receive-side optimization, and timer
@@ -8898,14 +8933,14 @@ tuning.
 
 ------------------------------------------------------------------------
 
-## 58.7 Netdev 0x1A --- 2026
+### 58.7 Netdev 0x1A --- 2026
 
 Sessions: https://netdevconf.info/0x1A/pages/sessions.html
 
 Netdev 0x1A is inside the requested time window and is especially
 valuable because its materials were available by August 2026.
 
-### io_uring ZCRX: Progress and Next Steps --- Pavel Begunkov
+#### io_uring ZCRX: Progress and Next Steps --- Pavel Begunkov
 
 The session covers the post-merge ZCRX problems:
 
@@ -8917,7 +8952,7 @@ The session covers the post-merge ZCRX problems:
 
 This is the natural follow-up to Linux 6.15 ZCRX.
 
-### Accelerating Software RDMA (RXE) with Netkit and Devmem
+#### Accelerating Software RDMA (RXE) with Netkit and Devmem
 
 Directly intersects two major late-period themes:
 
@@ -8932,7 +8967,7 @@ software RDMA
 and reinforces that netkit is becoming a mechanism for exposing modern
 memory/queue facilities beyond ordinary container networking.
 
-### Kernel shared memory socket transport --- David Wei
+#### Kernel shared memory socket transport --- David Wei
 
 Session:
 https://netdevconf.info/0x1A/sessions/talk/kernel-shared-memory-socket-transport.html
@@ -8953,11 +8988,11 @@ zero-copy sender + receiver IPC
 This is a new RFC/proposal lineage and should not be confused with DIBS,
 but it belongs in the same broad "avoid local-host copies" design space.
 
-### Linux QUIC: Bringing a Modern Secure Transport into the Kernel
+#### Linux QUIC: Bringing a Modern Secure Transport into the Kernel
 
 Direct conference counterpart to the 2024--2026 kernel QUIC RFC series.
 
-### TCP State of the union (2026) --- Eric Dumazet
+#### TCP State of the union (2026) --- Eric Dumazet
 
 Session:
 https://netdevconf.info/0x1A/sessions/talk/tcp-state-of-the-union-2026.html
@@ -8966,17 +9001,17 @@ The talk explicitly focuses on recent/upcoming TCP changes and
 performance on modern platforms, making it a useful companion source for
 the late TCP chapters.
 
-### Thrice the charm: an skb extension for BPF metadata
+#### Thrice the charm: an skb extension for BPF metadata
 
 Relevant to the long-running question of how metadata is carried with
 skb/BPF datapaths.
 
-### Securing IOAM in the Linux Kernel
+#### Securing IOAM in the Linux Kernel
 
 Follow-up to IOAM deployment: telemetry integrity/trust rather than
 merely carrying trace data.
 
-### Network Observability BoF
+#### Network Observability BoF
 
 Complements:
 
@@ -8985,7 +9020,7 @@ Complements:
 -   BPF network timestamp callbacks;
 -   modern tracing/Retis work.
 
-### Other relevant 0x1A sessions
+#### Other relevant 0x1A sessions
 
 -   AF_XDP copy mode needs more love
 -   XDP Workshop
@@ -8999,11 +9034,11 @@ Complements:
 
 ------------------------------------------------------------------------
 
-# 59. Netdev ↔ LWN ↔ mainline lineage map
+## 59. Netdev ↔ LWN ↔ mainline lineage map
 
 The conference material makes several feature histories much clearer.
 
-## BIG TCP
+### BIG TCP
 
 ``` text
 Netdev 0x15 (2021)
@@ -9030,7 +9065,7 @@ Linux 7.3 development
 VXLAN/GENEVE BIG TCP
 ```
 
-## Zero-copy receive / Device Memory TCP
+### Zero-copy receive / Device Memory TCP
 
 ``` text
 Netdev 0x14 (2020)
@@ -9058,7 +9093,7 @@ Netdev 0x1A (2026)
 io_uring ZCRX: Progress and Next Steps
 ```
 
-## BPF traffic control
+### BPF traffic control
 
 ``` text
 BPF struct_ops / TCP CC
@@ -9074,7 +9109,7 @@ eBPF Qdisc
 mainline traffic-control programmability
 ```
 
-## P4TC
+### P4TC
 
 ``` text
 Netdev 0x13 (pre-window)
@@ -9089,7 +9124,7 @@ LWN 2024
 P4TC hits a brick wall
 ```
 
-## Shared-memory networking
+### Shared-memory networking
 
 ``` text
 ISM / SMC-D
@@ -9108,7 +9143,7 @@ ancestry.
 
 ------------------------------------------------------------------------
 
-# 60. Recommended Netdev talks for this change log
+## 60. Recommended Netdev talks for this change log
 
 For understanding the architectural evolution rather than simply
 collecting conference talks, the highest-value sessions are:
@@ -9149,7 +9184,7 @@ which is the central goal of this change log.
 
 ------------------------------------------------------------------------
 
-# 61. Netdev coverage note
+## 61. Netdev coverage note
 
 The Netdev site confirms the relevant editions in the requested period:
 
@@ -9172,7 +9207,7 @@ inventory where a direct conference counterpart exists.
 
 ------------------------------------------------------------------------
 
-# 62. Provenance index --- Netdev → LWN → patch series → mainline
+## 62. Provenance index --- Netdev → LWN → patch series → mainline
 
 この章は canonical inventory の主要項目について、conference talk と
 upstream development の位置関係を横断的に追えるようにした索引である。
@@ -9301,9 +9336,9 @@ upstream development の位置関係を横断的に追えるようにした索�
 
 ------------------------------------------------------------------------
 
-# 63. Detailed provenance chains
+## 63. Detailed provenance chains
 
-## 63.1 BIG TCP
+### 63.1 BIG TCP
 
 ``` text
 Netdev 0x15 (2021)
@@ -9340,7 +9375,7 @@ aggregates.
 
 ------------------------------------------------------------------------
 
-## 63.2 Device Memory TCP + io_uring ZCRX
+### 63.2 Device Memory TCP + io_uring ZCRX
 
 ``` text
 Netdev 0x14 (2020)
@@ -9385,7 +9420,7 @@ than replacing the stack with a kernel-bypass datapath.
 
 ------------------------------------------------------------------------
 
-## 63.3 BPF qdisc
+### 63.3 BPF qdisc
 
 ``` text
 Linux 5.6
@@ -9411,7 +9446,7 @@ feature.
 
 ------------------------------------------------------------------------
 
-## 63.4 MPTCP
+### 63.4 MPTCP
 
 ``` text
 2019 LWN
@@ -9445,7 +9480,7 @@ initial upstreaming; 0x19 is a mature-project/status discussion.
 
 ------------------------------------------------------------------------
 
-## 63.5 IOAM
+### 63.5 IOAM
 
 ``` text
 Netdev 0x14 (2020)
@@ -9473,7 +9508,7 @@ integrity/trust.
 
 ------------------------------------------------------------------------
 
-## 63.6 KTLS / kernel handshake
+### 63.6 KTLS / kernel handshake
 
 ``` text
 KTLS record layer
@@ -9512,7 +9547,7 @@ net/handshake
 
 ------------------------------------------------------------------------
 
-## 63.7 P4TC vs BPF qdisc
+### 63.7 P4TC vs BPF qdisc
 
 Netdev helps separate two superficially similar programmable-TC
 directions.
@@ -9539,7 +9574,7 @@ They should therefore remain separate rows in the canonical inventory.
 
 ------------------------------------------------------------------------
 
-# 64. Canonical inventory --- Netdev counterpart field
+## 64. Canonical inventory --- Netdev counterpart field
 
 For the final normalized inventory, add these fields:
 
@@ -9591,11 +9626,11 @@ Example:
 
 ------------------------------------------------------------------------
 
-# 65. How to use the provenance index
+## 65. How to use the provenance index
 
 The document can now be read in three directions.
 
-### Start from a kernel release
+#### Start from a kernel release
 
 ``` text
 Linux 6.15
@@ -9607,7 +9642,7 @@ Linux 6.15
           └── Netdev 0x17 → 0x18 → 0x1A
 ```
 
-### Start from an LWN article
+#### Start from an LWN article
 
 ``` text
 LWN "Going big with TCP packets"
@@ -9618,7 +9653,7 @@ LWN "Going big with TCP packets"
    └── tunnel follow-up
 ```
 
-### Start from a Netdev talk
+#### Start from a Netdev talk
 
 ``` text
 Netdev 0x17 Device Memory TCP
@@ -9634,7 +9669,7 @@ bibliography.
 
 ------------------------------------------------------------------------
 
-# 66. Remaining provenance work
+## 66. Remaining provenance work
 
 The next verification pass should fill the remaining empty cells rather
 than add more themes:
@@ -9668,15 +9703,15 @@ provide the highest value if fully verified first.
 
 ------------------------------------------------------------------------
 
-# 67. Provenance verification pass 1 --- exact upstream anchors
+## 67. Provenance verification pass 1 --- exact upstream anchors
 
 This pass verifies representative/mainline commits for the first five
 high-priority lineages. A **merge commit** and a **feature commit** are
 recorded separately.
 
-## 67.1 BIG TCP
+### 67.1 BIG TCP
 
-### IPv4 BIG TCP --- Linux 6.3
+#### IPv4 BIG TCP --- Linux 6.3
 
 Final v4 series was accepted into net-next with ten commits.
 
@@ -9704,7 +9739,7 @@ A later 2026 GRO fix explicitly references `b1a78b9b9886` as the
 introduction point for IPv4 BIG TCP behavior, independently confirming
 this provenance.
 
-### Provenance
+#### Provenance
 
 ``` text
 Netdev 0x15 BIG TCP
@@ -9725,7 +9760,7 @@ Linux 6.3
 
 ------------------------------------------------------------------------
 
-## 67.2 Device Memory TCP RX --- Linux 6.12
+### 67.2 Device Memory TCP RX --- Linux 6.12
 
 This lineage requires special care because earlier patchwork-bot
 messages could look as if large early series had been accepted. In
@@ -9773,7 +9808,7 @@ payloads directly into a DMA-BUF/device-memory region while packet
 headers remain in ordinary kernel buffers so the normal TCP stack can
 process them.
 
-### Provenance
+#### Provenance
 
 ``` text
 Netdev 0x16
@@ -9799,7 +9834,7 @@ Linux 6.12
 
 ------------------------------------------------------------------------
 
-## 67.3 Device Memory TCP TX --- Linux 6.16
+### 67.3 Device Memory TCP TX --- Linux 6.16
 
 The TX direction was merged separately after RX.
 
@@ -9835,7 +9870,7 @@ are separate commits.
 
 ------------------------------------------------------------------------
 
-## 67.4 io_uring zero-copy RX --- Linux 6.15
+### 67.4 io_uring zero-copy RX --- Linux 6.15
 
 The feature was merged through Jens Axboe's pull:
 
@@ -9876,7 +9911,7 @@ The final pre-merge tip named in the pull was:
 io_uring/zcrx: add selftest case for recvzc with read limit
 ```
 
-### Important distinction
+#### Important distinction
 
 ``` text
 ca0b04ba...
@@ -9885,7 +9920,7 @@ ca0b04ba...
 is a **mainline merge commit**, not the single implementation commit.
 The implementation is a multi-commit series beneath that merge.
 
-### Provenance
+#### Provenance
 
 ``` text
 Netdev 0x16 architecture
@@ -9905,7 +9940,7 @@ Netdev 0x1A post-merge follow-up
 
 ------------------------------------------------------------------------
 
-## 67.5 BPF qdisc --- 2025
+### 67.5 BPF qdisc --- 2025
 
 The accepted BPF pull identifies ten Amery Hung commits implementing the
 initial BPF qdisc support.
@@ -9955,7 +9990,7 @@ the default qdisc and by making the currently supported `Qdisc_ops`
 callbacks mandatory. This is worth recording because the initial merge
 was functional but the API/validation rules were still settling.
 
-### Provenance
+#### Provenance
 
 ``` text
 BPF struct_ops / TCP CC
@@ -9973,7 +10008,7 @@ Netdev 0x17 eBPF Qdisc
 
 ------------------------------------------------------------------------
 
-## 67.6 netkit core --- Linux 6.7
+### 67.6 netkit core --- Linux 6.7
 
 The original netkit device has a clean feature anchor:
 
@@ -10001,11 +10036,11 @@ backlog queue.
 
 ------------------------------------------------------------------------
 
-## 67.7 netkit queue leasing --- 2026: merge, revert, rework, re-merge
+### 67.7 netkit queue leasing --- 2026: merge, revert, rework, re-merge
 
 This history corrects an earlier oversimplification in this document.
 
-### First merge
+#### First merge
 
 A v7-era queue-leasing series was merged into net-next in January 2026:
 
@@ -10025,7 +10060,7 @@ ff8889ff9107  net, ethtool: Disallow leased real rxqs to be resized
 920da3634194  netkit: Add xsk support for af_xdp applications
 ```
 
-### Immediate revert
+#### Immediate revert
 
 The merge was then reverted:
 
@@ -10044,7 +10079,7 @@ and the code needs more polish.
 Therefore the January 2026 merge must **not** be treated as the final
 upstream landing.
 
-### Rework
+#### Rework
 
 The series continued through later revisions, including:
 
@@ -10067,7 +10102,7 @@ physical NIC queue
     └── AF_XDP
 ```
 
-### Final re-merge
+#### Final re-merge
 
 A reworked series was merged again in April 2026.
 
@@ -10088,7 +10123,7 @@ selftests/net: Add queue leasing tests with netkit
 This tests io_uring zero-copy from a network namespace through netkit
 leased queues backed by a physical netdev.
 
-### Correct status timeline
+#### Correct status timeline
 
 ``` text
 2026-01
@@ -10112,7 +10147,7 @@ This is now the canonical history used by this document.
 
 ------------------------------------------------------------------------
 
-# 68. Provenance quality levels
+## 68. Provenance quality levels
 
 To make the final inventory auditable, each commit mapping should carry
 one of these quality levels.
@@ -10143,7 +10178,7 @@ Current status:
 
 ------------------------------------------------------------------------
 
-# 69. Next provenance batch
+## 69. Next provenance batch
 
 Next verification order:
 
@@ -10162,9 +10197,9 @@ genuinely multi-commit features.
 
 ------------------------------------------------------------------------
 
-# 70. Provenance verification pass 2 --- AccECN, RTNL, MPTCP/BPF, nexthop, AF_XDP
+## 70. Provenance verification pass 2 --- AccECN, RTNL, MPTCP/BPF, nexthop, AF_XDP
 
-## 70.1 AccECN --- correction and exact core anchors
+### 70.1 AccECN --- correction and exact core anchors
 
 Earlier revisions of this document stopped the review history too early
 at v16. The protocol series continued:
@@ -10222,7 +10257,7 @@ integration chain.**
 
 ------------------------------------------------------------------------
 
-## 70.2 RTNL breakup --- correction: migration, not a one-release switch
+### 70.2 RTNL breakup --- correction: migration, not a one-release switch
 
 The Linux 6.13 networking pull describes per-netns RTNL as:
 
@@ -10264,7 +10299,7 @@ rtnetlink: Add per-netns RTNL.
 which adds the per-netns mutex, locking helpers, lock ordering rules and
 the `DEBUG_NET_SMALL_RTNL` knob.
 
-### 6.13 scope
+#### 6.13 scope
 
 The 6.13 pull lists work including:
 
@@ -10276,7 +10311,7 @@ The 6.13 pull lists work including:
 -   converting phonet handlers to RCU;
 -   converting IPv4 address manipulation to per-netns RTNL.
 
-### Important current-state correction
+#### Important current-state correction
 
 The debug knob remains present in later kernel source, so this document
 must not describe 6.13 as "global RTNL replaced by per-netns RTNL".
@@ -10307,7 +10342,7 @@ feature commit.**
 
 ------------------------------------------------------------------------
 
-## 70.3 MPTCP + BPF protocol switching
+### 70.3 MPTCP + BPF protocol switching
 
 The BPF MPTCP series evolved substantially before merge.
 
@@ -10351,7 +10386,7 @@ A 2026 selftest fix independently confirms that the `mptcpify` BPF
 program in current kernels hooks `update_socket_protocol()` to rewrite
 eligible TCP socket creation into `IPPROTO_MPTCP`.
 
-### Important semantic detail
+#### Important semantic detail
 
 The hook sees the raw socket `type` before normal masking of:
 
@@ -10372,7 +10407,7 @@ accepted series rather than guessed from an RFC revision.
 
 ------------------------------------------------------------------------
 
-## 70.4 Nexthop objects --- 2019 initial architecture
+### 70.4 Nexthop objects --- 2019 initial architecture
 
 Final initial series:
 
@@ -10419,7 +10454,7 @@ exact individual initial commit hashes remain to be enumerated.
 
 ------------------------------------------------------------------------
 
-## 70.5 Resilient nexthop groups --- 2021
+### 70.5 Resilient nexthop groups --- 2021
 
 LWN/netdev archives show the kernel series implementing resilient
 nexthop groups.
@@ -10483,7 +10518,7 @@ enumerated.
 
 ------------------------------------------------------------------------
 
-## 70.6 AF_XDP multi-buffer --- Linux 6.6
+### 70.6 AF_XDP multi-buffer --- Linux 6.6
 
 Final accepted development series:
 
@@ -10535,7 +10570,7 @@ Fixes: 804627751b42
 
 which independently confirms the introduction anchor.
 
-### Why this matters
+#### Why this matters
 
 ``` text
 single-buffer AF_XDP
@@ -10556,7 +10591,7 @@ larger packets and modern multi-buffer drivers.
 
 ------------------------------------------------------------------------
 
-# 71. virtio-net AF_XDP --- status must be split by capability
+## 71. virtio-net AF_XDP --- status must be split by capability
 
 The long virtio-net AF_XDP effort should not be represented as one
 binary "merged/not merged" feature.
@@ -10609,7 +10644,7 @@ mergeable multi-buffer AF_XDP ZC    RFC/development at 2025 point
 
 ------------------------------------------------------------------------
 
-# 72. IOAM provenance --- current verified level
+## 72. IOAM provenance --- current verified level
 
 The initial IPv6 IOAM series and current kernel implementation are both
 verified.
@@ -10651,7 +10686,7 @@ initial merge hashes remain for the next commit-enumeration pass.
 
 ------------------------------------------------------------------------
 
-# 73. Quality table after pass 2
+## 73. Quality table after pass 2
 
   Feature                                     Previous                       Now
   ------------------------------ --------------------- -------------------------
@@ -10676,7 +10711,7 @@ Corrections introduced in this pass:
 
 ------------------------------------------------------------------------
 
-# 74. Next exact-commit pass
+## 74. Next exact-commit pass
 
 Remaining high-value commit enumeration:
 
@@ -10697,9 +10732,9 @@ canonical `git.kernel.org` links wherever the exact object is known.
 
 ------------------------------------------------------------------------
 
-# 75. Provenance verification pass 3 --- MPTCP, IOAM, BIG TCP tunnels
+## 75. Provenance verification pass 3 --- MPTCP, IOAM, BIG TCP tunnels
 
-## 75.1 Initial upstream MPTCP --- Linux 5.6
+### 75.1 Initial upstream MPTCP --- Linux 5.6
 
 The upstream MPTCP project documents Linux 5.6 as the first kernel
 release exposing the native MPTCP socket API:
@@ -10743,7 +10778,7 @@ The canonical inventory should still treat the initial MPTCP
 implementation as a **multi-commit feature**, not equate `048d19d444be`
 with the whole protocol.
 
-### Lineage
+#### Lineage
 
 ``` text
 2019 LWN
@@ -10767,7 +10802,7 @@ selftest anchor and first-release identification.
 
 ------------------------------------------------------------------------
 
-## 75.2 `update_socket_protocol()` --- exact BPF/MPTCP anchor
+### 75.2 `update_socket_protocol()` --- exact BPF/MPTCP anchor
 
 The BPF hook used to transparently convert eligible TCP socket creation
 to MPTCP has an exact upstream anchor:
@@ -10817,7 +10852,7 @@ merely an RFC.
 
 ------------------------------------------------------------------------
 
-## 75.3 IPv6 IOAM Pre-allocated Trace --- exact data-plane anchor
+### 75.3 IPv6 IOAM Pre-allocated Trace --- exact data-plane anchor
 
 Final development series:
 
@@ -10855,7 +10890,7 @@ Fixes: 9ee11f0fff20
 
 which independently validates it as the data-plane introduction point.
 
-### Scope warning
+#### Scope warning
 
 `9ee11f0fff20` is the data-plane anchor, not the complete IOAM series.
 The final series also contains:
@@ -10865,7 +10900,7 @@ The final series also contains:
 -   lightweight tunnel/output support;
 -   selftests.
 
-### Netdev relationship
+#### Netdev relationship
 
 ``` text
 Netdev 0x14
@@ -10891,7 +10926,7 @@ commit enumeration.**
 
 ------------------------------------------------------------------------
 
-## 75.4 Initial IPv6 BIG TCP --- Linux 5.19 exact introduction anchor
+### 75.4 Initial IPv6 BIG TCP --- Linux 5.19 exact introduction anchor
 
 The Linux 5.19 networking pull describes the new feature as:
 
@@ -10930,7 +10965,7 @@ NOT
 
 The 5.19 networking pull is the release-level authoritative anchor.
 
-### Evolution
+#### Evolution
 
 ``` text
 Netdev 0x15 (2021)
@@ -10958,7 +10993,7 @@ complete initial multi-commit series can still be enumerated.
 
 ------------------------------------------------------------------------
 
-## 75.5 BIG TCP over UDP tunnels --- Linux 7.3 development tree
+### 75.5 BIG TCP over UDP tunnels --- Linux 7.3 development tree
 
 Final accepted series:
 
@@ -10997,14 +11032,14 @@ f3d0f753f066  VXLAN
 but they rely on the preceding generic UDP/GSO/GRO work in the same
 series.
 
-### Packet-format detail
+#### Packet-format detail
 
 The series uses UDP length `0` for BIG UDP/GSO packets where the true
 length cannot be represented in the 16-bit UDP length field, adds
 receive-side validation, and raises `tso_max_size` for the VXLAN/GENEVE
 devices.
 
-### Release status
+#### Release status
 
 As of the document cutoff (2026-10-02):
 
@@ -11019,7 +11054,7 @@ so the status remains **merged-development**, not "released".
 
 ------------------------------------------------------------------------
 
-# 76. Updated provenance matrix
+## 76. Updated provenance matrix
 
   ---------------------------------------------------------------------------------
   Feature                    Kernel      Exact anchor(s)                  Quality
@@ -11057,7 +11092,7 @@ so the status remains **merged-development**, not "released".
 
 ------------------------------------------------------------------------
 
-# 77. Remaining capability audit
+## 77. Remaining capability audit
 
 The provenance backlog is now narrower:
 
@@ -11082,12 +11117,12 @@ and all nine net-next commits are now exactly identified.
 
 ------------------------------------------------------------------------
 
-# 78. Provenance verification pass 4 --- virtio-net AF_XDP capability matrix
+## 78. Provenance verification pass 4 --- virtio-net AF_XDP capability matrix
 
 The virtio-net AF_XDP history is now split by capability rather than
 described as one feature.
 
-## 78.1 Preparation phase --- 2023--2024
+### 78.1 Preparation phase --- 2023--2024
 
 The early series repeatedly identifies three prerequisites:
 
@@ -11113,7 +11148,7 @@ released kernel.
 
 ------------------------------------------------------------------------
 
-## 78.2 AF_XDP RX zero-copy --- Linux 6.11
+### 78.2 AF_XDP RX zero-copy --- Linux 6.11
 
 The Linux 6.11 networking pull explicitly lists:
 
@@ -11137,12 +11172,12 @@ virtio_net: xsk: rx: support recv small mode
 virtio_net: xsk: rx: support recv merge mode
 ```
 
-### Small receive mode
+#### Small receive mode
 
 `a4e7ba702701` implements the AF_XDP zero-copy receive handling for the
 virtio-net small buffer mode.
 
-### Mergeable receive mode
+#### Mergeable receive mode
 
 `99c861b44eb1` adds AF_XDP zero-copy receive support to mergeable
 receive buffers.
@@ -11152,7 +11187,7 @@ in zero-copy mode; see below.
 
 ------------------------------------------------------------------------
 
-## 78.3 Important correction: proposed revert was not the final status
+### 78.3 Important correction: proposed revert was not the final status
 
 In September 2024 a seven-patch **RFC** proposed reverting the RX
 zero-copy work because of crashes when `VIRTIO_F_ACCESS_PLATFORM` was
@@ -11196,7 +11231,7 @@ fixes against the retained RX implementation
 
 ------------------------------------------------------------------------
 
-## 78.4 AF_XDP TX zero-copy --- accepted in November 2024
+### 78.4 AF_XDP TX zero-copy --- accepted in November 2024
 
 TX was separated from the RX work.
 
@@ -11232,7 +11267,7 @@ NETDEV_XDP_ACT_XSK_ZEROCOPY
 
 is advertised after the TX series lands.
 
-### Capability timeline
+#### Capability timeline
 
 ``` text
 Linux 6.11 era
@@ -11249,7 +11284,7 @@ combined driver XSK pool binding
 
 ------------------------------------------------------------------------
 
-## 78.5 Mergeable RX is not the same as multi-buffer XDP support
+### 78.5 Mergeable RX is not the same as multi-buffer XDP support
 
 This distinction is essential.
 
@@ -11283,7 +11318,7 @@ use XDP frags for multi-buffer zero-copy XDP
 The RFC uses a jumbo-MTU example where one packet exceeds one XDP buffer
 and therefore must span multiple buffers.
 
-### 2025 correctness fix
+#### 2025 correctness fix
 
 A later fix targets:
 
@@ -11315,7 +11350,7 @@ multi-buffer XDP program support
 
 ------------------------------------------------------------------------
 
-# 79. virtio-net AF_XDP capability matrix
+## 79. virtio-net AF_XDP capability matrix
 
   ----------------------------------------------------------------------------------
   Capability      Status         Mainline / series   Interpretation
@@ -11355,7 +11390,7 @@ multi-buffer XDP program support
   handling                                           
   ----------------------------------------------------------------------------------
 
-### Canonical wording
+#### Canonical wording
 
 Do not write:
 
@@ -11376,7 +11411,7 @@ This is the capability-accurate description.
 
 ------------------------------------------------------------------------
 
-# 80. MPTCP BPF provenance --- subflow support predates protocol switching
+## 80. MPTCP BPF provenance --- subflow support predates protocol switching
 
 An important chronology point:
 
@@ -11419,7 +11454,7 @@ selection and then to management.
 
 ------------------------------------------------------------------------
 
-# 81. Nexthop series --- exact final-series structure
+## 81. Nexthop series --- exact final-series structure
 
 The final 2019 initial series is confirmed as:
 
@@ -11462,7 +11497,7 @@ subjects from `git.kernel.org`.
 
 ------------------------------------------------------------------------
 
-# 82. Quality update after capability audit
+## 82. Quality update after capability audit
 
   ---------------------------------------------------------------------
   Feature                            Quality
@@ -11491,13 +11526,13 @@ supported".
 
 ------------------------------------------------------------------------
 
-# 83. Provenance verification pass 5 --- RTNL migration map and MPTCP lineage
+## 83. Provenance verification pass 5 --- RTNL migration map and MPTCP lineage
 
-## 83.1 RTNL: release-by-release migration, not a single feature
+### 83.1 RTNL: release-by-release migration, not a single feature
 
 The RTNL work is now represented as a migration program.
 
-### Before Linux 6.13: reader-side preparation
+#### Before Linux 6.13: reader-side preparation
 
 By the first per-netns RTNL proposal in September 2024:
 
@@ -11544,7 +11579,7 @@ per-network-namespace RTNL
 preparations entering 6.13
 ```
 
-### Linux 6.13: per-netns RTNL infrastructure
+#### Linux 6.13: per-netns RTNL infrastructure
 
 Final early series:
 
@@ -11584,7 +11619,7 @@ Linux 6.13
 = infrastructure + first conversions + debug migration mode
 ```
 
-### Linux 6.15: breakup continues
+#### Linux 6.15: breakup continues
 
 The 6.15 merge-window coverage still says:
 
@@ -11594,7 +11629,7 @@ Work continues toward the breaking up of the RTNL lock
 
 This is important evidence that 6.13 was not the completion point.
 
-### 2025: subsystem-by-subsystem removal
+#### 2025: subsystem-by-subsystem removal
 
 Example:
 
@@ -11620,7 +11655,7 @@ global RTNL
    └── configuration state → dedicated/per-netns mutex
 ```
 
-### 2026: multicast routing and neighbour work
+#### 2026: multicast routing and neighbour work
 
 IPv4 multicast routing:
 
@@ -11659,7 +11694,7 @@ does not automatically mean
 the subsystem has no global serialization bottleneck
 ```
 
-### Canonical RTNL timeline
+#### Canonical RTNL timeline
 
 ``` text
 pre-6.9
@@ -11698,7 +11733,7 @@ instead of one networking "big lock"
 
 ------------------------------------------------------------------------
 
-## 83.2 MPTCP initial upstreaming --- precise interpretation
+### 83.2 MPTCP initial upstreaming --- precise interpretation
 
 The upstream MPTCP implementation guide confirms:
 
@@ -11758,7 +11793,7 @@ mptcp: add basic kselftest for mptcp
 
 Later fixes repeatedly reference it through `Fixes:`.
 
-### Canonical initial-MPTCP interpretation
+#### Canonical initial-MPTCP interpretation
 
 ``` text
 TCP infrastructure changes
@@ -11783,7 +11818,7 @@ The selftest commit remains an **exact anchor**, not the whole feature.
 
 ------------------------------------------------------------------------
 
-## 83.3 MPTCP+BPF --- 2020 subflow-control series
+### 83.3 MPTCP+BPF --- 2020 subflow-control series
 
 Final reviewed development series found:
 
@@ -11815,7 +11850,7 @@ other socket options
 
 to different TCP subflows belonging to one MPTCP connection.
 
-### Correct BPF evolution
+#### Correct BPF evolution
 
 ``` text
 2020
@@ -11842,7 +11877,7 @@ provenance.**
 
 ------------------------------------------------------------------------
 
-# 84. Nexthop-object provenance --- what is verified and what is not
+## 84. Nexthop-object provenance --- what is verified and what is not
 
 The final initial nexthop-object series is:
 
@@ -11875,7 +11910,7 @@ with excessive `synchronize_rcu()` and repeated validation of
 device/gateway/encapsulation information identified as major kernel-side
 costs.
 
-### Provenance policy
+#### Provenance policy
 
 Search/index results do not yet give a trustworthy one-to-one mapping of
 all 20 patch subjects to final mainline SHA-1s. Therefore this document
@@ -11896,11 +11931,11 @@ canonical mainline objects.
 
 ------------------------------------------------------------------------
 
-# 85. IOAM and MPTCP remaining exact-hash policy
+## 85. IOAM and MPTCP remaining exact-hash policy
 
 The same rule now applies to the remaining multi-commit sets.
 
-### IOAM
+#### IOAM
 
 Already exact:
 
@@ -11918,7 +11953,7 @@ output/tunnel path
 selftests
 ```
 
-### MPTCP 5.6
+#### MPTCP 5.6
 
 Already exact:
 
@@ -11942,7 +11977,7 @@ an old MPTCP development branch.
 
 ------------------------------------------------------------------------
 
-# 86. RTNL architectural conclusion
+## 86. RTNL architectural conclusion
 
 The 2019--2026 networking history shows a broader locking transition:
 
@@ -11985,7 +12020,7 @@ as evolving architectural lineages rather than isolated release notes.
 
 ------------------------------------------------------------------------
 
-# 87. Provenance backlog after pass 5
+## 87. Provenance backlog after pass 5
 
 Highest-value unresolved exact mappings are now:
 
@@ -12002,12 +12037,12 @@ complete; remaining work is now canonical Git provenance normalization.
 
 ------------------------------------------------------------------------
 
-# 88. Provenance verification pass 6 --- review lineage vs actual landing
+## 88. Provenance verification pass 6 --- review lineage vs actual landing
 
 This pass tightens an important rule: an old patch series may explain
 the design without being the series that actually landed upstream.
 
-## 88.1 MPTCP+BPF: 2020 series is design/review provenance, not final landing
+### 88.1 MPTCP+BPF: 2020 series is design/review provenance, not final landing
 
 The 2020 final review series was:
 
@@ -12033,7 +12068,7 @@ preventing per-subflow BPF policy.
 However, this exact five-patch series must **not** be labeled as the
 final merged series.
 
-### Evidence: cgroup part landed separately
+#### Evidence: cgroup part landed separately
 
 Later kernel fixes identify the mainline introduction of the cgroup
 behavior as:
@@ -12046,7 +12081,7 @@ mptcp: attach subflow socket to parent cgroup
 and a December 2020 MPTCP net-next series contains that patch
 independently.
 
-### Evidence: BPF mptcp_sock work was substantially reworked
+#### Evidence: BPF mptcp_sock work was substantially reworked
 
 In 2022 the BPF side returned as:
 
@@ -12087,7 +12122,7 @@ selftests/bpf: verify first of struct mptcp_sock
 Notably, by v4 the special-case kernel handling for `tcp_sock.is_mptcp`
 had been dropped in favor of existing BPF TCP helpers.
 
-### Correct canonical lineage
+#### Correct canonical lineage
 
 ``` text
 2020 v1→v3
@@ -12119,7 +12154,7 @@ seven accepted 2022 commits remains pending.**
 
 ------------------------------------------------------------------------
 
-## 88.2 MPTCP 5.6 initial selftest anchor remains independently strong
+### 88.2 MPTCP 5.6 initial selftest anchor remains independently strong
 
 The initial test anchor remains:
 
@@ -12142,7 +12177,7 @@ implementation.
 
 ------------------------------------------------------------------------
 
-## 88.3 IOAM data-plane anchor independently reconfirmed
+### 88.3 IOAM data-plane anchor independently reconfirmed
 
 The exact IOAM data-plane introduction remains:
 
@@ -12165,7 +12200,7 @@ inference from an old development branch.
 
 ------------------------------------------------------------------------
 
-# 89. Canonical provenance rule
+## 89. Canonical provenance rule
 
 For every remaining multi-year feature, the inventory now distinguishes
 three layers:
@@ -12203,7 +12238,7 @@ multi-stage integration.
 
 ------------------------------------------------------------------------
 
-# 90. Updated MPTCP provenance quality
+## 90. Updated MPTCP provenance quality
 
   ----------------------------------------------------------------------
   MPTCP item                   Status               Quality
@@ -12233,9 +12268,9 @@ than historical interpretation.
 
 ------------------------------------------------------------------------
 
-# 91. Provenance verification pass 7 --- exact MPTCP/BPF landing and nexthop correction
+## 91. Provenance verification pass 7 --- exact MPTCP/BPF landing and nexthop correction
 
-## 91.1 2022 MPTCP/BPF `mptcp_sock` --- all seven accepted commits
+### 91.1 2022 MPTCP/BPF `mptcp_sock` --- all seven accepted commits
 
 The final accepted series is:
 
@@ -12284,7 +12319,7 @@ bpf: add bpf_skc_to_mptcp_sock_proto
 
 while the remaining six commits establish test/config coverage.
 
-### Canonical MPTCP+BPF timeline
+#### Canonical MPTCP+BPF timeline
 
 ``` text
 2020 v3 design series
@@ -12313,7 +12348,7 @@ later update_socket_protocol()
 
 ------------------------------------------------------------------------
 
-## 91.2 Nexthop-object correction --- v4, not v3, was the applied final series
+### 91.2 Nexthop-object correction --- v4, not v3, was the applied final series
 
 An earlier section called v3 the final initial series. That is
 incomplete.
@@ -12356,7 +12391,7 @@ v3 late review revision
 v4 accepted/applied final series
 ```
 
-### Exact anchors recovered so far
+#### Exact anchors recovered so far
 
 Mainline history gives:
 
@@ -12397,7 +12432,7 @@ enumeration.**
 
 ------------------------------------------------------------------------
 
-## 91.3 Nexthop history is larger than the final 20-patch route-integration series
+### 91.3 Nexthop history is larger than the final 20-patch route-integration series
 
 The June 2019 networking pull shows that nexthop support arrived as a
 broader sequence than only the final 20 patches. Earlier commits already
@@ -12443,7 +12478,7 @@ to one of the final 20 commits.
 
 ------------------------------------------------------------------------
 
-# 92. IOAM accepted-series interpretation
+## 92. IOAM accepted-series interpretation
 
 The v5 series is:
 
@@ -12476,7 +12511,7 @@ ipv6: ioam: Data plane support for Pre-allocated Trace
 
 Later fixes repeatedly cite this exact object in `Fixes:`.
 
-### Review-history nuance
+#### Review-history nuance
 
 The earlier v4 series was explicitly challenged as premature because the
 relevant IETF documents were still drafts. v5 later added stronger
@@ -12509,7 +12544,7 @@ for complete six-commit enumeration.**
 
 ------------------------------------------------------------------------
 
-# 93. Provenance table after pass 7
+## 93. Provenance table after pass 7
 
   -----------------------------------------------------------------------
   Feature           Landing series    Exact             Quality
@@ -12556,9 +12591,9 @@ document.
 
 ------------------------------------------------------------------------
 
-# 94. Provenance verification pass 8 --- canonical landing confidence
+## 94. Provenance verification pass 8 --- canonical landing confidence
 
-## 94.1 MPTCP/BPF v5 is now fully canonical
+### 94.1 MPTCP/BPF v5 is now fully canonical
 
 The seven-commit 2022 `mptcp_sock` series is no longer merely an
 accepted-series reference. Patchwork-bot returned direct
@@ -12595,7 +12630,7 @@ mainline durability
 
 ------------------------------------------------------------------------
 
-## 94.2 MPTCP parent-cgroup landing is independently canonical
+### 94.2 MPTCP parent-cgroup landing is independently canonical
 
 The separately landed cgroup behavior is:
 
@@ -12625,7 +12660,7 @@ be attributed to one BPF series.
 
 ------------------------------------------------------------------------
 
-## 94.3 Nexthop final landing revision is confirmed, hashes remain conservative
+### 94.3 Nexthop final landing revision is confirmed, hashes remain conservative
 
 The accepted nexthop route-integration revision is conclusively:
 
@@ -12668,7 +12703,7 @@ enumeration remains Quality B.
 
 ------------------------------------------------------------------------
 
-## 94.4 IOAM v5: exact series date and revision changes
+### 94.4 IOAM v5: exact series date and revision changes
 
 The final v5 series was posted:
 
@@ -12718,7 +12753,7 @@ The other five v5 objects remain pending exact canonical enumeration.
 
 ------------------------------------------------------------------------
 
-# 95. Provenance-confidence convention
+## 95. Provenance-confidence convention
 
 The document now uses a stricter interpretation of Quality A:
 
@@ -12767,14 +12802,14 @@ enumeration, not in determining whether these features actually landed.
 
 ------------------------------------------------------------------------
 
-# 96. Provenance verification pass 9 --- MPTCP 5.6 and IOAM commit expansion
+## 96. Provenance verification pass 9 --- MPTCP 5.6 and IOAM commit expansion
 
-## 96.1 MPTCP 5.6: core implementation anchors
+### 96.1 MPTCP 5.6: core implementation anchors
 
 The initial native MPTCP implementation can now be anchored more
 precisely than by the selftest alone.
 
-### Socket infrastructure
+#### Socket infrastructure
 
 ``` text
 f870fa0b5768842cb4690c1c11f19f28b731ae6d
@@ -12792,7 +12827,7 @@ At this point the socket is still essentially a wrapper around one
 regular TCP subflow; the full on-wire MPTCP protocol is added by the
 subsequent commits in the initial series.
 
-### Receive path
+#### Receive path
 
 ``` text
 648ef4b88673
@@ -12811,7 +12846,7 @@ Fixes: 648ef4b88673
 ("mptcp: Implement MPTCP receive path")
 ```
 
-### Initial selftest
+#### Initial selftest
 
 ``` text
 048d19d444be
@@ -12820,7 +12855,7 @@ mptcp: add basic kselftest for mptcp
 
 remains the test-suite anchor.
 
-### More accurate initial lineage
+#### More accurate initial lineage
 
 ``` text
 TCP/socket prerequisites
@@ -12851,7 +12886,7 @@ initial-series SHA enumeration.**
 
 ------------------------------------------------------------------------
 
-## 96.2 IOAM v5: four of six commits now exactly anchored
+### 96.2 IOAM v5: four of six commits now exactly anchored
 
 The final v5 series contains:
 
@@ -12884,7 +12919,7 @@ The networking pull for Linux 5.15 lists the complete IOAM feature set,
 including the above six feature commits plus a later selftest
 improvement.
 
-### Remaining exact objects
+#### Remaining exact objects
 
 Still pending canonical SHA verification:
 
@@ -12897,7 +12932,7 @@ These are known to be present in the final v5 series and the Linux 5.15
 networking pull, but their SHA values are not inferred merely from
 parent adjacency.
 
-### IOAM provenance chain
+#### IOAM provenance chain
 
 ``` text
 Netdev 0x14
@@ -12928,7 +12963,7 @@ hashes.**
 
 ------------------------------------------------------------------------
 
-# 97. Nexthop core: exact initial-object anchor
+## 97. Nexthop core: exact initial-object anchor
 
 The initial nexthop infrastructure has an independently verified core
 commit:
@@ -12981,17 +13016,17 @@ full route-series SHA enumeration.**
 
 ------------------------------------------------------------------------
 
-# 98. Release-level cross-check
+## 98. Release-level cross-check
 
 The exact commit work is also checked against release-level pull
 requests rather than treated in isolation.
 
-### MPTCP
+#### MPTCP
 
 The initial MPTCP socket and protocol commits are part of the native
 MPTCP generation landing for Linux 5.6.
 
-### IOAM
+#### IOAM
 
 The Linux 5.15 networking pull explicitly lists:
 
@@ -13009,7 +13044,7 @@ a development branch with an actually pulled feature.
 
 ------------------------------------------------------------------------
 
-# 99. Provenance status after pass 9
+## 99. Provenance status after pass 9
 
   ---------------------------------------------------------------------
   Lineage                            Exact coverage
@@ -13040,9 +13075,9 @@ history.
 
 ------------------------------------------------------------------------
 
-# 100. Provenance verification pass 10 --- conservative close-out of exact-SHA gaps
+## 100. Provenance verification pass 10 --- conservative close-out of exact-SHA gaps
 
-## 100.1 IOAM: series/release mapping is complete; SHA mapping remains 4/6
+### 100.1 IOAM: series/release mapping is complete; SHA mapping remains 4/6
 
 The Linux 5.15 networking pull independently confirms the exact six
 feature subjects:
@@ -13089,7 +13124,7 @@ whether the feature landed.
 
 ------------------------------------------------------------------------
 
-## 100.2 Nexthop: split the provenance into object-core and route-integration generations
+### 100.2 Nexthop: split the provenance into object-core and route-integration generations
 
 The June 2019 networking pull exposes the initial object-core generation
 as a distinct sequence before the final route-integration v4/20 series.
@@ -13137,7 +13172,7 @@ cab14d1087d9
 selftests: Add version of router_multipath.sh using nexthop objects
 ```
 
-### Why this split matters
+#### Why this split matters
 
 A single "nexthop objects commit" would hide two architectural steps:
 
@@ -13154,7 +13189,7 @@ The later resilient-nexthop work then builds on both.
 
 ------------------------------------------------------------------------
 
-## 100.3 MPTCP 5.6: exact anchors versus complete protocol series
+### 100.3 MPTCP 5.6: exact anchors versus complete protocol series
 
 The initial MPTCP generation has three independently strong exact
 anchors:
@@ -13187,7 +13222,7 @@ The initial series also contains option parsing/creation, handshake and
 send-side work, but exact SHA values for every one of those commits
 remain outside the verified set.
 
-### Canonical wording
+#### Canonical wording
 
 Prefer:
 
@@ -13207,7 +13242,7 @@ because that commit is only the selftest.
 
 ------------------------------------------------------------------------
 
-# 101. What "complete" means for this change log
+## 101. What "complete" means for this change log
 
 For a feature to be useful in this historical document, it is not
 necessary to list every mechanical commit.
@@ -13243,7 +13278,7 @@ auditable.
 
 ------------------------------------------------------------------------
 
-# 102. Recommended canonical inventory schema
+## 102. Recommended canonical inventory schema
 
 The final normalized table should use:
 
@@ -13288,9 +13323,9 @@ lands.
 
 ------------------------------------------------------------------------
 
-# 103. Audit state at the end of exact-provenance passes
+## 103. Audit state at the end of exact-provenance passes
 
-### Fully strong / Quality A representative provenance
+#### Fully strong / Quality A representative provenance
 
 ``` text
 MPTCP/BPF mptcp_sock
@@ -13311,7 +13346,7 @@ nexthop object core
 AccECN core/negotiation anchors
 ```
 
-### Strong landing + partial full enumeration
+#### Strong landing + partial full enumeration
 
 ``` text
 initial MPTCP 5.6
@@ -13321,7 +13356,7 @@ RTNL multi-release conversion
 initial IPv6 BIG TCP
 ```
 
-### Intentionally retained as development/RFC status
+#### Intentionally retained as development/RFC status
 
 ``` text
 P4TC stalled direction
@@ -13336,7 +13371,7 @@ change database** than a simple LWN reading list.
 
 ------------------------------------------------------------------------
 
-# 104. Kernel Recipes cross-reference
+## 104. Kernel Recipes cross-reference
 
 Source library:
 
@@ -13355,12 +13390,12 @@ Category = networking
 and then supplements it with talks filed under other categories whose
 contents directly intersect the networking change log.
 
-## 104.1 In-scope conference talks found so far
+### 104.1 In-scope conference talks found so far
 
 The document's time range begins on 2019-05-07. Therefore Kernel Recipes
 2019 is in scope.
 
-### Kernel Recipes 2019 --- XDP closer integration with network stack
+#### Kernel Recipes 2019 --- XDP closer integration with network stack
 
 ``` text
 Speaker:
@@ -13391,7 +13426,7 @@ XDP
 A particularly interesting proposal in the abstract is moving skb
 allocation out of drivers by using XDP frames.
 
-### Relation to the change log
+#### Relation to the change log
 
 This is useful architectural provenance for:
 
@@ -13426,7 +13461,7 @@ Kernel Recipes archive:
 
 ------------------------------------------------------------------------
 
-### Kernel Recipes 2019 --- BPF at Facebook
+#### Kernel Recipes 2019 --- BPF at Facebook
 
 ``` text
 Speaker:
@@ -13446,7 +13481,7 @@ The archive describes production BPF uses including:
 -   container security;
 -   performance analysis.
 
-### Relation to the change log
+#### Relation to the change log
 
 This is broad architectural context for the subsequent progression:
 
@@ -13474,7 +13509,7 @@ Kernel Recipes archive:
 
 ------------------------------------------------------------------------
 
-## 104.2 Kernel Recipes 2023 --- Netconf 2023 Workshop
+### 104.2 Kernel Recipes 2023 --- Netconf 2023 Workshop
 
 ``` text
 Speaker:
@@ -13493,7 +13528,7 @@ the first pass.
 The slides summarize the Netconf workshop held at Kernel Recipes and
 name the major discussion areas.
 
-### Willem de Bruijn
+#### Willem de Bruijn
 
 ``` text
 complex-code refactoring
@@ -13513,7 +13548,7 @@ Device Memory TCP
 and is especially valuable because it captures SO_DEVMEM while the
 architecture was still being designed.
 
-### Daniel Borkmann
+#### Daniel Borkmann
 
 The workshop summary lists:
 
@@ -13533,7 +13568,7 @@ netkit / queue-oriented datapaths
 multi-program BPF networking
 ```
 
-### Eric Dumazet
+#### Eric Dumazet
 
 Topics include:
 
@@ -13548,7 +13583,7 @@ UDP accept()
 These belong to the broader socket/skb/queue scalability work
 surrounding the release timeline.
 
-### David Ahern
+#### David Ahern
 
 The workshop summary lists:
 
@@ -13561,7 +13596,7 @@ zero-cost counters for userspace monitoring
 The ML/TCP discussion is particularly relevant to the later Device
 Memory TCP and AI-networking work.
 
-### Florian Westphal
+#### Florian Westphal
 
 Topics include:
 
@@ -13577,7 +13612,7 @@ nftables CVE fixes
 This provides conference context for the document's netfilter/offload
 and IPsec tracks.
 
-### Other networking topics
+#### Other networking topics
 
 The slides also mention:
 
@@ -13590,7 +13625,7 @@ driver review / devlink device orchestration
 DPU/IPU modeling
 ```
 
-### Provenance role
+#### Provenance role
 
 Unlike a single feature talk, Netconf 2023 is best represented as:
 
@@ -13614,11 +13649,11 @@ Slides:
 
 ------------------------------------------------------------------------
 
-# 105. Cross-category Kernel Recipes talks relevant to networking
+## 105. Cross-category Kernel Recipes talks relevant to networking
 
 Category filtering alone is not sufficient.
 
-## 105.1 Kernel Recipes 2019 --- Faster IO through io_uring
+### 105.1 Kernel Recipes 2019 --- Faster IO through io_uring
 
 ``` text
 Speaker:
@@ -13658,7 +13693,7 @@ Kernel Recipes archive:
 
 ------------------------------------------------------------------------
 
-## 105.2 Kernel Recipes 2022 --- What's new with io_uring
+### 105.2 Kernel Recipes 2022 --- What's new with io_uring
 
 ``` text
 Speaker:
@@ -13680,7 +13715,7 @@ Kernel Recipes archive:
 
 ------------------------------------------------------------------------
 
-## 105.3 Kernel Recipes 2023 --- On the way to io_uring networking
+### 105.3 Kernel Recipes 2023 --- On the way to io_uring networking
 
 ``` text
 Speaker:
@@ -13727,7 +13762,7 @@ Kernel Recipes archive:
 
 ------------------------------------------------------------------------
 
-# 106. Kernel Recipes → LWN → mainline mapping
+## 106. Kernel Recipes → LWN → mainline mapping
 
   -----------------------------------------------------------------------------
   Kernel           Year Archive      Change-log lineage  Phase
@@ -13760,7 +13795,7 @@ Kernel Recipes archive:
 
 ------------------------------------------------------------------------
 
-# 107. Kernel Recipes and Netdev serve different provenance roles
+## 107. Kernel Recipes and Netdev serve different provenance roles
 
 The two conference archives complement each other.
 
@@ -13826,14 +13861,14 @@ architectural direction come from?"
 
 ------------------------------------------------------------------------
 
-# 108. Kernel Recipes cross-category sweep --- 2019--2026
+## 108. Kernel Recipes cross-category sweep --- 2019--2026
 
 A second pass searched beyond `Category = networking`, using
 networking-related titles, summaries and live-blog material. This found
 several talks that are directly relevant but classified under
 `security`, `tracing`, or `storage`.
 
-## 108.1 2019 --- Suricata and XDP
+### 108.1 2019 --- Suricata and XDP
 
 ``` text
 Speaker:
@@ -13875,7 +13910,7 @@ The live blog also records an important limitation observed at the time:
 AF_XDP did not provide all metadata/features needed by Suricata,
 including the hardware-timestamp use case discussed in the session.
 
-### Change-log relationship
+#### Change-log relationship
 
 ``` text
 XDP architecture
@@ -13903,7 +13938,7 @@ Kernel Recipes slides:
 
 ------------------------------------------------------------------------
 
-## 108.2 2019 --- The ubiquity but also the necessity of eBPF as a technology to keep the kernel relevant
+### 108.2 2019 --- The ubiquity but also the necessity of eBPF as a technology to keep the kernel relevant
 
 ``` text
 Speaker:
@@ -13946,7 +13981,7 @@ kernel-maintainer architectural argument.
 
 ------------------------------------------------------------------------
 
-## 108.3 2022 --- io_uring: path to zerocopy I/O
+### 108.3 2022 --- io_uring: path to zerocopy I/O
 
 ``` text
 Speaker:
@@ -13982,7 +14017,7 @@ TCP_ZEROCOPY_RECEIVE-like mmap approach
 zctap / AF_XDP-like provided-buffer approach
 ```
 
-### Provenance relationship
+#### Provenance relationship
 
 This is an unusually useful bridge between the later two major lineages:
 
@@ -14019,7 +14054,7 @@ landed.
 
 ------------------------------------------------------------------------
 
-## 108.4 2022 --- What's new with io_uring
+### 108.4 2022 --- What's new with io_uring
 
 ``` text
 Speaker:
@@ -14061,7 +14096,7 @@ rather than a networking feature by itself.
 
 ------------------------------------------------------------------------
 
-## 108.5 2023 --- On the way to io_uring networking
+### 108.5 2023 --- On the way to io_uring networking
 
 The archive category remains `storage`, but the title and abstract are
 explicitly about networking.
@@ -14077,7 +14112,7 @@ IORING_REGISTER_PBUF_RING
 where userspace returns buffers through another shared ring instead of
 submitting a special request for every returned buffer.
 
-### Three-stage Kernel Recipes io_uring lineage
+#### Three-stage Kernel Recipes io_uring lineage
 
 ``` text
 2019
@@ -14111,7 +14146,7 @@ document.
 
 ------------------------------------------------------------------------
 
-# 109. Netconf 2023 live-blog expansion
+## 109. Netconf 2023 live-blog expansion
 
 The Kernel Recipes live-blog account adds detail beyond the Netconf
 summary slides.
@@ -14160,7 +14195,7 @@ toward userspace without the same copying path.
 It also records page_pool as becoming increasingly important as a
 **common driver buffer management mechanism**.
 
-### Combined architecture view
+#### Combined architecture view
 
 ``` text
 page_pool
@@ -14186,7 +14221,7 @@ memory-management lineage already reconstructed from LWN and patches.
 
 ------------------------------------------------------------------------
 
-# 110. Coverage by Kernel Recipes year
+## 110. Coverage by Kernel Recipes year
 
 The archive search results show an important conference-history
 constraint.
@@ -14220,7 +14255,7 @@ conference-provenance source where material exists.
 
 ------------------------------------------------------------------------
 
-# 111. Updated Kernel Recipes inventory
+## 111. Updated Kernel Recipes inventory
 
   -----------------------------------------------------------------------
                Year Talk /         Archive        Primary relevance
@@ -14267,7 +14302,7 @@ conference-provenance source where material exists.
                                                   IPsec, nftables
   -----------------------------------------------------------------------
 
-## Inclusion policy
+### Inclusion policy
 
 Not every BPF or performance talk is automatically included.
 
@@ -14285,7 +14320,7 @@ connection remain outside the canonical networking inventory.
 
 ------------------------------------------------------------------------
 
-# 112. Conference provenance stack after Kernel Recipes sweep
+## 112. Conference provenance stack after Kernel Recipes sweep
 
 The resulting historical stack is now:
 
@@ -14358,7 +14393,7 @@ Linux 6.16 Device Memory TCP TX
 
 ------------------------------------------------------------------------
 
-# 113. Linux Plumbers Conference cross-reference --- 2019--2025
+## 113. Linux Plumbers Conference cross-reference --- 2019--2025
 
 The Linux Plumbers Conference (LPC) is now added as a fourth
 conference/review layer.
@@ -14367,7 +14402,7 @@ Unlike Netdev, LPC often combines networking with BPF and
 cross-subsystem discussions, and many sessions are explicitly intended
 to discuss work that is not yet finished.
 
-## 113.1 LPC 2019 --- Networking Summit
+### 113.1 LPC 2019 --- Networking Summit
 
 The 2019 Networking Summit already contains several lineages that later
 become major parts of this change log:
@@ -14381,7 +14416,7 @@ SwitchDev offload optimizations
 Linux kernel VXLAN + multicast routing
 ```
 
-### MPTCP
+#### MPTCP
 
 ``` text
 LPC 2019
@@ -14399,20 +14434,20 @@ Linux 5.6 native MPTCP
 
 This is strong pre-merge provenance for the initial MPTCP generation.
 
-### BPF socket lookup
+#### BPF socket lookup
 
 The "Programmable socket lookup with BPF" session predates the later
 `BPF_PROG_TYPE_SK_LOOKUP` mainline API and belongs directly in the
 socket-programmability lineage.
 
-### Netfilter hardware offload
+#### Netfilter hardware offload
 
 This provides conference provenance for the same offload direction
 covered by LWN's 2020 two-part netfilter hardware-offload series.
 
 ------------------------------------------------------------------------
 
-## 113.2 LPC 2020 --- Networking and BPF Summit
+### 113.2 LPC 2020 --- Networking and BPF Summit
 
 Important networking sessions include:
 
@@ -14424,7 +14459,7 @@ BPF extensible network: TCP header option, CC, and socket local storage
 Userspace OVS with HW Offload and AF_XDP
 ```
 
-### BPF qdisc
+#### BPF qdisc
 
 The 2020 "A programmable Qdisc with eBPF" talk is a particularly useful
 early ancestor of the later BPF-qdisc work.
@@ -14448,7 +14483,7 @@ mainline BPF Qdisc
 It is **design lineage**, not evidence that the later `Qdisc_ops`
 struct_ops design had already landed in 2020.
 
-### BPF TCP extensibility
+#### BPF TCP extensibility
 
 The TCP header option / congestion-control / socket-local-storage
 session connects to:
@@ -14462,7 +14497,7 @@ later MPTCP/BPF extensions
 
 ------------------------------------------------------------------------
 
-## 113.3 LPC 2021 --- BPF & Networking Summit
+### 113.3 LPC 2021 --- BPF & Networking Summit
 
 Important sessions include:
 
@@ -14475,7 +14510,7 @@ From XDP to Socket
 Bringing TSO/GRO and Jumbo frames to XDP
 ```
 
-### SO_REUSEPORT socket migration
+#### SO_REUSEPORT socket migration
 
 The talk explicitly describes the Linux 5.14 socket-migration feature
 and its BPF extension.
@@ -14488,7 +14523,7 @@ Phase:
 merge/post-merge explanation
 ```
 
-### XDP multi-buffer precursor
+#### XDP multi-buffer precursor
 
 "Bringing TSO/GRO and Jumbo frames to XDP" states the core limitation
 clearly:
@@ -14521,7 +14556,7 @@ virtio-net multi-buffer / zero-copy interactions
 
 ------------------------------------------------------------------------
 
-# 114. LPC 2022 --- eBPF & Networking
+## 114. LPC 2022 --- eBPF & Networking
 
 LPC 2022 is one of the richest years for the change-log lineages.
 
@@ -14538,7 +14573,7 @@ XDP gaining access to NIC hardware hints via BTF
 MPTCP: Extending kernel functionality with eBPF and Netlink
 ```
 
-## 114.1 High-speed Linux TCP
+### 114.1 High-speed Linux TCP
 
 David Ahern's talk quantifies the scaling problem at 400 Gb/s:
 
@@ -14568,7 +14603,7 @@ Device Memory TCP
 
 rather than treating those later mechanisms as isolated optimizations.
 
-## 114.2 Machine-readable Netlink protocols
+### 114.2 Machine-readable Netlink protocols
 
 The LPC session:
 
@@ -14597,7 +14632,7 @@ YNL userspace tooling
 MPTCP / nftables and other conversions
 ```
 
-## 114.3 MPTCP + BPF/Netlink
+### 114.3 MPTCP + BPF/Netlink
 
 The MPTCP session explicitly says:
 
@@ -14626,7 +14661,7 @@ update_socket_protocol()
 later iterator/kfunc work
 ```
 
-## 114.4 XDP hardware hints / metadata
+### 114.4 XDP hardware hints / metadata
 
 The BTF hardware-hints session identifies several consumers:
 
@@ -14642,7 +14677,7 @@ active in later LPC sessions.
 
 ------------------------------------------------------------------------
 
-# 115. LPC 2023 --- eBPF & Networking
+## 115. LPC 2023 --- eBPF & Networking
 
 A particularly important session is:
 
@@ -14674,7 +14709,7 @@ RDMA / RoCE / InfiniBand
 The design goal is to preserve the generic kernel socket/networking
 stack while removing the extra data copy.
 
-### Provenance chain
+#### Provenance chain
 
 ``` text
 Kernel Recipes 2022
@@ -14703,7 +14738,7 @@ This gives unusually strong multi-conference provenance for the feature.
 
 ------------------------------------------------------------------------
 
-# 116. LPC 2024 --- Networking Track
+## 116. LPC 2024 --- Networking Track
 
 LPC 2024 has a dedicated Networking Track described by the organizers as
 an in-person manifestation of the netdev mailing list.
@@ -14721,7 +14756,7 @@ WireGuard & GRO?
 State of the Bloat
 ```
 
-## 116.1 Per Netns RTNL
+### 116.1 Per Netns RTNL
 
 This is one of the strongest LPC matches to the existing change log.
 
@@ -14755,7 +14790,7 @@ subsystem-specific lock/refcount conversion
 This directly validates the document's decision to treat RTNL breakup as
 a **multi-year migration**, not a single-release feature.
 
-## 116.2 Network virtualization overhead
+### 116.2 Network virtualization overhead
 
 The network-virtualization session discusses reducing the cost of
 traversing both guest and host networking stacks.
@@ -14776,7 +14811,7 @@ queue leasing / KubeVirt zero-copy
 
 ------------------------------------------------------------------------
 
-# 117. LPC 2025 --- Networking Track
+## 117. LPC 2025 --- Networking Track
 
 The 2025 Networking Track is exceptionally relevant to the late part of
 this change log.
@@ -14795,7 +14830,7 @@ Kernel-Native Packet Processing on AMD GPUs
 Linux Networking with MANA: RX Path Optimization and Netshaper
 ```
 
-## 117.1 Zero-copy in containers / netkit queue leasing
+### 117.1 Zero-copy in containers / netkit queue leasing
 
 This is the most important LPC 2025 session for the current document.
 
@@ -14834,7 +14869,7 @@ queue-range BPF attachment
 TX-side BPF attachment
 ```
 
-### Exact historical relationship
+#### Exact historical relationship
 
 ``` text
 LPC 2025
@@ -14855,7 +14890,7 @@ netkit + KubeVirt zero-copy follow-up
 
 This is a high-value **design-to-landing** provenance source.
 
-## 117.2 Packet metadata
+### 117.2 Packet metadata
 
 The 2025 packet-metadata talk covers:
 
@@ -14884,7 +14919,7 @@ LPC 2025
 packet metadata RX/TX roadmap
 ```
 
-## 117.3 Kernel-native XDP on AMD GPUs
+### 117.3 Kernel-native XDP on AMD GPUs
 
 This session connects several otherwise separate lineages:
 
@@ -14919,7 +14954,7 @@ This should be treated as **post-merge application/extension
 provenance** for the device memory infrastructure, not as part of the
 initial Device Memory TCP implementation.
 
-## 117.4 page_pool in MANA
+### 117.4 page_pool in MANA
 
 The MANA session describes replacing per-page RX-buffer use with:
 
@@ -14937,7 +14972,7 @@ a core networking memory-management primitive.
 
 ------------------------------------------------------------------------
 
-# 118. LPC timeline mapped to the major change-log lineages
+## 118. LPC timeline mapped to the major change-log lineages
 
   ---------------------------------------------------------------------------
       Year LPC topic          Change-log lineage           Phase
@@ -15006,7 +15041,7 @@ a core networking memory-management primitive.
 
 ------------------------------------------------------------------------
 
-# 119. Conference provenance stack after LPC integration
+## 119. Conference provenance stack after LPC integration
 
 The full provenance stack is now:
 
@@ -15068,14 +15103,14 @@ provenance** and from **mainline provenance**.
 
 ------------------------------------------------------------------------
 
-# 120. LPC cross-track sweep --- DMA, RDMA, virtualization and io_uring
+## 120. LPC cross-track sweep --- DMA, RDMA, virtualization and io_uring
 
 The LPC search was expanded beyond the Networking/eBPF tracks. This
 matters because several prerequisites for modern zero-copy networking
 live in RDMA, VFIO/IOMMU/PCI, virtualization, and generic io_uring
 discussions rather than in the networking track itself.
 
-## 120.1 LPC 2019 --- Challenges of the RDMA subsystem
+### 120.1 LPC 2019 --- Challenges of the RDMA subsystem
 
 ``` text
 Speaker:
@@ -15111,7 +15146,7 @@ ODP
 container support
 ```
 
-### Historical relevance
+#### Historical relevance
 
 This is not direct Device Memory TCP provenance. The networking feature
 did not yet exist in its later form.
@@ -15146,7 +15181,7 @@ the RDMA subsystem.
 
 ------------------------------------------------------------------------
 
-## 120.2 LPC 2020 --- xen-netfront and virtio_net XDP offloading
+### 120.2 LPC 2020 --- xen-netfront and virtio_net XDP offloading
 
 ``` text
 Track:
@@ -15186,7 +15221,7 @@ API originated from this exact proposal.
 
 ------------------------------------------------------------------------
 
-## 120.3 LPC 2020 --- Userspace OVS with HW Offload and AF_XDP
+### 120.3 LPC 2020 --- Userspace OVS with HW Offload and AF_XDP
 
 The session proposes a three-level processing hierarchy:
 
@@ -15204,7 +15239,7 @@ OVS-DPDK style full userspace-driver deployment. That allows hardware
 offload through `tc-flower` while also providing a high-performance
 userspace fallback.
 
-### Relevance
+#### Relevance
 
 This is useful historical evidence for the recurring Linux networking
 design pattern:
@@ -15233,7 +15268,7 @@ although the mechanisms differ.
 
 ------------------------------------------------------------------------
 
-## 120.4 LPC 2021 --- io_uring: BPF controlled I/O
+### 120.4 LPC 2021 --- io_uring: BPF controlled I/O
 
 ``` text
 Speaker:
@@ -15265,9 +15300,9 @@ design context**, not as a direct ancestor of a specific networking API.
 
 ------------------------------------------------------------------------
 
-# 121. LPC 2022 --- P2P inside virtual machines
+## 121. LPC 2022 --- P2P inside virtual machines
 
-## Exposing PCIe topology to Guest OS for peer-to-peer
+### Exposing PCIe topology to Guest OS for peer-to-peer
 
 ``` text
 Speaker:
@@ -15300,7 +15335,7 @@ DMA-BUF
 The host kernel can validate PCI topology/distance, but a guest may not
 see enough of the physical PCI topology to make the same decision.
 
-### Relevance to the networking history
+#### Relevance to the networking history
 
 This is especially useful when interpreting later GPU/device-memory
 networking work.
@@ -15322,7 +15357,7 @@ exposing a fast packet API.
 
 ------------------------------------------------------------------------
 
-# 122. LPC 2023 --- ZCRX as a hybrid rather than kernel-bypass design
+## 122. LPC 2023 --- ZCRX as a hybrid rather than kernel-bypass design
 
 The cross-track sweep reinforces the significance of the 2023:
 
@@ -15391,7 +15426,7 @@ inventory.
 
 ------------------------------------------------------------------------
 
-# 123. VFIO/IOMMU/PCI as supporting provenance
+## 123. VFIO/IOMMU/PCI as supporting provenance
 
 The 2023--2025 VFIO/IOMMU/PCI microconference descriptions repeatedly
 list:
@@ -15433,12 +15468,12 @@ generic microconference proposal
 
 ------------------------------------------------------------------------
 
-# 124. Cross-track findings that materially change the networking narrative
+## 124. Cross-track findings that materially change the networking narrative
 
 The additional LPC material strengthens three long-term architectural
 themes.
 
-## Theme 1 --- zero copy is also a memory-ownership problem
+### Theme 1 --- zero copy is also a memory-ownership problem
 
 ``` text
 2019 RDMA / DMA-BUF / HMM / P2P discussions
@@ -15473,7 +15508,7 @@ how is it isolated?
 how is it exposed across namespaces/VMs?
 ```
 
-## Theme 2 --- kernel bypass is not the only high-performance model
+### Theme 2 --- kernel bypass is not the only high-performance model
 
 Several LPC talks independently converge on:
 
@@ -15496,7 +15531,7 @@ Device Memory TCP
 netkit queue leasing
 ```
 
-## Theme 3 --- virtualization makes direct-I/O topology harder
+### Theme 3 --- virtualization makes direct-I/O topology harder
 
 ``` text
 physical topology
@@ -15527,7 +15562,7 @@ enough of the physical data path to containers and VMs.
 
 ------------------------------------------------------------------------
 
-# 125. Updated LPC canonical inventory
+## 125. Updated LPC canonical inventory
 
   -------------------------------------------------------------------------
             Year Session          LPC area          Canonical role
@@ -15595,7 +15630,7 @@ enough of the physical data path to containers and VMs.
 
 ------------------------------------------------------------------------
 
-# 126. Provenance graph with cross-subsystem LPC material
+## 126. Provenance graph with cross-subsystem LPC material
 
 The networking-memory branch can now be represented more accurately as:
 
@@ -15634,14 +15669,14 @@ It captures a major conclusion of the multi-source research:
 
 ------------------------------------------------------------------------
 
-# 127. Unified chronological timeline --- conferences → LWN → patches → mainline
+## 127. Unified chronological timeline --- conferences → LWN → patches → mainline
 
 Legend: `[KR]` Kernel Recipes, `[LPC]` Linux Plumbers Conference,
 `[Netdev]` Netdev, `[LWN]` LWN, `[Patch]` upstream series, `[Mainline]`
 canonical landing, `[Release]` kernel milestone, `[RFC]` design only,
 `[X]` removal.
 
-## 2019 --- upstreaming and programmable networking
+### 2019 --- upstreaming and programmable networking
 
 ``` text
 [KR] XDP closer integration → high-speed RX memory pressure
@@ -15651,7 +15686,7 @@ canonical landing, `[Release]` kernel milestone, `[RFC]` design only,
 [LPC] Programmable socket lookup with BPF
 ```
 
-## 2020 --- native MPTCP and BPF extensibility
+### 2020 --- native MPTCP and BPF extensibility
 
 ``` text
 f870fa0b5768 MPTCP socket stubs
@@ -15668,7 +15703,7 @@ Linux 5.6
 [Netdev 0x14] IOAM / MPTCP / TC conntrack offload
 ```
 
-## 2021 --- multi-buffer pressure, IOAM, zero-copy
+### 2021 --- multi-buffer pressure, IOAM, zero-copy
 
 ``` text
 [LPC] TSO/GRO/Jumbo for XDP → non-linear XDP → AF_XDP multi-buffer
@@ -15688,7 +15723,7 @@ Linux 5.15
 [LWN] BPF meets io_uring / zero-copy TX
 ```
 
-## 2022 --- BIG TCP, MPTCP extensibility, YNL, ZC architecture
+### 2022 --- BIG TCP, MPTCP extensibility, YNL, ZC architecture
 
 ``` text
 [Netdev] BIG TCP → [LWN] Going big with TCP packets → Linux 5.19
@@ -15710,7 +15745,7 @@ YAML specs → YNL → protocol conversions
   └─ DMA-BUF/P2P
 ```
 
-## 2023 --- netkit, Device Memory TCP and ZCRX
+### 2023 --- netkit, Device Memory TCP and ZCRX
 
 ``` text
 [Patch] IPv4 BIG TCP v4/10 → Linux 6.3
@@ -15736,7 +15771,7 @@ RFC/revision cycle
 AF_XDP multi-buffer → Linux 6.6
 ```
 
-## 2024 --- devmem RX, virtio AF_XDP and RTNL
+### 2024 --- devmem RX, virtio AF_XDP and RTNL
 
 ``` text
 Device Memory TCP v26/13 → Linux 6.12
@@ -15756,7 +15791,7 @@ per-netns RTNL infrastructure → Linux 6.13
 continued subsystem RTNL removal
 ```
 
-## 2025 --- ZCRX landing and container zero-copy
+### 2025 --- ZCRX landing and container zero-copy
 
 ``` text
 io_uring ZCRX revisions
@@ -15779,7 +15814,7 @@ physical NIC queue → netkit lease
   └─ AF_XDP → QEMU/KVM
 ```
 
-## 2026 --- queue leasing, devmem TX, AccECN, tunnel BIG TCP
+### 2026 --- queue leasing, devmem TX, AccECN, tunnel BIG TCP
 
 ``` text
 77b9c4a438fc... first queue-leasing merge
@@ -15806,9 +15841,9 @@ IPv6 BIG TCP → IPv4 BIG TCP
 VXLAN / GENEVE → Linux 7.3 development
 ```
 
-# 128. Unified feature lineage index
+## 128. Unified feature lineage index
 
-## Packet memory / zero copy
+### Packet memory / zero copy
 
 ``` text
 RX memory pressure → page_pool → DMA-BUF/P2P + memory providers → netmem
@@ -15818,37 +15853,37 @@ RX memory pressure → page_pool → DMA-BUF/P2P + memory providers → netmem
                                                      queue leasing/netns
 ```
 
-## Packet size
+### Packet size
 
 ``` text
 GRO/GSO → IPv6 BIG TCP 5.19 → IPv4 BIG TCP 6.3 → tunnel BIG TCP
 ```
 
-## BPF networking
+### BPF networking
 
 ``` text
 XDP → struct_ops → SK_LOOKUP → MPTCP BPF → netkit → BPF qdisc → queue/TX policy
 ```
 
-## MPTCP
+### MPTCP
 
 ``` text
 2019 LPC/LWN → 5.6 native MPTCP → path management → 2022 BPF → userspace PM → extensions
 ```
 
-## Control plane
+### Control plane
 
 ``` text
 hand-written Netlink → 2022 YAML proposal → YAML specs → YNL → protocol conversions
 ```
 
-## Locking
+### Locking
 
 ``` text
 global RTNL → unlocked flags → RCU readers → per-netns RTNL → subsystem lock removal
 ```
 
-# 129. Source-role matrix
+## 129. Source-role matrix
 
   ---------------------------------------------------------------------
   Source                             Best used for
@@ -15882,7 +15917,7 @@ Mainline?       → git
 Which release?  → release pull/tag
 ```
 
-# 130. Recommended reading order
+## 130. Recommended reading order
 
 ``` text
 1. Unified chronological timeline
@@ -15898,9 +15933,9 @@ and an auditable source map.
 
 ------------------------------------------------------------------------
 
-# 131. LWN article completeness audit
+## 131. LWN article completeness audit
 
-## 131.1 Method
+### 131.1 Method
 
 The audit uses two independent discovery paths.
 
@@ -15937,9 +15972,9 @@ Article types are tagged as:
 
 A feature may legitimately have more than one LWN entry.
 
-## 131.2 Newly recovered or newly promoted entries
+### 131.2 Newly recovered or newly promoted entries
 
-### 2019
+#### 2019
 
 ``` text
 2019-05-08 [C/F] Memory management for 400Gb/s interfaces
@@ -15978,7 +16013,7 @@ VSOCK multi-transport
 Wi-Fi airtime queue limits
 ```
 
-### 2020
+#### 2020
 
 ``` text
 2020-01-02 [F] A medley of performance-related BPF patches
@@ -16023,7 +16058,7 @@ The `Programming socket lookup with BPF` RFC in 2019 plus the 5.9
 merge-window report now provide a clear LWN-side design-to-landing trail
 for SK_LOOKUP.
 
-### 2021
+#### 2021
 
 Canonical feature articles already indexed remain important:
 
@@ -16061,7 +16096,7 @@ SO_RESERVE_MEM
 
 even when there is no separate feature article for each one.
 
-### 2022
+#### 2022
 
 ``` text
 2022-02-02 [P] tcp: BIG TCP implementation
@@ -16088,9 +16123,9 @@ new userspace API for MPTCP flow management
 The early io_uring ZCRX pages are retained as `[P/RFC]`; they are not
 presented as mainline functionality.
 
-## 131.3 2023--2024 audit
+### 131.3 2023--2024 audit
 
-### 2023
+#### 2023
 
 The release sweep covers:
 
@@ -16117,7 +16152,7 @@ AF_XDP multi-buffer
 The 6.3 merge-window summaries are retained as release evidence for IPv4
 BIG TCP.
 
-### 2024
+#### 2024
 
 ``` text
 2024-06-10 [F] P4TC hits a brick wall
@@ -16150,7 +16185,7 @@ new traffic-shaping API
 
 P4TC remains tagged `RFC/development/stalled`, not a mainline feature.
 
-## 131.4 2025 audit
+### 131.4 2025 audit
 
 Feature articles/patch archives include:
 
@@ -16209,7 +16244,7 @@ The 47% UDP RX number is retained only as the benchmark result reported
 in the 6.18 merge-window article, not as a general performance
 guarantee.
 
-## 131.5 2026 audit through 2026-10-02
+### 131.5 2026 audit through 2026-10-02
 
 Feature/conference articles include:
 
@@ -16251,7 +16286,7 @@ The 7.3 merge-window article is especially important because it provides
 LWN release-level confirmation that BIG TCP over UDP tunnels landed in
 the development cycle.
 
-## 131.6 Completeness status
+### 131.6 Completeness status
 
 The audit now distinguishes three notions of "complete":
 
@@ -16281,7 +16316,7 @@ Therefore the defensible wording is:
 It should not be described as a mathematically exhaustive list of every
 LWN URL containing network-related material.
 
-# 132. LWN audit rules for the canonical inventory
+## 132. LWN audit rules for the canonical inventory
 
 For each feature, retain:
 
@@ -16306,9 +16341,9 @@ many independent features
 
 while still preserving an auditable trail from design to mainline.
 
-# 133. Newly strengthened LWN provenance chains
+## 133. Newly strengthened LWN provenance chains
 
-## SK_LOOKUP
+### SK_LOOKUP
 
 ``` text
 2019 [P] Programming socket lookup with BPF
@@ -16320,7 +16355,7 @@ LPC 2019 discussion
 BPF_PROG_TYPE_SK_LOOKUP mainline
 ```
 
-## BIG TCP
+### BIG TCP
 
 ``` text
 Netdev 0x15
@@ -16338,7 +16373,7 @@ Netdev 0x15
 7.3 [M] VXLAN/GENEVE landing confirmation
 ```
 
-## io_uring ZCRX
+### io_uring ZCRX
 
 ``` text
 2022 Kernel Recipes design discussion
@@ -16352,7 +16387,7 @@ LWN v1...v13 patch-series trail
 6.15 [M] merge-window/mainline confirmation
 ```
 
-## Device Memory TCP
+### Device Memory TCP
 
 ``` text
 2023 Netconf/Netdev design
@@ -16370,7 +16405,7 @@ v14/9
 6.16 [M] TX landing
 ```
 
-## RTNL breakup
+### RTNL breakup
 
 ``` text
 earlier unlocked/RCU work
@@ -16384,3 +16419,4 @@ LPC 2024 Per Netns RTNL
 
 These chains are now preferred over citing a single LWN page as if it
 represented the entire history of a feature.
+
