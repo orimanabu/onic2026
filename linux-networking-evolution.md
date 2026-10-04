@@ -8265,38 +8265,38 @@ so the status remains **merged-development**, not "released".
 
 # 76. Updated provenance matrix
 
-  -----------------------------------------------------------------------------------------------
-  Feature                    Kernel            Exact anchor(s)                  Quality
-  -------------------------- ----------------- -------------------------------- -----------------
-  initial MPTCP              5.6               `048d19d444be` selftest + native B
-                                               API/release verification         
+  ---------------------------------------------------------------------------------------
+  Feature                    Kernel        Exact anchor(s)                  Quality
+  -------------------------- ------------- -------------------------------- -------------
+  initial MPTCP              5.6           `048d19d444be` selftest + native B
+                                           API/release verification         
 
-  BPF                        later MPTCP/BPF   `0dd061a6a115`                   **A**
-  `update_socket_protocol`   era                                                
+  BPF                        later         `0dd061a6a115`                   **A**
+  `update_socket_protocol`   MPTCP/BPF era                                  
 
-  IPv6 IOAM data plane       5.x               `9ee11f0fff20`                   **A**
+  IPv6 IOAM data plane       5.x           `9ee11f0fff20`                   **A**
 
-  IPv6 BIG TCP               5.19              `0fe79f28bfaf...` + release pull A/B
+  IPv6 BIG TCP               5.19          `0fe79f28bfaf...` + release pull A/B
 
-  IPv4 BIG TCP               6.3               `9eefedd58ae1`, `b1a78b9b9886`   **A**
+  IPv4 BIG TCP               6.3           `9eefedd58ae1`, `b1a78b9b9886`   **A**
 
-  BIG TCP VXLAN              7.3 dev           `f3d0f753f066`                   **A**
+  BIG TCP VXLAN              7.3 dev       `f3d0f753f066`                   **A**
 
-  BIG TCP GENEVE             7.3 dev           `03ebe91b0f61`                   **A**
+  BIG TCP GENEVE             7.3 dev       `03ebe91b0f61`                   **A**
 
-  AF_XDP multi-buffer        6.6               `804627751b42` et al.            **A**
+  AF_XDP multi-buffer        6.6           `804627751b42` et al.            **A**
 
-  Device Memory TCP RX       6.12              `8f0b3cc9a4c1` + series          **A**
+  Device Memory TCP RX       6.12          `8f0b3cc9a4c1` + series          **A**
 
-  io_uring ZCRX              6.15              merge `ca0b04ba0b35...`          B
+  io_uring ZCRX              6.15          merge `ca0b04ba0b35...`          B
 
-  BPF qdisc                  2025-era          `c8240344956e...`                **A**
+  BPF qdisc                  2025-era      `c8240344956e...`                **A**
 
-  netkit core                6.7               `35dfaad7188c...`                **A**
+  netkit core                6.7           `35dfaad7188c...`                **A**
 
-  netkit queue leasing       2026              merge→revert→`15089225889b...`   **A**
-                                               remerge                          
-  -----------------------------------------------------------------------------------------------
+  netkit queue leasing       2026          merge→revert→`15089225889b...`   **A**
+                                           remerge                          
+  ---------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -8322,3 +8322,411 @@ The provenance backlog is now narrower:
 
 The tunnel BIG TCP branch no longer needs status research: the v9 series
 and all nine net-next commits are now exactly identified.
+
+------------------------------------------------------------------------
+
+# 78. Provenance verification pass 4 --- virtio-net AF_XDP capability matrix
+
+The virtio-net AF_XDP history is now split by capability rather than
+described as one feature.
+
+## 78.1 Preparation phase --- 2023--2024
+
+The early series repeatedly identifies three prerequisites:
+
+``` text
+1. virtqueue per-queue reset
+2. virtio-core premapped DMA
+3. virtio-net XDP refactoring
+```
+
+Representative LWN/netdev series:
+
+``` text
+2023-02  [PATCH 00/33] virtio-net: support AF_XDP zero copy
+2023-10  [PATCH net-next v1 00/19]
+2024-01  split/refactored series
+2024-06  v5/v6
+2024-07  final RX series
+```
+
+The initial 2023 series was therefore development/proposal history, not
+evidence that virtio-net already supported AF_XDP zero-copy in a
+released kernel.
+
+------------------------------------------------------------------------
+
+## 78.2 AF_XDP RX zero-copy --- Linux 6.11
+
+The Linux 6.11 networking pull explicitly lists:
+
+``` text
+VirtIO net:
+  - support for AF_XDP Rx zero-copy
+```
+
+This is the release-level authoritative milestone.
+
+Important RX commits include:
+
+``` text
+e9f3962441c0a4d6f16c656e6c8aa02a3ccdd568
+virtio_net: xsk: rx: support fill with xsk buffer
+
+a4e7ba7027012f009f22a68bcfde670f9298d3a4
+virtio_net: xsk: rx: support recv small mode
+
+99c861b44eb1fb9dfe8776854116a6a9064c19bb
+virtio_net: xsk: rx: support recv merge mode
+```
+
+### Small receive mode
+
+`a4e7ba702701` implements the AF_XDP zero-copy receive handling for the
+virtio-net small buffer mode.
+
+### Mergeable receive mode
+
+`99c861b44eb1` adds AF_XDP zero-copy receive support to mergeable
+receive buffers.
+
+This does **not** mean arbitrary multi-buffer XDP programs are supported
+in zero-copy mode; see below.
+
+------------------------------------------------------------------------
+
+## 78.3 Important correction: proposed revert was not the final status
+
+In September 2024 a seven-patch **RFC** proposed reverting the RX
+zero-copy work because of crashes when `VIRTIO_F_ACCESS_PLATFORM` was
+absent and:
+
+``` text
+net.core.high_order_alloc_disable=1
+```
+
+The RFC explicitly proposed reverting, among others:
+
+``` text
+99c861b44eb1  recv merge mode
+a4e7ba702701  recv small mode
+e9f3962441c0  fill with xsk buffer
+```
+
+However, this must not be recorded as "virtio-net RX ZC was reverted
+from mainline".
+
+Later fixes in 2025 still use these commits as active `Fixes:` targets,
+and the current driver retains the XSK pool setup path.
+
+Therefore:
+
+``` text
+2024-07
+RX ZC merged for Linux 6.11
+      │
+      ▼
+2024-09
+RFC to revert due to crash
+      │
+      └── proposal / review event,
+          not the canonical final state
+      │
+      ▼
+2025
+fixes against the retained RX implementation
+```
+
+------------------------------------------------------------------------
+
+## 78.4 AF_XDP TX zero-copy --- accepted in November 2024
+
+TX was separated from the RX work.
+
+Development:
+
+``` text
+2024-07  RFC TX series
+2024-08  [PATCH net-next 00/13]
+2024-09  RFC v1 after merge window closed
+2024-11  [PATCH net-next v4 00/13]
+```
+
+The v4 series was applied to `netdev/net-next.git` on 2024-11-16.
+
+Verified series anchors include:
+
+``` text
+9f19c084057a
+virtio_ring: introduce vring_need_unmap_buffer
+
+21a4e3ce6dc7b0a3bc882ebe1cb921a40235ddb0
+virtio_net: xsk: bind/unbind xsk for tx
+
+37e0ca657a3d
+virtio_net: xdp_features add NETDEV_XDP_ACT_XSK_ZEROCOPY
+```
+
+The final feature-advertisement commit is especially useful:
+
+``` text
+NETDEV_XDP_ACT_XSK_ZEROCOPY
+```
+
+is advertised after the TX series lands.
+
+### Capability timeline
+
+``` text
+Linux 6.11 era
+    AF_XDP RX zero-copy
+          │
+          ▼
+late 2024 net-next
+    AF_XDP TX zero-copy
+          │
+          ▼
+combined driver XSK pool binding
+    RX + TX queue handling
+```
+
+------------------------------------------------------------------------
+
+## 78.5 Mergeable RX is not the same as multi-buffer XDP support
+
+This distinction is essential.
+
+`99c861b44eb1` allows AF_XDP zero-copy receive in virtio-net's
+**mergeable receive-buffer mode**.
+
+But when a packet itself spans multiple XDP buffers and an XDP program
+is attached, the driver did not yet support running that program over
+the multi-buffer zero-copy packet.
+
+2025 RFC:
+
+``` text
+[RFC PATCH net-next v2 0/2]
+virtio-net: support zerocopy multi buffer XDP in mergeable
+```
+
+states explicitly:
+
+``` text
+currently:
+zerocopy + mergeable receive mode
+        │
+        ├── single-buffer XDP: supported
+        └── multi-buffer XDP: not supported
+
+proposal:
+use XDP frags for multi-buffer zero-copy XDP
+```
+
+The RFC uses a jumbo-MTU example where one packet exceeds one XDP buffer
+and therefore must span multiple buffers.
+
+### 2025 correctness fix
+
+A later fix targets:
+
+``` text
+Fixes: 99c861b44eb1
+("virtio_net: xsk: rx: support recv merge mode")
+```
+
+because the unsupported multi-buffer case could bypass the attached XDP
+program and incorrectly pass the packet to the normal stack.
+
+The accepted fix eventually became:
+
+``` text
+1ab665817448c31f4758dce43c455bd4c5e460aa
+virtio-net: drop the multi-buffer XDP packet in zerocopy
+```
+
+and returns an abort/drop result rather than silently bypassing the XDP
+program.
+
+This is strong evidence for the capability boundary:
+
+``` text
+mergeable AF_XDP ZC RX
+        ≠
+multi-buffer XDP program support
+```
+
+------------------------------------------------------------------------
+
+# 79. virtio-net AF_XDP capability matrix
+
+  ---------------------------------------------------------------------------------------
+  Capability        Status            Mainline / series   Interpretation
+                                      anchor              
+  ----------------- ----------------- ------------------- -------------------------------
+  virtqueue reset   merged            pre-AF_XDP work     enables queue reconfiguration
+  prerequisite      prerequisite                          
+
+  premapped DMA     merged            virtio-core work    avoids ordinary per-buffer
+  prerequisite      prerequisite                          mapping path
+
+  XDP refactoring   merged            pre-6.11 work       prepares common RX/XDP path
+                    prerequisite                          
+
+  AF_XDP RX         **merged**        `a4e7ba702701`      Linux 6.11 networking milestone
+  zero-copy, small                                        
+  mode                                                    
+
+  AF_XDP RX         **merged**        `99c861b44eb1`      mergeable receive mode
+  zero-copy,                                              supported
+  mergeable mode                                          
+
+  AF_XDP TX         **merged**        v4/13 applied Nov   separate later series
+  zero-copy                           2024;               
+                                      `21a4e3ce6dc7...`   
+
+  XSK ZC feature    **merged**        `37e0ca657a3d`      `NETDEV_XDP_ACT_XSK_ZEROCOPY`
+  advertisement                                           
+
+  zero-copy         **not established 2025 RFC v2         separate XDP-frags problem
+  multi-buffer XDP  by base 6.11                          
+  in mergeable RX   work**                                
+
+  unsupported       **fixed**         `1ab665817448...`   prevents silent XDP bypass
+  multi-buffer                                            
+  handling                                                
+  ---------------------------------------------------------------------------------------
+
+### Canonical wording
+
+Do not write:
+
+``` text
+Linux 6.11: virtio-net gained full AF_XDP zero-copy support
+```
+
+Prefer:
+
+``` text
+Linux 6.11 added virtio-net AF_XDP RX zero-copy support, including small and
+mergeable receive modes. TX zero-copy was merged separately later in 2024.
+Zero-copy multi-buffer XDP processing in mergeable mode remained a separate
+problem and was still the subject of RFC work in 2025.
+```
+
+This is the capability-accurate description.
+
+------------------------------------------------------------------------
+
+# 80. MPTCP BPF provenance --- subflow support predates protocol switching
+
+An important chronology point:
+
+``` text
+2020
+BPF gains awareness of MPTCP subflows
+       │
+       ▼
+later
+BPF update_socket_protocol()
+       │
+       ▼
+BPF can transparently select MPTCP
+       │
+       ▼
+later iterator/kfunc work
+richer subflow inspection/control
+```
+
+A 2020 series:
+
+``` text
+[PATCH bpf-next 0/3] bpf: add MPTCP subflow support
+```
+
+was motivated by the fact that BPF previously could not distinguish
+ordinary TCP sockets from TCP sockets acting as MPTCP subflows.
+
+This means the canonical MPTCP+BPF history should not begin with
+`update_socket_protocol()`.
+
+Instead separate:
+
+1.  **subflow identification/visibility**;
+2.  **protocol selection (`update_socket_protocol`)**;
+3.  **subflow iterators/kfuncs and richer control**.
+
+This better reflects how BPF integration expanded from observation to
+selection and then to management.
+
+------------------------------------------------------------------------
+
+# 81. Nexthop series --- exact final-series structure
+
+The final 2019 initial series is confirmed as:
+
+``` text
+[PATCH v3 net-next 00/20]
+net: Enable nexthop objects with IPv4 and IPv6 routes
+2019-06-07
+```
+
+The archive exposes all 20 patch subjects. They fall into four
+conceptual groups:
+
+``` text
+A. IPv6 fib6_nh preparation
+   - make existing IPv6 paths able to deal with nexthop-contained fib6_nh
+
+B. nexthop-object route integration
+   - IPv4
+   - IPv6
+
+C. object lifecycle/API
+   - replace
+   - delete/use/reference handling
+
+D. selftests
+   - PMTU
+   - multiple prefixes / shared nexthop
+   - router multipath using nexthop objects
+```
+
+The key architectural fact is that the series is explicitly described by
+David Ahern as the **final set of the initial nexthop object work**.
+
+For provenance purposes, the 20-patch series itself is therefore a
+stronger initial feature anchor than choosing one arbitrary commit and
+labeling it "the nexthop commit".
+
+The next pass should attach the exact mainline hash to each of these 20
+subjects from `git.kernel.org`.
+
+------------------------------------------------------------------------
+
+# 82. Quality update after capability audit
+
+  -----------------------------------------------------------------------
+  Feature                             Quality
+  ----------------------------------- -----------------------------------
+  virtio-net AF_XDP RX ZC small mode  **A**
+
+  virtio-net AF_XDP RX ZC mergeable   **A**
+  mode                                
+
+  virtio-net AF_XDP TX ZC             **A**
+
+  virtio-net multi-buffer ZC XDP      **D/RFC for 2025 proposal; boundary
+                                      verified A**
+
+  MPTCP early BPF subflow visibility  **C/B**
+
+  MPTCP `update_socket_protocol`      **A**
+
+  2019 nexthop initial series         **B**, exact 20-hash enumeration
+                                      pending
+  -----------------------------------------------------------------------
+
+The most important result of this pass is that virtio-net can now be
+represented without the misleading binary label "AF_XDP zero-copy
+supported".
