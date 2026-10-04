@@ -10973,34 +10973,34 @@ Kernel Recipes archive:
 
 # 106. Kernel Recipes → LWN → mainline mapping
 
-  ----------------------------------------------------------------------------------
-  Kernel                Year Archive      Change-log lineage  Phase
-  Recipes                    category                         
-  ------------- ------------ ------------ ------------------- ----------------------
-  XDP closer            2019 networking   XDP →               design/architecture
-  integration                             page_pool/AF_XDP →  
-  with network                            netkit              
-  stack                                                       
+  --------------------------------------------------------------------------------
+  Kernel              Year Archive      Change-log lineage  Phase
+  Recipes                  category                         
+  ------------- ---------- ------------ ------------------- ----------------------
+  XDP closer          2019 networking   XDP →               design/architecture
+  integration                           page_pool/AF_XDP →  
+  with network                          netkit              
+  stack                                                     
 
-  BPF at                2019 networking   BPF networking →    deployment/design
-  Facebook                                struct_ops/socket   
-                                          hooks/netkit        
+  BPF at              2019 networking   BPF networking →    deployment/design
+  Facebook                              struct_ops/socket   
+                                        hooks/netkit        
 
-  Faster IO             2019 storage      io_uring →          pre-networking
-  through                                 networking TX/RX    foundation
-  io_uring                                                    
+  Faster IO           2019 storage      io_uring →          pre-networking
+  through                               networking TX/RX    foundation
+  io_uring                                                  
 
-  What's new            2022 storage      io_uring → ZC       foundation/merge-era
-  with io_uring                           networking          
+  What's new          2022 storage      io_uring → ZC       foundation/merge-era
+  with io_uring                         networking          
 
-  On the way to         2023 storage      io_uring ZC TX/RX   design/merge-era
-  io_uring                                                    
-  networking                                                  
+  On the way to       2023 storage      io_uring ZC TX/RX   design/merge-era
+  io_uring                                                  
+  networking                                                
 
-  Netconf 2023          2023 networking   SO_DEVMEM, BIG TCP, multi-lineage workshop
-  Workshop                                XDP/BPF, IPsec,     
-                                          nftables, TCP/ML    
-  ----------------------------------------------------------------------------------
+  Netconf 2023        2023 networking   SO_DEVMEM, BIG TCP, multi-lineage workshop
+  Workshop                              XDP/BPF, IPsec,     
+                                        nftables, TCP/ML    
+  --------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -11466,50 +11466,50 @@ conference-provenance source where material exists.
 
 # 111. Updated Kernel Recipes inventory
 
-  -------------------------------------------------------------------------
-                 Year Talk /         Archive        Primary relevance
-                      workshop       category       
-  ------------------- -------------- -------------- -----------------------
-                 2019 XDP closer     networking     XDP/netstack
-                      integration                   integration, xdp_frame,
-                      with network                  skb-allocation
-                      stack                         direction
+  ------------------------------------------------------------------------
+                Year Talk /         Archive        Primary relevance
+                     workshop       category       
+  ------------------ -------------- -------------- -----------------------
+                2019 XDP closer     networking     XDP/netstack
+                     integration                   integration, xdp_frame,
+                     with network                  skb-allocation
+                     stack                         direction
 
-                 2019 BPF at         networking     production BPF
-                      Facebook                      networking
+                2019 BPF at         networking     production BPF
+                     Facebook                      networking
 
-                 2019 Suricata and   security       XDP/AF_XDP production
-                      XDP                           packet capture
+                2019 Suricata and   security       XDP/AF_XDP production
+                     XDP                           packet capture
 
-                 2019 The ubiquity   tracing        programmable-kernel
-                      but also the                  architecture
-                      necessity of                  
-                      eBPF...                       
+                2019 The ubiquity   tracing        programmable-kernel
+                     but also the                  architecture
+                     necessity of                  
+                     eBPF...                       
 
-                 2019 Faster IO      storage        io_uring foundation
-                      through                       
-                      io_uring                      
+                2019 Faster IO      storage        io_uring foundation
+                     through                       
+                     io_uring                      
 
-                 2022 What's new     storage        buffers, direct
-                      with io_uring                 descriptors,
-                                                    infrastructure
+                2022 What's new     storage        buffers, direct
+                     with io_uring                 descriptors,
+                                                   infrastructure
 
-                 2022 io_uring: path storage        network ZC TX, future
-                      to zerocopy                   ZC RX, DMA-BUF/P2P
-                      I/O                           
+                2022 io_uring: path storage        network ZC TX, future
+                     to zerocopy                   ZC RX, DMA-BUF/P2P
+                     I/O                           
 
-                 2022 The untold     tracing        BPF
-                      story of BPF                  historical/contextual
-                                                    material
+                2022 The untold     tracing        BPF
+                     story of BPF                  historical/contextual
+                                                   material
 
-                 2023 On the way to  storage        networking-specific
-                      io_uring                      io_uring evolution
-                      networking                    
+                2023 On the way to  storage        networking-specific
+                     io_uring                      io_uring evolution
+                     networking                    
 
-                 2023 Netconf 2023   networking     page_pool, SO_DEVMEM,
-                      Workshop                      BIG TCP, XDP/BPF,
-                                                    IPsec, nftables
-  -------------------------------------------------------------------------
+                2023 Netconf 2023   networking     page_pool, SO_DEVMEM,
+                     Workshop                      BIG TCP, XDP/BPF,
+                                                   IPsec, nftables
+  ------------------------------------------------------------------------
 
 ## Inclusion policy
 
@@ -12183,70 +12183,70 @@ a core networking memory-management primitive.
 
 # 118. LPC timeline mapped to the major change-log lineages
 
-  ----------------------------------------------------------------------------------------
-                   Year LPC topic          Change-log lineage           Phase
-  --------------------- ------------------ ---------------------------- ------------------
-                   2019 Multipath TCP      MPTCP 5.6                    pre-merge
-                        Upstreaming                                     
+  ------------------------------------------------------------------------------------
+               Year LPC topic          Change-log lineage           Phase
+  ----------------- ------------------ ---------------------------- ------------------
+               2019 Multipath TCP      MPTCP 5.6                    pre-merge
+                    Upstreaming                                     
 
-                   2019 Programmable       SK_LOOKUP                    pre-merge
-                        socket lookup with                              
-                        BPF                                             
+               2019 Programmable       SK_LOOKUP                    pre-merge
+                    socket lookup with                              
+                    BPF                                             
 
-                   2019 netfilter hardware nftables/flowtable/offload   design/merge-era
-                        offloads                                        
+               2019 netfilter hardware nftables/flowtable/offload   design/merge-era
+                    offloads                                        
 
-                   2020 Programmable Qdisc BPF qdisc                    early design
-                        with eBPF                                       
+               2020 Programmable Qdisc BPF qdisc                    early design
+                    with eBPF                                       
 
-                   2020 BPF TCP header     BPF TCP programmability      design/merge-era
-                        option/CC/socket                                
-                        storage                                         
+               2020 BPF TCP header     BPF TCP programmability      design/merge-era
+                    option/CC/socket                                
+                    storage                                         
 
-                   2020 OVS + AF_XDP       AF_XDP/virtual networking    application
+               2020 OVS + AF_XDP       AF_XDP/virtual networking    application
 
-                   2021 SO_REUSEPORT       SO_REUSEPORT failover        merge/post-merge
-                        socket migration                                
+               2021 SO_REUSEPORT       SO_REUSEPORT failover        merge/post-merge
+                    socket migration                                
 
-                   2021 TSO/GRO/Jumbo for  XDP multi-buffer             pre-merge
-                        XDP                                             
+               2021 TSO/GRO/Jumbo for  XDP multi-buffer             pre-merge
+                    XDP                                             
 
-                   2021 bpfilter           BPF firewall                 design
+               2021 bpfilter           BPF firewall                 design
 
-                   2022 high-speed Linux   BIG TCP/ZC/devmem            architecture
-                        networking                                      
+               2022 high-speed Linux   BIG TCP/ZC/devmem            architecture
+                    networking                                      
 
-                   2022 machine-readable   YNL                          pre-merge
-                        Netlink YAML                                    
+               2022 machine-readable   YNL                          pre-merge
+                    Netlink YAML                                    
 
-                   2022 MPTCP BPF +        MPTCP extensibility          merge/design
-                        Netlink                                         
+               2022 MPTCP BPF +        MPTCP extensibility          merge/design
+                    Netlink                                         
 
-                   2022 XDP hardware hints packet metadata              design
+               2022 XDP hardware hints packet metadata              design
 
-                   2022 packet queueing in programmable queueing        RFC
-                        XDP                                             
+               2022 packet queueing in programmable queueing        RFC
+                    XDP                                             
 
-                   2023 io_uring ZC        io_uring ZCRX                pre-merge
-                        receive                                         
+               2023 io_uring ZC        io_uring ZCRX                pre-merge
+                    receive                                         
 
-                   2024 Per Netns RTNL     RTNL breakup                 pre/merge-era
+               2024 Per Netns RTNL     RTNL breakup                 pre/merge-era
 
-                   2024 network            virtio/AF_XDP/netkit         architecture
-                        virtualization                                  
-                        overhead                                        
+               2024 network            virtio/AF_XDP/netkit         architecture
+                    virtualization                                  
+                    overhead                                        
 
-                   2025 zero-copy in       netkit queue leasing         design/merge-era
-                        containers                                      
+               2025 zero-copy in       netkit queue leasing         design/merge-era
+                    containers                                      
 
-                   2025 packet metadata    XDP/BPF metadata             ongoing
+               2025 packet metadata    XDP/BPF metadata             ongoing
 
-                   2025 XDP on AMD GPU     devmem/P2PDMA/XDP            post-merge
-                                                                        extension
+               2025 XDP on AMD GPU     devmem/P2PDMA/XDP            post-merge
+                                                                    extension
 
-                   2025 MANA RX page_pool  page_pool                    post-merge
-                                                                        application
-  ----------------------------------------------------------------------------------------
+               2025 MANA RX page_pool  page_pool                    post-merge
+                                                                    application
+  ------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -12309,3 +12309,569 @@ what is actually in mainline?
 
 This makes it possible to distinguish **idea provenance** from **landing
 provenance** and from **mainline provenance**.
+
+------------------------------------------------------------------------
+
+# 120. LPC cross-track sweep --- DMA, RDMA, virtualization and io_uring
+
+The LPC search was expanded beyond the Networking/eBPF tracks. This
+matters because several prerequisites for modern zero-copy networking
+live in RDMA, VFIO/IOMMU/PCI, virtualization, and generic io_uring
+discussions rather than in the networking track itself.
+
+## 120.1 LPC 2019 --- Challenges of the RDMA subsystem
+
+``` text
+Speaker:
+Jason Gunthorpe
+
+Track:
+Refereed / RDMA-related
+
+Year:
+2019
+```
+
+The session discusses several cross-subsystem problems:
+
+``` text
+userspace DMA programming model
+long-term DMA and get_user_pages
+DAX / page cache interaction
+GPU + DMA-BUF + VFIO interoperability
+PCI peer-to-peer DMA
+overlap with netdev / virtio / NVMe
+```
+
+The accompanying RDMA microconference description is even more explicit
+about:
+
+``` text
+RDMA ↔ GPU / NVMe P2P
+HMM
+DMA-BUF
+DAX
+ODP
+container support
+```
+
+### Historical relevance
+
+This is not direct Device Memory TCP provenance. The networking feature
+did not yet exist in its later form.
+
+It is instead **infrastructure/problem-space provenance** for a
+recurring kernel question:
+
+``` text
+How can a high-speed I/O device DMA directly to memory that is not ordinary
+kernel-owned system RAM while preserving Linux memory-management, isolation,
+lifetime and device-ownership rules?
+```
+
+That question later appears in several networking lineages:
+
+``` text
+RDMA / P2P / HMM / DMA-BUF
+             │
+             ├──────────────┐
+             ▼              ▼
+        GPU memory      userspace memory
+             │              │
+             ▼              ▼
+       Device Memory     io_uring ZCRX
+           TCP
+```
+
+The important distinction is that Device Memory TCP solves the
+networking-stack side of the problem through
+page_pool/netmem/memory-provider integration rather than simply reusing
+the RDMA subsystem.
+
+------------------------------------------------------------------------
+
+## 120.2 LPC 2020 --- xen-netfront and virtio_net XDP offloading
+
+``` text
+Track:
+Networking and BPF Summit
+
+Year:
+2020
+```
+
+The proposal discusses moving/offloading guest XDP programs toward the
+host for `virtio-net` and `xen-netfront`.
+
+It predates the later AF_XDP zero-copy work, but belongs in the
+virtual-networking performance lineage:
+
+``` text
+guest virtual NIC
+      │
+      ▼
+XDP processing
+      │
+      ▼
+host/guest XDP offload discussion
+      │
+      ▼
+virtio-net XDP refactoring
+      │
+      ▼
+virtio-net AF_XDP RX zero-copy
+      │
+      ▼
+netkit / KubeVirt queue-leasing direction
+```
+
+This is **design lineage**, not a claim that the later virtio-net AF_XDP
+API originated from this exact proposal.
+
+------------------------------------------------------------------------
+
+## 120.3 LPC 2020 --- Userspace OVS with HW Offload and AF_XDP
+
+The session proposes a three-level processing hierarchy:
+
+``` text
+1. hardware
+   tc-flower offload
+       ↓ fallback
+2. XDP
+       ↓ fallback
+3. OVS userspace datapath via AF_XDP
+```
+
+A key property is that AF_XDP retains a kernel network driver, unlike an
+OVS-DPDK style full userspace-driver deployment. That allows hardware
+offload through `tc-flower` while also providing a high-performance
+userspace fallback.
+
+### Relevance
+
+This is useful historical evidence for the recurring Linux networking
+design pattern:
+
+``` text
+do not choose only between
+"normal kernel stack"
+and
+"complete kernel bypass"
+
+instead combine:
+hardware offload
++ programmable in-kernel fast path
++ selective zero-copy userspace path
+```
+
+The same architectural philosophy later appears in:
+
+``` text
+Device Memory TCP
+io_uring ZCRX
+netkit queue leasing
+```
+
+although the mechanisms differ.
+
+------------------------------------------------------------------------
+
+## 120.4 LPC 2021 --- io_uring: BPF controlled I/O
+
+``` text
+Speaker:
+Pavel Begunkov
+
+Track:
+LPC Refereed Track
+
+Year:
+2021
+```
+
+This is not itself a networking feature. It explores allowing BPF to
+influence/control io_uring submission in order to reduce context
+switches and scheduling overhead.
+
+For this networking history its value is as an early cross-subsystem
+connection:
+
+``` text
+BPF programmability
+        +
+io_uring asynchronous I/O
+```
+
+The later networking history increasingly combines these two ecosystems,
+but the 2021 proposal should remain classified as **generic io_uring/BPF
+design context**, not as a direct ancestor of a specific networking API.
+
+------------------------------------------------------------------------
+
+# 121. LPC 2022 --- P2P inside virtual machines
+
+## Exposing PCIe topology to Guest OS for peer-to-peer
+
+``` text
+Speaker:
+Oded Gabbay
+
+Track:
+VFIO/IOMMU/PCI
+
+Year:
+2022
+```
+
+The talk identifies a concrete virtualization problem for peer-to-peer
+DMA.
+
+Typical P2P consumers include:
+
+``` text
+GPU ↔ RDMA NIC
+AI accelerator ↔ NVMe
+```
+
+and kernel implementations may use:
+
+``` text
+p2pdma
+DMA-BUF
+```
+
+The host kernel can validate PCI topology/distance, but a guest may not
+see enough of the physical PCI topology to make the same decision.
+
+### Relevance to the networking history
+
+This is especially useful when interpreting later GPU/device-memory
+networking work.
+
+``` text
+P2P DMA on bare metal
+       │
+       ▼
+virtualization hides physical topology
+       │
+       ▼
+guest cannot safely determine P2P feasibility
+```
+
+That is a different problem from the later KubeVirt/netkit queue-leasing
+path, but both show why zero-copy networking inside
+virtualized/containerized environments requires more than merely
+exposing a fast packet API.
+
+------------------------------------------------------------------------
+
+# 122. LPC 2023 --- ZCRX as a hybrid rather than kernel-bypass design
+
+The cross-track sweep reinforces the significance of the 2023:
+
+``` text
+Zero Copy Receive using io_uring
+```
+
+session.
+
+Its description explicitly positions the proposal between:
+
+``` text
+full kernel copy
+        and
+full kernel bypass
+```
+
+using:
+
+``` text
+flow steering
+header splitting
+page_pool memory providers
+io_uring
+```
+
+The control plane/stateful networking remains in the normal kernel stack
+while payload DMA can go directly to userspace memory.
+
+Conceptually:
+
+``` text
+                packet
+                  │
+           header splitting
+             ┌────┴────┐
+             ▼         ▼
+          header     payload
+             │         │
+             ▼         ▼
+       kernel stack   DMA
+       TCP state       │
+                       ▼
+                  userspace memory
+```
+
+The LPC material also explicitly mentions future extension toward GPU
+device memory.
+
+This provides an important bridge:
+
+``` text
+io_uring ZCRX
+       │
+       ├── userspace memory provider
+       │
+       └── future device/GPU memory
+                    │
+                    ▼
+              Device Memory TCP
+              adjacent design space
+```
+
+The two features should still be kept distinct in the canonical
+inventory.
+
+------------------------------------------------------------------------
+
+# 123. VFIO/IOMMU/PCI as supporting provenance
+
+The 2023--2025 VFIO/IOMMU/PCI microconference descriptions repeatedly
+list:
+
+``` text
+ATS / PRI
+SR-IOV / PASID
+SVA
+RDMA
+P2PDMA
+CXL
+IOMMU
+DMA ownership
+```
+
+These sessions are too broad to map to a single networking feature and
+should not be promoted into the main networking timeline individually.
+
+They are nevertheless useful as **supporting infrastructure provenance**
+for topics such as:
+
+``` text
+Device Memory TCP
+GPU packet processing
+RDMA/GPU P2P
+zero-copy virtual machines
+confidential-device networking
+```
+
+The rule used in this document is therefore:
+
+``` text
+specific cross-track talk
+    → canonical conference inventory entry
+
+generic microconference proposal
+    → supporting context only
+```
+
+------------------------------------------------------------------------
+
+# 124. Cross-track findings that materially change the networking narrative
+
+The additional LPC material strengthens three long-term architectural
+themes.
+
+## Theme 1 --- zero copy is also a memory-ownership problem
+
+``` text
+2019 RDMA / DMA-BUF / HMM / P2P discussions
+                 │
+                 ▼
+       memory ownership / pinning /
+       DMA lifetime / isolation
+                 │
+                 ▼
+2022 VM P2P topology problem
+                 │
+                 ▼
+2023 page_pool memory-provider ZCRX
+                 │
+                 ▼
+2024–2025 netmem / Device Memory TCP
+```
+
+Thus modern zero-copy networking cannot be explained only as:
+
+``` text
+remove memcpy()
+```
+
+It also requires solving:
+
+``` text
+who owns the memory?
+who may DMA to it?
+how is lifetime tracked?
+how is it isolated?
+how is it exposed across namespaces/VMs?
+```
+
+## Theme 2 --- kernel bypass is not the only high-performance model
+
+Several LPC talks independently converge on:
+
+``` text
+hardware offload
+       +
+kernel programmable fast path
+       +
+selective zero-copy
+       +
+normal kernel control plane
+```
+
+Examples include:
+
+``` text
+OVS + tc-flower + XDP + AF_XDP
+io_uring ZCRX
+Device Memory TCP
+netkit queue leasing
+```
+
+## Theme 3 --- virtualization makes direct-I/O topology harder
+
+``` text
+physical topology
+    ├── NIC
+    ├── GPU
+    └── accelerator
+          │
+          ▼
+      hypervisor
+          │
+          ▼
+guest sees virtual topology
+```
+
+This affects:
+
+``` text
+P2PDMA validation
+device-memory access
+queue ownership
+AF_XDP placement
+KubeVirt zero-copy
+```
+
+The later netkit queue-leasing work can therefore be understood as part
+of a broader attempt to preserve kernel-managed isolation while exposing
+enough of the physical data path to containers and VMs.
+
+------------------------------------------------------------------------
+
+# 125. Updated LPC canonical inventory
+
+  --------------------------------------------------------------------------------
+                   Year Session          LPC area          Canonical role
+  --------------------- ---------------- ----------------- -----------------------
+                   2019 Multipath TCP    Networking        MPTCP pre-merge
+                        Upstreaming                        
+
+                   2019 Programmable     Networking        SK_LOOKUP pre-merge
+                        socket lookup                      
+                        with BPF                           
+
+                   2019 Challenges of    Refereed/RDMA     DMA/P2P/device-memory
+                        the RDMA                           problem-space
+                        subsystem                          
+
+                   2019 RDMA MC          RDMA              HMM/DMA-BUF/P2P
+                                                           supporting context
+
+                   2020 xen-netfront and Networking+BPF    virtual-NIC XDP design
+                        virtio_net XDP                     
+                        offloading                         
+
+                   2020 Userspace OVS    Networking+BPF    hybrid HW/XDP/AF_XDP
+                        with HW Offload                    datapath
+                        and AF_XDP                         
+
+                   2020 A programmable   Networking+BPF    BPF-qdisc early design
+                        Qdisc with eBPF                    
+
+                   2021 TSO/GRO/Jumbo    BPF+Networking    XDP multi-buffer
+                        frames for XDP                     precursor
+
+                   2021 io_uring: BPF    Refereed          io_uring/BPF context
+                        controlled I/O                     
+
+                   2022 High-speed Linux eBPF+Networking   BIG-TCP/ZC architecture
+                        TCP                                
+
+                   2022 Netlink YAML     eBPF+Networking   YNL pre-merge
+
+                   2022 MPTCP BPF +      eBPF+Networking   MPTCP extensibility
+                        Netlink                            
+
+                   2022 PCIe topology to VFIO/IOMMU/PCI    virtualized P2P
+                        guest for P2P                      constraint
+
+                   2023 Zero Copy        eBPF+Networking   io_uring ZCRX pre-merge
+                        Receive using                      
+                        io_uring                           
+
+                   2024 Per Netns RTNL   Networking        RTNL breakup
+
+                   2024 Network          Networking        virtual-network
+                        virtualization                     optimization
+                        overhead                           
+
+                   2025 Zero-copy in     Networking        netkit queue leasing
+                        containers                         
+
+                   2025 Packet Metadata  Networking        metadata API evolution
+
+                   2025 XDP on AMD GPUs  Networking        devmem/P2PDMA
+                                                           post-merge extension
+  --------------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# 126. Provenance graph with cross-subsystem LPC material
+
+The networking-memory branch can now be represented more accurately as:
+
+``` text
+                 ┌──────────────────────────┐
+                 │  RDMA / MM / DMA world  │
+                 │  GUP, HMM, DMA-BUF, P2P │
+                 └────────────┬─────────────┘
+                              │
+                              ▼
+                       DMA ownership /
+                       memory lifetime
+                              │
+       ┌──────────────────────┼──────────────────────┐
+       │                      │                      │
+       ▼                      ▼                      ▼
+   page_pool               AF_XDP               P2PDMA
+       │                      │                      │
+       ▼                      │                      ▼
+    netmem                    │                 GPU memory
+       │                      │                      │
+   ┌───┴───────────┐          │                      │
+   ▼               ▼          ▼                      ▼
+Device Memory   io_uring   virtio/netkit      GPU packet
+TCP             ZCRX       queue leasing      processing
+```
+
+This is intentionally a dependency/problem-space graph, not a claim that
+each box was implemented directly from the box above it.
+
+It captures a major conclusion of the multi-source research:
+
+> Linux networking's recent zero-copy evolution is inseparable from the
+> kernel's broader DMA, memory-ownership, device-memory and
+> virtualization work.
