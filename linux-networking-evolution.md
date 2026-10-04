@@ -976,6 +976,26 @@ packet programmability
 
 ------------------------------------------------------------------------
 
+### USENIX research から見える「kernel bypass → in-kernel extensibility」の流れ
+
+USENIX の研究を併せて読むと、Linux networking の programmability が解こうとしてきた問題を別の角度から確認できる。
+
+``` text
+mTCP (NSDI 2014): user-level TCP / kernel overhead avoidance
+        ↓
+XDP/eBPF: early in-kernel programmable hook
+        ↓
+Electrode (NSDI 2023) / DINT (NSDI 2024):
+  kernel の protection / isolation を維持し frequent path を eBPF 化
+        ↓
+eTran (NSDI 2025):
+  transport 自体を eBPF で extensible にする
+```
+
+mTCP は Linux kernel TCP processing の CPU cost に対して user-level TCP stack を採った。一方 Electrode と DINT は、kernel bypass の security / isolation / maintainability 上の trade-off を避けながら、XDP/eBPF により frequent path を kernel 内で処理する。eTran はさらに TCP/DCTCP や Homa のような transport design を eBPF ベースの extensible kernel transport として扱う。この研究史は、**kernel を単に迂回するのではなく、kernel の ownership / protection model を保ったまま fast path や protocol behavior を programmable にする**という方向を補強する。
+
+これらは upstream Linux release milestone ではないため Part II には追加せず、architecture の動機を説明する research evidence として扱う。
+
 ## Virtual networking --- veth/virtio → netkit/queue ownership
 
 v5.0 の典型:
@@ -1416,6 +1436,12 @@ manage RX memory so buffers can move between RX/XDP/TX
 ```
 
 The last point directly motivates page_pool.
+
+### USENIX research に見る XDP / SmartNIC offload
+
+OSDI 2020 の **hXDP** は、Linux XDP/eBPF の program model、map、helper semantics を FPGA NIC 上へ持ち込み、unmodified eBPF program を NIC 側で実行する研究である。これは upstream XDP hardware-offload の release provenance ではないが、XDP が **Linux の programmable-datapath semantics を hardware execution target へ投影できる abstraction** として研究されたことを示す。USENIX ATC 2022 の program-warping work はこの方向をさらに最適化した。
+
+NSDI 2023 の **IO-TCP** は TCP stack の control plane を CPU 側に保持しつつ、disk I/O と TCP packet-transfer data plane を SmartNIC へ offload する split-stack design を示した。upstream feature そのものではないが、「canonical semantics/control は host に保持し、data movement / fast path を device へ移す」という driver/offload architecture の比較材料になる。
 
 ### DIM --- interrupt moderation の共通 library 化
 
@@ -2027,6 +2053,22 @@ commit-level anchor と、 まだ解消していない attribution boundary
 のみを記録します。
 
 ## Appendix の読み方
+## USENIX research index --- architecture motivation / design-space evidence
+
+以下は upstream release attribution の根拠ではなく、Linux networking architecture の design space と、その機能が解こうとする問題を説明する research evidence である。
+
+- **NSDI 2011 — Multipath TCP congestion control** — Linux implementation を用いた multipath congestion control の研究。MPTCP design lineage の前史として参照する。
+- **NSDI 2014 — mTCP** — kernel TCP/syscall/packet-I/O overhead に対する user-level TCP stack という設計点。
+- **OSDI 2020 — hXDP** — Linux XDP/eBPF semantics を FPGA NIC execution target へ展開。
+- **USENIX ATC 2022 — eBPF Program Warping** — hXDP を発展させ、eBPF program の一部を FPGA pipeline へ変換。
+- **NSDI 2023 — Electrode** — XDP/eBPF により kernel-stack traversal と user/kernel crossing を削減。
+- **NSDI 2023 — IO-TCP** — TCP control plane を CPU 側に保持し、packet-transfer/data plane を SmartNIC へ offload。
+- **NSDI 2023 — Valinor** — eBPF を利用して qdisc、CC、scheduler、NIC、hardware offload を複数 vantage point から観測。
+- **NSDI 2024 — DINT** — kernel-bypass-like performance と kernel stack の security/isolation/maintainability の両立を狙う。
+- **NSDI 2025 — eTran** — eBPF によって kernel transport を extensible にし、TCP/DCTCP と Homa を実装。
+
+これらは Part II / Part VII の canonical release/commit evidence と混同しない。
+
 
 Appendix は evidence catalog である。そこに現れる日付は RFC date、posting date、review base、conference date の場合があり、Part II に明記されない限り release attribution として読まない。
 
