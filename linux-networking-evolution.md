@@ -2431,7 +2431,7 @@ netkit queue leasing exact release assignment
 IPv6 BIG TCP HBH-removal exact release assignment
 large (>4K) memory-provider RX buffers exact release assignment
 TLS + sockmap removal exact 7.2 landing
-FIB-rule per-netns mutex exact 7.3 landing/benchmark provenance
+FIB-rule per-netns mutex exact 7.3-development landing/benchmark provenance
 ```
 
 This is deliberate: a plausible or remembered release number is not
@@ -3107,37 +3107,37 @@ them.
 
 ### Driver-framework confidence table
 
-  ------------------------------------------------------------------------------
-  Framework         Design/RFC              Release       Exact anchor status
-                                            landing       
-  ----------------- ----------------------- ------------- ----------------------
-  switchdev         2014/2015 evolution     3.19 origin;  multi-commit;
-                                            4.x expansion expansion commits
-                                                          identified
+  -----------------------------------------------------------------------------
+  Framework         Design/RFC              Release      Exact anchor status
+                                            landing      
+  ----------------- ----------------------- ------------ ----------------------
+  switchdev         2014/2015 evolution     3.19 origin; multi-commit;
+                                            4.x          expansion commits
+                                            expansion    identified
 
-  devlink           2016 series             4.6           release verified;
-                                                          exact origin pending
+  devlink           2016 series             4.6          release verified;
+                                                         exact origin pending
 
-  phylink           2015 RFC                4.13          `9525ae83959b...`
-                                            generation    exact
+  phylink           2015 RFC                4.13         `9525ae83959b...`
+                                            generation   exact
 
-  DIM/net_dim       pre-2018 work           upstream by   generic-library SHA
-                                            Netdev 0x12 / pending
-                                            2018          
+  DIM/net_dim       pre-2018 work           upstream by  generic-library SHA
+                                            Netdev 0x12  pending
+                                            / 2018       
 
-  netdevsim         offload test framework  4.16          release verified
+  netdevsim         offload test framework  4.16         release verified
 
-  ethtool-netlink   2018 RFC lineage        5.6           release verified;
-                                            groundwork    exact core set pending
+  ethtool-netlink   2018 RFC lineage        5.6          release verified;
+                                            groundwork   exact core set pending
 
-  auxiliary bus     ancillary/virtual-bus   5.11          signed tag/tip
-                    predecessors                          verified; origin SHA
-                                                          pending
+  auxiliary bus     ancillary/virtual-bus   5.11         signed tag/tip
+                    predecessors                         verified; origin SHA
+                                                         pending
 
-  Rust phylib       2023 RFC→v11            6.8           release/final-series
-                                                          verified; exact SHAs
-                                                          pending
-  ------------------------------------------------------------------------------
+  Rust phylib       2023 RFC→v11            6.8          release/final-series
+                                                         verified; exact SHAs
+                                                         pending
+  -----------------------------------------------------------------------------
 
 ## Release-attribution re-audit --- pass 6: Driver Framework exact anchors
 
@@ -3266,6 +3266,142 @@ These current capabilities are shown as the **direction of evolution**
 and are not all retroactively assigned to Linux 6.8. Exact release
 attribution for queue creation, queue leasing and each memory-provider
 operation remains in the 7.x audit backlog.
+
+## Release-attribution re-audit --- pass 8: 7.x and development boundary
+
+The 7.x audit uses a stricter rule than the earlier draft: a net-next
+series is not called a released 7.x feature merely because its likely
+target cycle is known.
+
+As of this audit, Linux 7.2 has a stable series. Work targeting the next
+cycle is labeled **7.3-development** until a released mainline baseline
+exists.
+
+### Queue leasing --- accepted/reworked development lineage
+
+The January 2026 netkit v7 series defines queue leasing as a way for a
+virtual netdev in a container namespace to proxy a physical NIC queue,
+so that AF_XDP and memory providers can be configured through the
+virtual interface at native speed.
+
+The architectural relationship is:
+
+``` text
+physical NIC RX queue
+        ↓ leased/proxied
+netkit guest queue
+        ↓
+container namespace
+        ├── AF_XDP
+        └── memory provider / zero-copy RX
+```
+
+The history includes an early merge, revert and later remerge/rework
+already recorded in the exact-provenance appendix. Because this lineage
+crossed development-cycle boundaries, the canonical table does not
+assign it to a released 7.1 merely from series dates.
+
+### Large RX buffers for memory providers
+
+The large-buffer work is not just an io_uring optimization. The series
+explicitly builds on per-queue configuration and says the mechanism can
+be used by other memory providers.
+
+The key design change is:
+
+``` text
+old assumption:
+  one provider fragment ≈ PAGE_SIZE / 4K on x86
+
+new model:
+  queue-specific provider buffer length
+  e.g. 32K buffers
+        ↓
+  hardware GRO can coalesce into larger contiguous regions
+        ↓
+  fewer fragments through the stack
+```
+
+Reported development benchmarks on a 200-Gbit NIC show substantial
+CPU-utilization gains for 32K versus 4K receive buffers. These numbers
+are development-series measurements, not universal performance
+guarantees.
+
+A later series explicitly describes support for memory providers with
+buffers larger than 4K/PAGE_SIZE. Exact released-version attribution
+remains separate from the architectural lineage.
+
+### IPv6 BIG TCP without Hop-by-Hop header
+
+The v3 series dated 2026-02-02 removes the synthetic IPv6 Hop-by-Hop
+jumbo header used by the original BIG TCP implementation.
+
+Motivation:
+
+``` text
+original IPv6 BIG TCP
+  temporary HBH carries 32-bit packet length
+        ↓
+tunnels create difficult inner/outer HBH handling
+        ↓
+drivers would need tunnel-specific stripping logic
+        ↓
+remove HBH and recover length from skb->len
+        ↓
+align IPv6 BIG TCP with IPv4 BIG TCP
+```
+
+This is a prerequisite for the later BIG TCP tunnel work. The document
+therefore treats "BIG TCP without HBH" and "BIG TCP for UDP tunnels" as
+two separate series.
+
+### BIG TCP for VXLAN / GENEVE --- 7.3-development
+
+The final v9 series was posted on 2026-07-10. It is explicitly a
+follow-up to the IPv6 HBH-removal work and adds BIG TCP support for
+IPv4/IPv6 workloads over VXLAN and GENEVE.
+
+This is recorded as **7.3-development**, not as a released 7.3 feature
+in the canonical release map.
+
+### TLS + sockmap cleanup
+
+The 7.x cleanup lineage must distinguish two different statements:
+
+``` text
+historical:
+  TLS and sockmap had integration paths and many interaction fixes
+
+current cleanup:
+  kernel rejects unsupported TLS + sockmap combinations
+```
+
+Stable trees in 2026 contain the change
+`tls: reject the combination of TLS and sockmap`. This confirms the
+cleanup direction, but it is not sufficient by itself to label a
+particular mainline release as "TLS+sockmap removal". The old wording is
+therefore downgraded until the originating mainline commit/tag is
+audited.
+
+### FIB-rule per-netns locking
+
+Search results for the exact 7.3-development landing/benchmark are not
+yet strong enough for A-grade provenance. The document keeps this item
+in the development audit backlog rather than presenting an unverified
+release assignment.
+
+## 7.x confidence rule
+
+``` text
+stable release evidence
+    > mainline merge/tag containment
+    > accepted/pulled net-next series
+    > final patch series
+    > RFC
+```
+
+A feature is never promoted upward merely because the calendar makes a
+target release plausible.
 
 # Part III --- Long-term feature lineages
 
@@ -5745,6 +5881,33 @@ BQL
 The document explicitly separates the Linux 6.8 queue/NAPI **object
 visibility milestone** from later queue creation, leasing and
 memory-provider configuration so that current APIs are not backdated.
+
+## Pass 8 --- 7.x status summary
+
+  -----------------------------------------------------------------------
+  Topic                               Status after re-audit
+  ----------------------------------- -----------------------------------
+  queue leasing                       development lineage verified;
+                                      released-version attribution kept
+                                      conservative
+
+  \>4K / large RX provider buffers    architecture and benchmark series
+                                      verified; exact released version
+                                      pending
+
+  IPv6 BIG TCP without HBH            v3 series verified; separate
+                                      prerequisite lineage
+
+  BIG TCP over VXLAN/GENEVE           final v9 2026-07-10; recorded as
+                                      7.3-development
+
+  TLS + sockmap cleanup               cleanup direction verified; exact
+                                      mainline origin/release still
+                                      pending
+
+  FIB-rule per-netns mutex            remains pending exact
+                                      landing/benchmark evidence
+  -----------------------------------------------------------------------
 
 # Appendix --- Provenance and research notes
 
