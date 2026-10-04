@@ -1169,7 +1169,7 @@ This is a major change in driver responsibility: a driver becomes an implementat
 
 ### devlink --- device-wide control plane
 
-Initial devlink series: https://lwn.net/Articles/677967/
+devlink series (v3): https://lwn.net/Articles/677967/
 
 devlink fills a gap left by `net_device`: many settings belong to the whole ASIC/device, not one network interface.
 
@@ -1328,7 +1328,7 @@ self-healing / recovery
 vendor-support data collection
 ```
 
-Conference: https://netdevconf.org/0x13/loadsessions/devlink-health-reporting-and-recovery-system.html
+Conference: Netdev 0x13, “devlink health reporting and recovery system”. 以前記載していた `loadsessions/...` URL は実在を確認できないため削除し、conference archive/session index を参照する。
 
 This changes hardware error handling from driver-specific logs/private tools toward a common operational model.
 
@@ -1435,7 +1435,7 @@ memory providers
 host pages / userspace memory / device memory
 ```
 
-Kernel Recipes 2024's io_uring zero-copy discussion makes the dependency explicit: zero-copy RX requires support from NIC hardware, firmware and driver, and uses page_pool / netmem plus queue configuration.
+Kernel Recipes 2024 の公開 abstract が直接述べるのは、kernel network stack を利用し、vanilla TCP と互換性のある zero-copy receive の設計である。NIC / firmware / driver support、page_pool、netmem、queue configuration という具体的な実装依存関係は abstract 自体ではなく、同 conference の live blog と後続 upstream implementation から確認する。
 
 This means modern high-speed network drivers are increasingly **memory-provider-aware** rather than simply allocating `struct page` objects.
 
@@ -1506,11 +1506,11 @@ lifetime / removal handling
 networking abstractions
 ```
 
-The 2024--2026 Rust driver-core work therefore matters directly to future network drivers, even when developed outside `net/`.
+The 2024--2026 Rust driver-core work therefore matters directly to future network drivers, even when developed outside `net/`. なお Kernel Recipes 2024 の Andreas Hindborg の講演は block-device driver API を具体例とした講演であり、networking talk ではない。本書では Rust/C API boundary の一般的な driver-framework lesson としてのみ参照する。
 
 Kernel Recipes: https://kernel-recipes.org/en/2024/schedule/interfacing-kernel-c-apis-from-rust/ https://kernel-recipes.org/en/2025/schedule/so-you-want-to-write-a-driver-in-rust/ https://kernel-recipes.org/en/2026/schedule/enforcing-device-driver-lifecycle-rules-at-compile-time/
 
-The 2026 driver-model work frames a major goal as converting lifecycle conventions into compile-time invariants:
+Kernel Recipes 2026 の公式 schedule と講演ページで Danilo Krummrich の “Enforcing Device Driver Lifecycle Rules at Compile Time” の実在を確認できる。この講演は networking-specific ではなく Rust driver-core / Linux device model の講演である。その driver-model work は lifecycle conventions を compile-time invariants に変換することを主要な目標としている:
 
 ``` text
 C driver:
@@ -1548,7 +1548,7 @@ Netdev 0x17's Rust networking tutorial emphasized memory safety and prevention o
 Netdev is the strongest conference source for driver-framework implementation:
 
 ``` text
-2016  switchdev / hardware-offload model
+2016  switchdev / hardware-offload model (conference provenance not independently re-verified here)
 2018  DIM, switchdev/NOS, offload and driver API work
 2019  devlink health
 2023  Rust networking tutorial
@@ -1566,10 +1566,10 @@ Kernel Recipes is especially useful for architecture:
 ``` text
 2018  XDP as a programmable layer in driver context
 2019  XDP integration and generic packet-buffer ideas
-2024  zero-copy networking + page_pool/netmem/memory providers
-      Rust/C API abstraction discussion
+2024  zero-copy networking (abstract: kernel-stack / vanilla-TCP compatibility; implementation details: live blog + upstream evidence)
+      Rust/C API abstraction discussion (block-device example; not a networking talk)
 2025  practical Rust driver development
-2026  compile-time enforcement of driver lifecycle rules
+2026  compile-time enforcement of driver lifecycle rules (Rust driver-core/device model; not networking-specific)
 ```
 
 ## Topics worth a remaining exact-commit audit
@@ -1836,6 +1836,7 @@ release attributionには使用しません。
 | Netdev: XDP / AF_XDP / TC / BPF | Part III programmability |
 | Netdev: BIG TCP | Part III packet aggregation |
 | Netdev: Device Memory TCP / zero-copy | Part III packet memory |
+| Netdev 0x19: Diagnosing Page Pool Leaks | Part IV page_pool | abstract directly supports page_pool as the standard RX-datapath memory-management mechanism; zero-copy driver requirements are grounded separately |
 | Netdev: queue/NAPI/netdev-genl | Part IV driver framework |
 | Netdev: MPTCP / TCP state-of-the-union | Part III transport |
 | Kernel Recipes: XDP / BPF / io_uring | Parts III–IV |
