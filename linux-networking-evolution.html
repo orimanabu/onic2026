@@ -1,0 +1,3518 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Linux Networking Evolution v3.0 to 7.x — Canonical Edition r24</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+
+<style>
+/* Wider reading layout for large tables, diagrams, and code blocks */
+html {
+  background: #fff;
+}
+body {
+  max-width: 1500px;
+  width: calc(100% - 64px);
+  margin: 0 auto;
+  padding: 32px 0 72px;
+  line-height: 1.65;
+}
+table {
+  width: 100%;
+  display: table;
+}
+pre {
+  overflow-x: auto;
+}
+@media (max-width: 900px) {
+  body {
+    width: calc(100% - 32px);
+    padding: 20px 0 48px;
+  }
+}
+</style>
+
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Linux Networking Evolution v3.0 to 7.x — Canonical
+Edition r24</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#linux-networking-evolution--linux-v30-から-7x-まで"
+id="toc-linux-networking-evolution--linux-v30-から-7x-まで">Linux
+Networking Evolution — Linux v3.0 から 7.x まで</a>
+<ul>
+<li><a href="#この文書の読み方"
+id="toc-この文書の読み方">この文書の読み方</a>
+<ul>
+<li><a href="#図の記法" id="toc-図の記法">図の記法</a></li>
+</ul></li>
+</ul></li>
+<li><a
+href="#part-i--executive-thesis-linux-networking-は何が変わったのか"
+id="toc-part-i--executive-thesis-linux-networking-は何が変わったのか">Part
+I — Executive thesis: Linux networking は何が変わったのか</a>
+<ul>
+<li><a href="#本書で固定する語彙"
+id="toc-本書で固定する語彙">本書で固定する語彙</a></li>
+<li><a href="#architecture-evolution-map"
+id="toc-architecture-evolution-map">Architecture evolution map</a></li>
+<li><a href="#snapshot-v30--v50--2026"
+id="toc-snapshot-v30--v50--2026">Snapshot: v3.0 / v5.0 / 2026</a></li>
+<li><a href="#6軸contractcross-cutting-domain-の対応"
+id="toc-6軸contractcross-cutting-domain-の対応">6軸・contract・cross-cutting
+domain の対応</a>
+<ul>
+<li><a href="#thesis-を検証する代表例"
+id="toc-thesis-を検証する代表例">thesis を検証する代表例</a></li>
+<li><a href="#この-thesis-が説明しないもの"
+id="toc-この-thesis-が説明しないもの">この thesis
+が説明しないもの</a></li>
+</ul></li>
+</ul></li>
+<li><a href="#part-ii--four-architecture-eras"
+id="toc-part-ii--four-architecture-eras">Part II — Four architecture
+eras</a>
+<ul>
+<li><a href="#era-間で変わった設計上の問い"
+id="toc-era-間で変わった設計上の問い">Era
+間で変わった設計上の問い</a></li>
+</ul></li>
+<li><a href="#part-iii--long-term-lineages"
+id="toc-part-iii--long-term-lineages">Part III — Long-term lineages</a>
+<ul>
+<li><a href="#era-1-foundations--6軸を初期問題へ投影した4つの見方"
+id="toc-era-1-foundations--6軸を初期問題へ投影した4つの見方">Era 1
+foundations — 6軸を初期問題へ投影した4つの見方</a>
+<ul>
+<li><a href="#queue--scalability-foundation"
+id="toc-queue--scalability-foundation">Queue / scalability
+foundation</a></li>
+<li><a href="#virtualization--control-foundation"
+id="toc-virtualization--control-foundation">Virtualization / control
+foundation</a></li>
+<li><a href="#programmability-foundation"
+id="toc-programmability-foundation">Programmability foundation</a></li>
+<li><a href="#server--transport-foundation"
+id="toc-server--transport-foundation">Server / transport
+foundation</a></li>
+<li><a href="#v3x-から後続-era-へ" id="toc-v3x-から後続-era-へ">v3.x
+から後続 era へ</a></li>
+</ul></li>
+<li><a href="#queueing--latency--pacing--multi-layer-control-evolution"
+id="toc-queueing--latency--pacing--multi-layer-control-evolution">Queueing
+/ latency / pacing — multi-layer control evolution</a></li>
+<li><a href="#packet-aggregation--grogso--big-tcp"
+id="toc-packet-aggregation--grogso--big-tcp">Packet aggregation —
+GRO/GSO → BIG TCP</a></li>
+<li><a
+href="#packet-memory--page_pool--netmem--memory-providers--device-memory"
+id="toc-packet-memory--page_pool--netmem--memory-providers--device-memory">Packet
+memory — page_pool → netmem → memory providers / device memory</a>
+<ul>
+<li><a href="#page_pool--rx-memory-lifecycle-の共通化"
+id="toc-page_pool--rx-memory-lifecycle-の共通化">page_pool — RX memory
+lifecycle の共通化</a></li>
+<li><a href="#netmem--struct-page-と-packet-memory-を同一視しない"
+id="toc-netmem--struct-page-と-packet-memory-を同一視しない">netmem —
+<code>struct page</code> と packet memory を同一視しない</a></li>
+<li><a
+href="#memory-providers--queue-binding--memory-lifetime-と-rx-queue-を接続する"
+id="toc-memory-providers--queue-binding--memory-lifetime-と-rx-queue-を接続する">memory
+providers / queue binding — memory lifetime と RX queue
+を接続する</a></li>
+</ul></li>
+<li><a href="#io_uring-networking" id="toc-io_uring-networking">io_uring
+networking</a></li>
+<li><a href="#xdp--af_xdp" id="toc-xdp--af_xdp">XDP / AF_XDP</a></li>
+<li><a href="#bpf--packet-filter-から-stack-extension-へ"
+id="toc-bpf--packet-filter-から-stack-extension-へ">BPF — packet filter
+から stack extension へ</a>
+<ul>
+<li><a
+href="#usenix-research-から見えるkernel-bypass--in-kernel-extensibilityの流れ"
+id="toc-usenix-research-から見えるkernel-bypass--in-kernel-extensibilityの流れ">USENIX
+research から見える「kernel bypass → in-kernel
+extensibility」の流れ</a></li>
+</ul></li>
+<li><a
+href="#virtual-networking--datapath-と-queue-assignment-の並行進化"
+id="toc-virtual-networking--datapath-と-queue-assignment-の並行進化">Virtual
+networking — datapath と queue assignment の並行進化</a></li>
+<li><a href="#tcp--udp--transport" id="toc-tcp--udp--transport">TCP /
+UDP / transport</a>
+<ul>
+<li><a href="#transport-protocol-evolution"
+id="toc-transport-protocol-evolution">Transport protocol
+evolution</a></li>
+<li><a href="#他の-architecture-lineage-へ置く-tcp-関連機能"
+id="toc-他の-architecture-lineage-へ置く-tcp-関連機能">他の architecture
+lineage へ置く TCP 関連機能</a></li>
+<li><a href="#udp" id="toc-udp">UDP</a></li>
+</ul></li>
+<li><a href="#routing--netlink--rtnl"
+id="toc-routing--netlink--rtnl">Routing / Netlink / RTNL</a></li>
+<li><a href="#netfilter--nftables--conntrack"
+id="toc-netfilter--nftables--conntrack">netfilter / nftables /
+conntrack</a></li>
+<li><a
+href="#part-iii-から-part-iv-へ--feature-lineage-から-driver-contract-へ"
+id="toc-part-iii-から-part-iv-へ--feature-lineage-から-driver-contract-へ">Part
+III から Part IV へ — feature lineage から driver contract へ</a></li>
+</ul></li>
+<li><a href="#part-iv--network-device-driver-framework-の進化"
+id="toc-part-iv--network-device-driver-framework-の進化">Part IV —
+Network Device Driver Framework の進化</a>
+<ul>
+<li><a href="#driver-framework-projection"
+id="toc-driver-framework-projection">Driver-framework projection</a>
+<ul>
+<li><a href="#長期的な-architecture-の変化"
+id="toc-長期的な-architecture-の変化">長期的な architecture
+の変化</a></li>
+</ul></li>
+<li><a href="#linux-30-時点の出発点"
+id="toc-linux-30-時点の出発点">Linux 3.0 時点の出発点</a></li>
+<li><a href="#linux-33--dqlbql-queue-control-が共通-core-へ移る"
+id="toc-linux-33--dqlbql-queue-control-が共通-core-へ移る">Linux 3.3 —
+DQL/BQL: queue control が共通 core へ移る</a></li>
+<li><a
+href="#offload--device-object-contracts--hardware-が-linux-networking-の-first-class-object-になる"
+id="toc-offload--device-object-contracts--hardware-が-linux-networking-の-first-class-object-になる">Offload
+/ device-object contracts — hardware が Linux networking の first-class
+object になる</a>
+<ul>
+<li><a href="#switchdev--linux-319-で始まり-4x-で拡大"
+id="toc-switchdev--linux-319-で始まり-4x-で拡大">switchdev — Linux 3.19
+で始まり 4.x で拡大</a></li>
+<li><a href="#devlink--device-全体を扱う-control-plane"
+id="toc-devlink--device-全体を扱う-control-plane">devlink — device
+全体を扱う control plane</a></li>
+<li><a href="#phylink-と-sfp" id="toc-phylink-と-sfp">phylink と
+SFP</a></li>
+<li><a href="#vf-representor-と-smartnicdpu-control"
+id="toc-vf-representor-と-smartnicdpu-control">VF representor と
+SmartNIC/DPU control</a></li>
+<li><a href="#xdp-が-driver-fast-path-を変える"
+id="toc-xdp-が-driver-fast-path-を変える">XDP が driver fast path
+を変える</a></li>
+<li><a href="#usenix-research-に見る-xdp--smartnic-offload"
+id="toc-usenix-research-に見る-xdp--smartnic-offload">USENIX research
+に見る XDP / SmartNIC offload</a></li>
+<li><a href="#dim--interrupt-moderation-の共通-library-化"
+id="toc-dim--interrupt-moderation-の共通-library-化">DIM — interrupt
+moderation の共通 library 化</a></li>
+<li><a href="#page_pool--rx-memory-management-の共通-infrastructure-化"
+id="toc-page_pool--rx-memory-management-の共通-infrastructure-化">page_pool
+— RX memory management の共通 infrastructure 化</a></li>
+</ul></li>
+<li><a
+href="#operational-driver-infrastructure--management-apihealth共通-library"
+id="toc-operational-driver-infrastructure--management-apihealth共通-library">Operational
+driver infrastructure — management API・health・共通 library</a>
+<ul>
+<li><a href="#devlink-health" id="toc-devlink-health">devlink
+health</a></li>
+<li><a href="#ethtool-ioctl--generic-netlink"
+id="toc-ethtool-ioctl--generic-netlink">ethtool ioctl → Generic
+Netlink</a></li>
+<li><a href="#netdevsim-と-selftest-driven-driver-api-design"
+id="toc-netdevsim-と-selftest-driven-driver-api-design">netdevsim と
+selftest-driven driver API design</a></li>
+<li><a href="#auxiliary-bus--1つの-pci-device-と複数-subsystem-driver"
+id="toc-auxiliary-bus--1つの-pci-device-と複数-subsystem-driver">auxiliary
+bus — 1つの PCI device と複数 subsystem driver</a></li>
+</ul></li>
+<li><a
+href="#explicit-queue--memory-contracts--queuenapimemory-provider-の-object-化"
+id="toc-explicit-queue--memory-contracts--queuenapimemory-provider-の-object-化">Explicit
+queue / memory contracts — queue・NAPI・memory provider の object 化</a>
+<ul>
+<li><a href="#page_pool-の可観測化"
+id="toc-page_pool-の可観測化">page_pool の可観測化</a></li>
+<li><a href="#queue--napi-object-の-generic-netdev-api-化"
+id="toc-queue--napi-object-の-generic-netdev-api-化">queue / NAPI object
+の generic netdev API 化</a></li>
+<li><a href="#page_pool--netmem--memory-providers"
+id="toc-page_pool--netmem--memory-providers">page_pool → netmem → memory
+providers</a></li>
+<li><a href="#xfrm-device--ipsec-packet-offload"
+id="toc-xfrm-device--ipsec-packet-offload">XFRM device / IPsec packet
+offload</a></li>
+</ul></li>
+<li><a
+href="#rust--common-driver-contracts-を-safe-abstraction-として表現する-parallel-track"
+id="toc-rust--common-driver-contracts-を-safe-abstraction-として表現する-parallel-track">Rust
+— common driver contracts を safe abstraction として表現する parallel
+track</a></li>
+<li><a href="#conference-に見る-lineage"
+id="toc-conference-に見る-lineage">Conference に見る lineage</a>
+<ul>
+<li><a href="#netdev" id="toc-netdev">Netdev</a></li>
+<li><a href="#kernel-recipes" id="toc-kernel-recipes">Kernel
+Recipes</a></li>
+</ul></li>
+<li><a
+href="#part-iv-から-part-v-へ--common-contracts-から-operability-へ"
+id="toc-part-iv-から-part-v-へ--common-contracts-から-operability-へ">Part
+IV から Part V へ — common contracts から operability へ</a></li>
+</ul></li>
+<li><a href="#part-v--observability--explainability"
+id="toc-part-v--observability--explainability">Part V — Observability /
+Explainability</a>
+<ul>
+<li><a href="#kernel-observability-primitive"
+id="toc-kernel-observability-primitive">Kernel observability
+primitive</a>
+<ul>
+<li><a href="#primitive-が提供する情報と限界"
+id="toc-primitive-が提供する情報と限界">Primitive
+が提供する情報と限界</a></li>
+<li><a href="#btf-と-ebpf-tracing" id="toc-btf-と-ebpf-tracing">BTF と
+eBPF tracing</a></li>
+<li><a href="#structured-drop-reason"
+id="toc-structured-drop-reason">Structured drop reason</a></li>
+<li><a href="#timestamping-と-packet-lifecycle"
+id="toc-timestamping-と-packet-lifecycle">Timestamping と packet
+lifecycle</a></li>
+<li><a href="#queue--napi--page_pool-observability"
+id="toc-queue--napi--page_pool-observability">Queue / NAPI / page_pool
+observability</a></li>
+</ul></li>
+<li><a href="#tool-の-case-study" id="toc-tool-の-case-study">Tool の
+case study</a></li>
+</ul></li>
+<li><a href="#synthesis--thesis-への回帰と未完の仕事"
+id="toc-synthesis--thesis-への回帰と未完の仕事">Synthesis — thesis
+への回帰と未完の仕事</a>
+<ul>
+<li><a href="#6軸への回帰" id="toc-6軸への回帰">6軸への回帰</a></li>
+</ul></li>
+<li><a href="#part-vi--canonical-release-chronology"
+id="toc-part-vi--canonical-release-chronology">Part VI — Canonical
+release chronology</a>
+<ul>
+<li><a href="#採用基準" id="toc-採用基準">採用基準</a></li>
+<li><a href="#evidence-model" id="toc-evidence-model">Evidence
+model</a></li>
+<li><a href="#canonical-milestone-table"
+id="toc-canonical-milestone-table">Canonical milestone table</a>
+<ul>
+<li><a href="#30318" id="toc-30318">3.0–3.18</a></li>
+<li><a href="#319420" id="toc-319420">3.19–4.20</a></li>
+<li><a href="#5061" id="toc-5061">5.0–6.1</a></li>
+<li><a href="#6273-rc" id="toc-6273-rc">6.2–7.3-rc</a></li>
+<li><a href="#provenance-正規化を残す-architecture-critical-items"
+id="toc-provenance-正規化を残す-architecture-critical-items">provenance
+正規化を残す architecture-critical items</a></li>
+</ul></li>
+<li><a href="#part-vi-から-part-vii-へ--chronology-から-provenance-へ"
+id="toc-part-vi-から-part-vii-へ--chronology-から-provenance-へ">Part VI
+から Part VII へ — chronology から provenance へ</a></li>
+</ul></li>
+<li><a href="#part-vii--正規-provenance-ledger"
+id="toc-part-vii--正規-provenance-ledger">Part VII — 正規 provenance
+ledger</a>
+<ul>
+<li><a href="#exact-mainline-anchor-inventory"
+id="toc-exact-mainline-anchor-inventory">Exact mainline anchor
+inventory</a></li>
+<li><a href="#open-provenance-items" id="toc-open-provenance-items">Open
+provenance items</a></li>
+</ul></li>
+<li><a href="#appendix--source-index非正規"
+id="toc-appendix--source-index非正規">Appendix — Source
+index（非正規）</a>
+<ul>
+<li><a
+href="#usenix-research-index--architecture-motivation--design-space-evidence"
+id="toc-usenix-research-index--architecture-motivation--design-space-evidence">USENIX
+research index — architecture motivation / design-space
+evidence</a></li>
+<li><a href="#kernel-documentation--primary-source-index"
+id="toc-kernel-documentation--primary-source-index">Kernel documentation
+/ primary-source index</a></li>
+<li><a href="#exact-anchor-index" id="toc-exact-anchor-index">Exact
+anchor index</a></li>
+<li><a href="#conference-provenance-index"
+id="toc-conference-provenance-index">Conference provenance index</a>
+<ul>
+<li><a
+href="#additional-architecture--implementation-conference-references"
+id="toc-additional-architecture--implementation-conference-references">Additional
+architecture / implementation conference references</a></li>
+</ul></li>
+<li><a href="#retis--pwru-case-study-index"
+id="toc-retis--pwru-case-study-index">Retis / pwru case-study
+index</a></li>
+<li><a href="#provenance-policy" id="toc-provenance-policy">Provenance
+policy</a></li>
+</ul></li>
+<li><a href="#changelog--errata非正規"
+id="toc-changelog--errata非正規">Changelog / Errata（非正規）</a></li>
+</ul>
+</nav>
+<h1 id="linux-networking-evolution--linux-v30-から-7x-まで">Linux
+Networking Evolution — Linux v3.0 から 7.x まで</h1>
+<blockquote>
+<p><strong>Clean canonical edition.</strong> Part I presents the thesis,
+Part II the architecture eras, Parts III–V the lineages /
+driver-framework / observability story. Part VI is the only normative
+release chronology, Part VII the provenance ledger, and Appendix
+material is supporting evidence rather than an alternate release
+map.</p>
+</blockquote>
+<p><strong>調査基準日:</strong> 2026-10-02<br />
+<strong>構成改訂:</strong> 2026-10-04（r24）</p>
+<p>この文書は、Linux networking の変化を「調査した順」ではなく、
+<strong>kernel networking
+がどのように進化したかを読む順序</strong>に再構成した版である。</p>
+<p><strong>対象範囲:</strong> wired / host networking
+を中心に扱う。RDMA、Wi-Fi 全般、QUIC や security protocol
+の網羅的な歴史は対象外とし、mac80211 は queue management （airtime /
+AQL）の観点から選択的に扱う。</p>
+<h2 id="この文書の読み方">この文書の読み方</h2>
+<p>本編は <strong>thesis → architecture map → era → lineage → driver
+framework / observability → conclusion</strong> の順で読む。release
+番号を調べる場合は Part VI、 commit-level provenance を再監査する場合は
+Part VII へ直接進んでよい。</p>
+<p>Part I–V の version 表記は説明上の参照であり、release attribution
+を独立に定義しない。 その正本は Part VI、exact anchor の台帳は Part VII
+である。詳細な evidence 用語と canonicalization rule は Part VI
+冒頭で定義する。</p>
+<h3 id="図の記法">図の記法</h3>
+<ul>
+<li><code>→</code> / <code>↓</code> — 時系列または shared design problem
+に沿う <strong>lineage
+continuation</strong>。直接依存を意味しない。</li>
+<li><code>⇒</code> — 本文で明示した <strong>direct extension /
+integration</strong>。</li>
+<li><code>∥</code> — 同時期の <strong>parallel evolution</strong>。</li>
+<li><code>↔︎</code> — 相互作用するが親子関係ではない。</li>
+</ul>
+<hr />
+<h1
+id="part-i--executive-thesis-linux-networking-は何が変わったのか">Part I
+— Executive thesis: Linux networking は何が変わったのか</h1>
+<p>Linux networking の15年間の変化は、単純な「高速化」でも、従来の
+<code>skb</code> path の置き換えでもない。 従来の <strong>CPU が system
+RAM 上の skb を処理するモデルを現在も広く維持しながら</strong>、
+AF_XDP、device memory、io_uring zero-copy、programmable/offloaded path
+など、 複数の execution / memory-ownership model を workload と hardware
+capability に応じて <strong>共存させられる architecture
+へ拡張した</strong>ことが大きな変化である。</p>
+<p>その変化は6つの軸で並行して進んだ。</p>
+<pre class="text"><code>PERFORMANCE       queueing / pacing / aggregation / zero-copy
+PROGRAMMABILITY   BPF / XDP / socket / protocol / qdisc extension points
+MEMORY            page_pool / netmem / memory providers / device memory
+CONTROL PLANE     Netlink object model / YNL / RTNL scope reduction
+OBSERVABILITY     typed tracing / drop reason / queue-NAPI-memory identity
+DRIVER FRAMEWORK  switchdev / devlink / phylink / DIM / common driver contracts</code></pre>
+<p>これらのさらに上位にある横断的な傾向を、本書では <strong>explicit
+resource / control contracts</strong> と捉える。 すなわち
+driver-private、implicit、global だった仕組みを、kernel 共通の
+object、API、accounting、 assignment、lifetime、synchronization contract
+として明示する方向である。</p>
+<h3 id="本書で固定する語彙">本書で固定する語彙</h3>
+<ul>
+<li><strong>上位 thesis:</strong> explicit resource / control
+contracts</li>
+<li><strong>contract の具体形:</strong> object / accounting / API /
+assignment / lifetime / synchronization</li>
+<li><strong>重要な subtheme:</strong> ownership（特に queue / packet
+memory）</li>
+<li><strong>帰結:</strong> reusable / programmable / observable な
+resource control</li>
+</ul>
+<p><code>ownership</code> はこの流れの重要な一部だが、すべてを ownership
+だけで説明しない。たとえば BQL は 主に byte accounting /
+backpressure、per-netns RTNL は synchronization scope の問題である。
+一方 page_pool / AF_XDP / memory providers / queue leasing では、buffer
+や queue を誰が管理・割り当てるかという ownership が中心問題になる。</p>
+<h2 id="architecture-evolution-map">Architecture evolution map</h2>
+<pre class="text"><code>                    private / implicit / global
+                              │
+          ┌───────────────────┼────────────────────┐
+          │                   │                    │
+      queue state         packet execution      memory lifetime
+      BQL / pacing        BPF / XDP / TC        page_pool / netmem
+          │                   │                    │
+          ├──────────────┬────┴──────────────┬─────┤
+          │              │                   │     │
+     device control   queue/NAPI objects   memory providers
+   switchdev/devlink     netdev-genl       AF_XDP / devmem
+          │              │                   │
+          └──────────────┼───────────────────┘
+                         ▼
+              explicit common contracts
+                         │
+          object · accounting · API · lifetime · assignment · synchronization
+          （各 contract が提供する capability は API ごとに異なる）</code></pre>
+<p>この図の矢印は個々の機能の直接的な派生関係を表さない。異なる
+subsystem が、 <strong>暗黙的な状態を明示的な contract
+にする</strong>という共通方向へ進んだことを示す。</p>
+<h2 id="snapshot-v30--v50--2026">Snapshot: v3.0 / v5.0 / 2026</h2>
+<p>本書の起点は v3.0 である。v5.0
+は第2の起点ではなく、XDP/AF_XDP、switchdev/devlink、 page_pool など
+programmable/offload/memory infrastructure がすでに成立した
+<strong>中間観測点</strong>として置く。</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">観点</th>
+<th style="text-align: left;">v3.0 前後</th>
+<th style="text-align: left;">v5.0 前後</th>
+<th style="text-align: left;">2026</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">driver-local tuning が大きい</td>
+<td style="text-align: left;">BQL/TSQ/fq/pacing が定着</td>
+<td style="text-align: left;">multi-layer control + cake_mq / scalable
+TX</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">classic BPF 中心</td>
+<td style="text-align: left;">XDP/AF_XDP・TC BPF</td>
+<td style="text-align: left;">struct_ops / TCX / BPF qdisc / netkit</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">MEMORY</td>
+<td style="text-align: left;">page-centric driver-local recycle</td>
+<td style="text-align: left;">page_pool が利用可能</td>
+<td style="text-align: left;">netmem / memory providers / device
+memory</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">net_device 中心</td>
+<td style="text-align: left;">switchdev/devlink/phylink</td>
+<td style="text-align: left;">queue/NAPI objects・YNL-described
+APIs</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">CONTROL PLANE</td>
+<td style="text-align: left;">global RTNL 依存が大きい</td>
+<td style="text-align: left;">global RTNL が依然中心</td>
+<td style="text-align: left;">per-netns / fine-grained / RTNL-less
+paths</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">OBSERVABILITY</td>
+<td style="text-align: left;">logs/counters/tracing の個別利用</td>
+<td style="text-align: left;">BPF/BTF ecosystem が拡大</td>
+<td style="text-align: left;">typed drop reason + queue/NAPI/memory
+identity</td>
+</tr>
+</tbody>
+</table>
+<h2
+id="6軸contractcross-cutting-domain-の対応">6軸・contract・cross-cutting
+domain の対応</h2>
+<p>6軸は <strong>architecture analysis の主軸</strong>であり、全
+milestone の排他的 taxonomy ではない。 TRANSPORT、VIRTUAL /
+OVERLAY、SECURITY は Axis と独立した <strong>cross-cutting
+domain</strong> である。 Domain は単に「その protocol
+のコードを通る」という意味ではなく、protocol semantics / path management
+/ authentication / virtual-overlay behavior 自体が milestone
+の主題である場合に付与する。 したがって BIG TCP や Device Memory TCP は
+TCP path に存在しても、それだけを理由に TRANSPORT とはしない。</p>
+<table>
+<thead>
+<tr class="header">
+<th>Architecture axis</th>
+<th style="text-align: left;">15年間の変化</th>
+<th style="text-align: left;">主な contract form</th>
+<th style="text-align: left;">本文の主な扱い</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>PERFORMANCE</td>
+<td style="text-align: left;">implicit queueing → explicit accounting /
+multi-layer scheduling / larger processing units</td>
+<td style="text-align: left;">accounting / API</td>
+<td style="text-align: left;">Part III「Queueing / latency /
+pacing」「Packet aggregation」</td>
+</tr>
+<tr class="even">
+<td>PROGRAMMABILITY</td>
+<td style="text-align: left;">fixed path → verified extension points →
+reusable programmable infrastructure</td>
+<td style="text-align: left;">API / object</td>
+<td style="text-align: left;">Part III「BPF」「XDP / AF_XDP」</td>
+</tr>
+<tr class="odd">
+<td>MEMORY</td>
+<td style="text-align: left;">driver-local page handling → common
+lifetime / provider / assignment model</td>
+<td style="text-align: left;">lifetime / assignment / object</td>
+<td style="text-align: left;">Part III「Packet memory」「io_uring
+networking」</td>
+</tr>
+<tr class="even">
+<td>CONTROL PLANE</td>
+<td style="text-align: left;">embedded/global state → reusable objects /
+schema / narrower lock scope</td>
+<td style="text-align: left;">object / API / synchronization</td>
+<td style="text-align: left;">Part III「Routing / Netlink /
+RTNL」「netfilter」</td>
+</tr>
+<tr class="odd">
+<td>OBSERVABILITY</td>
+<td style="text-align: left;">opaque outcome → typed reason / identity /
+correlation</td>
+<td style="text-align: left;">contract を検証する evidence layer</td>
+<td style="text-align: left;">Part V</td>
+</tr>
+<tr class="even">
+<td>DRIVER FRAMEWORK</td>
+<td style="text-align: left;">driver-local convention → reusable kernel
+framework / device-wide object</td>
+<td style="text-align: left;">object / API / accounting / lifetime</td>
+<td style="text-align: left;">Part IV</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Cross-cutting domain:</strong> TRANSPORT は Part III「TCP /
+UDP / transport」、 VIRTUAL / OVERLAY は Part III「Virtual
+networking」、SECURITY は本書の主対象ではなく、 kTLS / WireGuard /
+TCP-AO / XFRM offload のように他の lineage
+と交差する場合だけ補助ラベルとして扱う。</p>
+<h3 id="thesis-を検証する代表例">thesis を検証する代表例</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Milestone</th>
+<th>以前の状態</th>
+<th>主に明示化したもの</th>
+<th>Contract form</th>
+<th>Axis</th>
+<th>Era</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>DQL/BQL</td>
+<td>driver-local TX ring tuning</td>
+<td>queued/completed byte accounting</td>
+<td>accounting</td>
+<td>PERFORMANCE / DRIVER FRAMEWORK</td>
+<td>Era 1</td>
+</tr>
+<tr class="even">
+<td><code>bpf()</code> / maps / verifier</td>
+<td>fixed kernel behavior / ad-hoc attachment</td>
+<td>verified program + map interface</td>
+<td>API</td>
+<td>PROGRAMMABILITY</td>
+<td>Era 1</td>
+</tr>
+<tr class="odd">
+<td>switchdev / devlink</td>
+<td>vendor-local forwarding / device state</td>
+<td>forwarding/device/resource objects</td>
+<td>object</td>
+<td>DRIVER FRAMEWORK</td>
+<td>Era 2</td>
+</tr>
+<tr class="even">
+<td>page_pool</td>
+<td>driver-local page recycle / DMA lifetime</td>
+<td>allocation / recycle / DMA lifetime</td>
+<td>lifetime</td>
+<td>MEMORY</td>
+<td>Era 2</td>
+</tr>
+<tr class="odd">
+<td>AF_XDP</td>
+<td>kernel-centric queue/buffer handling</td>
+<td>queue / UMEM binding</td>
+<td>assignment + lifetime</td>
+<td>MEMORY / PROGRAMMABILITY</td>
+<td>Era 2</td>
+</tr>
+<tr class="even">
+<td>nexthop objects</td>
+<td>route に埋め込まれた nexthop state</td>
+<td>reusable nexthop object / group</td>
+<td>object</td>
+<td>CONTROL PLANE</td>
+<td>Era 3</td>
+</tr>
+<tr class="odd">
+<td>BPF <code>struct_ops</code></td>
+<td>protocol algorithm が built-in implementation 中心</td>
+<td>typed operations implemented by verified BPF</td>
+<td>API + object</td>
+<td>PROGRAMMABILITY</td>
+<td>Era 3</td>
+</tr>
+<tr class="even">
+<td>YNL</td>
+<td>handwritten Netlink family definition / client boilerplate</td>
+<td>machine-readable Netlink schema</td>
+<td>API</td>
+<td>CONTROL PLANE</td>
+<td>Era 4</td>
+</tr>
+<tr class="odd">
+<td>queue/NAPI netdev-genl</td>
+<td>opaque driver rings / NAPI instances</td>
+<td>stable queue/NAPI identity and relations</td>
+<td>object</td>
+<td>DRIVER FRAMEWORK / OBSERVABILITY</td>
+<td>Era 4</td>
+</tr>
+<tr class="even">
+<td>Device Memory TCP</td>
+<td>packet payload は system RAM 前提</td>
+<td>non-system-RAM memory bound into networking path</td>
+<td>assignment + lifetime</td>
+<td>MEMORY</td>
+<td>Era 4</td>
+</tr>
+<tr class="odd">
+<td>io_uring ZCRX / memory-provider path</td>
+<td>socket receive と userspace buffer lifecycle の分離</td>
+<td>queue-bound receive memory provider</td>
+<td>assignment + lifetime</td>
+<td>MEMORY</td>
+<td>Era 4</td>
+</tr>
+<tr class="even">
+<td>per-netns RTNL</td>
+<td>global RTNL scope</td>
+<td>namespace-scoped synchronization</td>
+<td>synchronization</td>
+<td>CONTROL PLANE</td>
+<td>Era 4</td>
+</tr>
+<tr class="odd">
+<td>RX HW queue leasing</td>
+<td>hardware queue が physical netdev に固定</td>
+<td>hardware queue assignment / leasing</td>
+<td>assignment</td>
+<td>MEMORY / DRIVER FRAMEWORK</td>
+<td>Era 4</td>
+</tr>
+</tbody>
+</table>
+<p>この分布は Era の違いも示す。Era 1 では accounting / API の基礎、Era
+2–3 では reusable object / programmability、Era 4 では assignment /
+lifetime / synchronization の明示化が目立つ。ただし 各 Era
+は重なりを許し、この表は厳密な periodization ではない。</p>
+<p>この表は release attribution の正本ではない。version と Evidence
+class は Part VI に従う。</p>
+<h3 id="この-thesis-が説明しないもの">この thesis が説明しないもの</h3>
+<p><code>explicit resource / control contracts</code>
+は本書が観察する強い architecture tendency であり、 Linux networking
+の全変更を説明する万能則ではない。TFO / DCTCP / BBR / MPTCP / PLB /
+AccECN のような <strong>transport algorithm / protocol
+evolution</strong>、GRO/GSO / BIG TCP のような
+<strong>処理単位の拡大</strong>、<code>dev_queue_xmit()</code> llist
+化のような <strong>implementation scalability</strong> は、それ自体を
+contract 化として説明しない。これらは対応する architecture axis または
+cross-cutting domain の lineage で扱う。</p>
+<p>Observability も7番目の contract form とはしない。typed
+identity、drop reason、tracepoint、 timestamp などは、resource/control
+contract と runtime behavior を理解・検証する <strong>evidence
+layer</strong> と位置付ける。</p>
+<p>Part II–V はこの thesis を architecture の観点から検証し、Part VI–VII
+が release attribution と provenance を再監査可能な形で保持する。</p>
+<h1 id="part-ii--four-architecture-eras">Part II — Four architecture
+eras</h1>
+<p>ここでの era は kernel major version
+の境界ではなく、<strong>networking architecture
+が主に解こうとした問題</strong>で区切る。 境界は重なり、ある era
+で始まった仕組みは後続 era でも継続して発展する。</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Era</th>
+<th style="text-align: left;">おおよその期間</th>
+<th style="text-align: left;">主問題</th>
+<th style="text-align: left;">代表的な milestone</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Era 1 — Queue &amp; scalability
+foundation</strong></td>
+<td style="text-align: left;">～2014頃</td>
+<td style="text-align: left;">queue
+backlog、multicore、namespace、overlay、filtering の基礎</td>
+<td style="text-align: left;">BQL, CoDel/fq_codel, TSQ, pacing,
+namespace/setns, VXLAN, nftables, eBPF foundation</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Era 2 — Programmable
+datapath</strong></td>
+<td style="text-align: left;">2015～2018頃</td>
+<td style="text-align: left;">packet path
+を安全に拡張し、hardware/offload と接続する</td>
+<td style="text-align: left;">TC BPF, XDP, cgroup/LWT BPF, SOCKMAP,
+switchdev, devlink, AF_XDP, page_pool</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Era 3 — Programmability becomes
+infrastructure</strong></td>
+<td style="text-align: left;">2019～2022頃</td>
+<td style="text-align: left;">programmable mechanism を protocol /
+operations / memory infrastructure に広げる</td>
+<td style="text-align: left;">BTF ecosystem, struct_ops, SK_LOOKUP,
+MPTCP, BIG TCP, io_uring networking, drop reason, devlink health</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Era 4 — Explicit resource /
+control contracts</strong></td>
+<td style="text-align: left;">2023～</td>
+<td style="text-align: left;">queue・memory・device・locking scope
+を明示的 object/contract として扱う</td>
+<td style="text-align: left;">netmem, memory providers, Device Memory
+TCP, netdev-genl queue/NAPI objects, queue leasing, per-netns RTNL, BPF
+qdisc, YNL</td>
+</tr>
+</tbody>
+</table>
+<p>この区分は release attribution の正本ではない。たとえば page_pool は
+Era 2 で利用可能になり、 Era 4 の memory-provider architecture
+の重要な基礎になる。per-netns RTNL も一度に完成した機能ではなく、 複数
+release にわたる migration である。正確な release は Part VI
+を参照する。</p>
+<h2 id="era-間で変わった設計上の問い">Era 間で変わった設計上の問い</h2>
+<pre class="text"><code>How much should we queue?
+        ↓
+Where can we program the datapath?
+        ↓
+How do those mechanisms become reusable infrastructure?
+        ↓
+How explicitly can resources, ownership and synchronization be modeled?
+        queue / memory / device / locking scope</code></pre>
+<p>この矢印も feature dependency
+ではなく、時代ごとの<strong>支配的な設計課題の変化</strong>を表す。</p>
+<hr />
+<h1 id="part-iii--long-term-lineages">Part III — Long-term lineages</h1>
+<p>Part III では release
+順ではなく、同じ設計課題が長期間にどう変化したかを追う。
+図の矢印は、明示しない限り「直接の親子関係」を意味しない。dependency /
+extension / parallel development / shared design problem
+を区別する。release attribution の正本は Part VI である。</p>
+<h2 id="era-1-foundations--6軸を初期問題へ投影した4つの見方">Era 1
+foundations — 6軸を初期問題へ投影した4つの見方</h2>
+<p>v3.x は release-by-release に読むより、後の Linux networking
+を支える4つの foundation が 並行して形成された時期として読む方が、本書の
+architecture-first な構成に合う。 個々の release attribution の正本は
+Part VI に置き、ここでは設計上の意味だけを追う。</p>
+<p>ここでいう4 foundation は新しい分類体系ではなく、Era 1 の milestone
+を6軸から読み直すための編集上の束ね方である。</p>
+<h3 id="queue--scalability-foundation">Queue / scalability
+foundation</h3>
+<p>v3.x では「どこに、どれだけ packet / byte
+を滞留させるか」を複数レイヤーで制御する仕組みが整った。</p>
+<p>この foundation は <strong>socket / qdisc / driver-NIC の3層が同じ
+queue-pressure
+問題を別々に扱い始めたこと</strong>を指す。詳細な3層図と後続の BBR / EDT
+/ CAKE / AQL / cake_mq は、直後の
+<code>Queueing / latency / pacing</code> に集約する。</p>
+<p>Era 1 で重要なのは、BQL、CoDel/fq_codel、TSQ、sch_fq/TCP pacing
+が単一の後継系列ではなく、queueing / latency / burst control
+を異なる層で扱う foundation を形成したことである。</p>
+<h3 id="virtualization--control-foundation">Virtualization / control
+foundation</h3>
+<p>namespace を file descriptor と <code>setns()</code>
+で操作できるようになったことにより、 network namespace は container /
+orchestration から利用しやすい control primitive になった。 同時期に
+VXLAN、ipvlan などが加わり、host 内外の virtual network topology
+を構成する building block が増えた。</p>
+<pre class="text"><code>namespace / setns
+      │
+      ├── host-local isolation and placement
+      │
+      ├── VXLAN ── overlay reachability
+      │
+      └── ipvlan ─ interface multiplexing</code></pre>
+<p>IPv4 route-cache removal や nftables も、従来の global/cache-heavy
+または個別 subsystem 的な設計から、 より明示的な lookup / rule / object
+model へ向かう control-plane foundation として重要である。</p>
+<h3 id="programmability-foundation">Programmability foundation</h3>
+<p>classic BPF から eBPF への変化は、一度に「modern
+BPF」が完成した出来事ではない。</p>
+<pre class="text"><code>classic BPF
+    │
+    ▼
+eBPF ISA redesign
+    │
+    ▼
+bpf() + maps + verifier
+    │
+    ▼
+socket attachment</code></pre>
+<p>ここで成立したのは、後の TC BPF、XDP、cgroup/LWT
+hooks、SOCKMAP/SOCK_OPS、 AF_XDP、SK_LOOKUP、struct_ops、netkit、BPF
+qdisc へ展開できる <strong>verified in-kernel programmability の基礎
+contract</strong> である。</p>
+<p>以後の BPF history は一本の attachment-point lineage
+ではない。packet/datapath、 socket/lookup、protocol
+algorithms、virtual-device/queue control が独立・並行して拡大する。
+詳細は後述の BPF / XDP lineage で扱う。</p>
+<h3 id="server--transport-foundation">Server / transport foundation</h3>
+<p><code>SO_REUSEPORT</code>、<code>SO_BUSY_POLL</code>、TCP Fast
+Open、DCTCP などは、 multicore server、low latency、connection
+establishment、datacenter congestion control という
+異なる問題に対する基礎を形成した。</p>
+<p>Era 1 では TFO と DCTCP が、それぞれ connection establishment と
+datacenter congestion feedback の 基礎 milestone となった。後続の BBR /
+MPTCP / AccECN は <code>TCP / UDP / transport</code>、 BIG TCP は
+<code>Packet aggregation</code> で扱い、ここでは Era 1 を越える
+transport timeline を再掲しない。</p>
+<h3 id="v3x-から後続-era-へ">v3.x から後続 era へ</h3>
+<p>v3.x で重要なのは個々の feature 数ではなく、後の architecture
+を可能にする <strong>accounting、namespace/control、verified
+programmability、multi-layer queue control</strong> が kernel 共通
+primitive として揃い始めたことである。</p>
+<p>Part III の以下の節では、Part VI の milestone
+が<strong>どの設計課題を共有し、 どこで dependency / extension /
+parallel evolution / shared design problem
+の関係にあるか</strong>を説明する。 release ごとの provenance
+は繰り返さない。driver-specific な共通化は Part IV、 tracing/tooling
+の詳細は Part V で扱う。</p>
+<h2
+id="queueing--latency--pacing--multi-layer-control-evolution">Queueing /
+latency / pacing — multi-layer control evolution</h2>
+<p>PERFORMANCE 軸の queueing lineage は、単に qdisc algorithm
+が増えた歴史ではない。 socket が作る burst、qdisc が保持する
+backlog、driver/NIC ring に積まれた outstanding bytes、 さらに
+multiqueue NIC での queue
+選択を、それぞれ別レイヤーで制御できるようになった歴史である。</p>
+<pre class="text"><code>socket / transport:  TSQ · TCP pacing · BBR
+                          ∥
+qdisc / scheduler:   CoDel · fq_codel · sch_fq · EDT · CAKE / cake_mq
+                          ∥
+driver / NIC:        DQL/BQL · multiqueue scaling · dev_queue_xmit() llist</code></pre>
+<p>DQL/BQL は driver が NIC へ渡した byte と完了した byte を accounting
+し、hardware queue に過剰な backlog を作らないための backpressure
+contract を与える。TSQ は同じ問題を TCP socket 側から制限し、
+<code>sch_fq</code> と TCP pacing は「何個 queue
+に入れるか」だけでなく「いつ送るか」を扱う。</p>
+<p>CoDel/fq_codel と CAKE は qdisc 層で delay / fairness / shaping
+を扱う。EDT と <code>SO_TXTIME</code> は time-based transmission
+を明示し、taprio は time-aware scheduling を hardware/offload
+と接続する。 これらは同じ API の世代交代ではなく、queueing problem
+を複数層へ分解した結果である。</p>
+<p>Wi-Fi/mac80211 では airtime accounting/scheduling と AQL が、byte
+queue だけでは表現しにくい wireless medium
+の占有時間を明示的に扱う。これは wired BQL の単純な派生ではないが、
+<strong>hidden queue pressure を accounting
+可能な量へ変換する</strong>という shared design problem を持つ。</p>
+<p>6.19 の <code>dev_queue_xmit()</code> llist 化は contract
+明示化ではなく、shared-qdisc / multiqueue TX の implementation
+scalability を改善する milestone である。7.0 の <code>cake_mq</code> は
+CAKE を multi-queue-aware に拡張し、modern NIC の queue topology と
+qdisc control の接点を強める。</p>
+<h2 id="packet-aggregation--grogso--big-tcp">Packet aggregation —
+GRO/GSO → BIG TCP</h2>
+<p>v5.0 ですでに GRO/GSO/TSO は成熟していたが、高速 NIC では per-packet
+metadata processing が支配的になる。</p>
+<pre class="text"><code>wire packets
+    ↓ GRO
+large skb
+    ↓ GSO/TSO
+wire packets</code></pre>
+<p>v5.19 BIG TCP は kernel internal GRO/GSO aggregate の 64KiB
+制約を緩和した。</p>
+<pre class="text"><code>GRO/GSO
+  ↓
+IPv6 BIG TCP (5.19)
+  ⇒ IPv4 BIG TCP (6.3)
+  ⇒ IPv6 BIG TCP without synthetic HBH jumbo header (Linux 7.0)
+  ⇒ BIG TCP over VXLAN / GENEVE (7.3-rc/mainline)</code></pre>
+<p>PPPoE GRO/GSO のような encapsulation-specific aggregation も、同じ
+PERFORMANCE 軸で per-packet cost を減らすが、BIG TCP
+の派生機能ではない。</p>
+<p>BIG TCP は wire MTU を巨大化する機能ではなく、 <strong>kernel 内部の
+packet-processing unit
+を大きくする機能</strong>として理解する。利用可否と効果は protocol
+path、 GRO/GSO/offload capability、driver/NIC、tunnel implementation
+などに依存し、すべての device / path で 一律に大きな aggregate
+を利用できることを意味しない。</p>
+<hr />
+<h2
+id="packet-memory--page_pool--netmem--memory-providers--device-memory">Packet
+memory — page_pool → netmem → memory providers / device memory</h2>
+<p>packet memory の変化は「zero-copy
+が増えた」という一語では足りない。重要なのは、 <strong>allocation /
+recycling / lifetime / DMA mapping / queue binding
+を誰が管理するか</strong>が driver-private な慣習から common contract
+へ移ってきたことである。</p>
+<h3 id="page_pool--rx-memory-lifecycle-の共通化">page_pool — RX memory
+lifecycle の共通化</h3>
+<p>従来の RX driver は page allocation、DMA mapping、recycle
+を個別に実装しがちだった。 page_pool は RX/XDP 向けに page の再利用と
+DMA lifecycle を共通化し、driver と networking core の 間に reusable
+lifetime contract を作る。</p>
+<pre class="text"><code>old RX:
+NIC → allocate/map page → stack → unmap/free
+
+page_pool:
+NIC → recycled/mapped page → stack ─┐
+      ↑                             │
+      └──────── return/recycle ─────┘</code></pre>
+<p>page_pool は XDP 専用ではない。XDP と強く結び付いて普及したが、後の
+zero-copy RX、 memory-provider、device-memory path が driver ごとの独自
+allocator に戻らずに済むための common infrastructure として読む。</p>
+<h3 id="netmem--struct-page-と-packet-memory-を同一視しない">netmem —
+<code>struct page</code> と packet memory を同一視しない</h3>
+<p>system RAM の page だけを packet backing と仮定すると、device memory
+や userspace-owned memory を 同じ networking path
+で扱いにくい。<code>netmem</code> は networking が扱う memory identity
+を <code>struct page</code> そのものから切り離す方向を表す。</p>
+<pre class="text"><code>network packet memory
+          ↓
+        netmem
+       /      \
+system RAM   non-page / device-backed memory</code></pre>
+<p>ここで重要なのは「RAM を device memory に置換した」ことではなく、従来
+path を維持したまま 異なる backing memory を表現できる contract
+を追加したことである。</p>
+<h3
+id="memory-providers--queue-binding--memory-lifetime-と-rx-queue-を接続する">memory
+providers / queue binding — memory lifetime と RX queue を接続する</h3>
+<p>io_uring ZCRX や Device Memory TCP では、memory pool
+を用意するだけでは不十分である。 どの RX queue がどの memory provider
+を使うか、buffer がいつ application/device から返却されるか、 queue
+reconfiguration 中に lifetime をどう保つかを kernel/driver/userspace
+間で合意する必要がある。</p>
+<pre class="text"><code>RX queue
+   ↔ memory provider
+   ↔ page_pool / netmem-backed buffers
+   ↔ userspace or device consumer</code></pre>
+<p>このため Era 4 では MEMORY 軸が <code>lifetime</code> だけでなく
+<code>assignment</code> と強く結び付く。 netdev-genl queue
+objects、io_uring ZCRX、Device Memory TCP、RX HW queue leasing は
+同一機能ではないが、<strong>queue identity と memory ownership/lifetime
+を明示的に結び付ける</strong> という architecture problem
+を共有する。</p>
+<p>Device Memory TCP は system RAM を経由しない RX/TX path
+を可能にする代表例である。</p>
+<pre class="text"><code>traditional:
+NIC → system RAM → CPU/copy/mapping → GPU/accelerator
+
+device-memory path:
+NIC ─────────────→ device memory → GPU/accelerator</code></pre>
+<p>large RX buffers や <code>&gt;PAGE_SIZE</code> devmem buffer
+の拡張は、この model が fixed-size page assumption から
+離れていく実装上の進展として位置付ける。</p>
+<p>DIBS は shared-memory communication 側の別 lineage であり、この
+packet-memory contract の 直接の predecessor/successor ではない。本書の
+canonical packet-networking story には昇格させない。</p>
+<h2 id="io_uring-networking">io_uring networking</h2>
+<p>6.0 の SEND_ZC / multishot receive と 6.15 の ZCRX を同じ lineage
+で扱い、TCP 節には重複記載しない。</p>
+<p>TCP <code>MSG_ZEROCOPY</code> は send-side copy avoidance の先行
+milestone であり、後の io_uring <code>SEND_ZC</code> と 同一 API
+ではないが、userspace↔︎kernel の data movement cost を減らす PERFORMANCE
+lineage の 重要な前段として扱う。</p>
+<pre class="text"><code>sendmsg / recvmsg
+      ↓
+zero-copy TX
+      ↓
+multishot / registered buffers
+      ↓
+zero-copy RX (6.15)
+      ↓
+memory-provider / device-memory integration</code></pre>
+<p>目標は syscall reduction だけではなく、 NICからuserspaceまでの buffer
+ownership/lifetime の効率化にある。</p>
+<hr />
+<h2 id="xdp--af_xdp">XDP / AF_XDP</h2>
+<p>v5.0 時点で XDP/AF_XDP は存在した。その後の本質は周辺 infrastructure
+の成熟。ここで XDP → AF_XDP → netkit / queue leasing
+を単純な派生関係とはみなさない。 XDP は native driver mode、generic/SKB
+mode、hardware offload で実行位置・性能特性・必要な driver support
+が異なり、 AF_XDP や queue leasing は queue ownership / zero-copy
+という共通課題から並行して発展した面を持つ。</p>
+<pre class="text"><code>XDP
+├─ redirect
+├─ page_pool
+├─ link/lifecycle
+└─ AF_XDP
+    ├─ zero-copy
+    ├─ multi-buffer (6.6)
+    ├─ virtio-net ZC
+    └─ queue ownership / netkit integration</code></pre>
+<p>v6.6 AF_XDP multi-buffer は:</p>
+<pre class="text"><code>one packet = one buffer</code></pre>
+<p>から:</p>
+<pre class="text"><code>one packet
+├─ buffer 1
+├─ buffer 2
+└─ buffer N (EOP)</code></pre>
+<p>への重要な変更である。</p>
+<p>XDP multi-buffer / frags は、single contiguous buffer
+を暗黙の前提にしていた XDP packet model を multi-buffer packet
+へ拡張した。6.6 の AF_XDP multi-buffer は同じ multi-buffer problem を
+userspace zero-copy path へ接続するが、native/generic/offload XDP mode
+の差を消すものではない。</p>
+<hr />
+<h2 id="bpf--packet-filter-から-stack-extension-へ">BPF — packet filter
+から stack extension へ</h2>
+<p>BPF の発展は一本道ではなく、attachment point
+と適用範囲が複数方向へ増えたものとして捉える。</p>
+<p>TC direct packet access、devmap/cpumap、SK_MSG、flow
+dissector、<code>struct_ops</code>、SK_LOOKUP、TCX は、
+packet/datapath、socket/message、protocol algorithm、attachment/lifetime
+という異なる面を拡張した。 一本の attachment-point lineage
+としてではなく、verified programmability
+の適用範囲が広がったものとして読む。</p>
+<pre class="text"><code>                     BPF core / verifier / maps
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+ packet / datapath        socket / lookup       protocol algorithms
+ XDP, TC                  cgroup hooks,         struct_ops / TCP CC
+                         SK_LOOKUP
+        │                                           │
+        └──────────────┐                 ┌──────────┘
+                       ▼                 ▼
+                 virtual devices / queue control
+                 netkit · BPF qdisc · related hooks</code></pre>
+<p>ここで下段は上段の単純な後継ではない。5.x～6.x にかけて
+<strong>適用範囲と attachment point が
+独立・並行して追加された</strong>結果として、packet、socket、protocol
+algorithm、virtual device、 queue/datapath まで programmability
+の対象が広がった、と読む。</p>
+<h3
+id="usenix-research-から見えるkernel-bypass--in-kernel-extensibilityの流れ">USENIX
+research から見える「kernel bypass → in-kernel
+extensibility」の流れ</h3>
+<p>USENIX の研究を併せて読むと、Linux networking の programmability
+が解こうとしてきた問題を別の角度から確認できる。</p>
+<pre class="text"><code>mTCP (NSDI 2014): user-level TCP / kernel overhead avoidance
+        ↓
+XDP/eBPF: early in-kernel programmable hook
+        ↓
+Electrode (NSDI 2023) / DINT (NSDI 2024):
+  kernel の protection / isolation を維持し frequent path を eBPF 化
+        ↓
+eTran (NSDI 2025):
+  transport 自体を eBPF で extensible にする</code></pre>
+<p>mTCP は Linux kernel TCP processing の CPU cost に対して user-level
+TCP stack を採った。一方 Electrode と DINT は、kernel bypass の security
+/ isolation / maintainability 上の trade-off を避けながら、XDP/eBPF
+により frequent path を kernel 内で処理する。eTran はさらに TCP/DCTCP や
+Homa のような transport design を eBPF ベースの extensible kernel
+transport として扱う。この研究史は、<strong>kernel
+を単に迂回するのではなく、kernel の ownership / protection model
+を保ったまま fast path や protocol behavior を programmable
+にする</strong>という方向を補強する。</p>
+<p>これらは upstream Linux release milestone ではないため Part VI
+には追加せず、architecture の動機を説明する research evidence
+として扱う。</p>
+<hr />
+<h2
+id="virtual-networking--datapath-と-queue-assignment-の並行進化">Virtual
+networking — datapath と queue assignment の並行進化</h2>
+<p>v5.0 前後の典型的な virtual datapath は次のような形だった。</p>
+<pre class="text"><code>container → veth → host stack → NIC
+
+guest virtio-net → QEMU/vhost/TAP → bridge/OVS → NIC</code></pre>
+<p>その後は一つの後継系列ではなく、複数の branch
+が並行して発展した。</p>
+<pre class="text"><code>VM datapath:
+  virtio-net ∥ vhost ∥ vDPA ∥ SR-IOV/VFIO
+                    ↔
+              AF_XDP zero-copy
+
+container datapath:
+  veth ∥ netkit / BPF-native path
+
+queue / zero-copy assignment:
+  AF_XDP / io_uring ↔ RX HW queue leasing</code></pre>
+<p>netkit は veth の単純な後継ではなく、RX HW queue leasing も netkit
+から派生した機能ではない。queue lease は virtual-device queue と
+physical-device queue の対応を明示し、AF_XDP や memory-provider 型の
+queue-bound API を container/virtual-device 側から利用可能にする
+<strong>assignment mechanism</strong> として位置付ける。</p>
+<p>v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、v7.1 RX HW queue leasing
+に共通して見える方向性は、 full kernel bypass
+そのものではなく、<strong>kernel の control / protection model
+を維持しながら data movement と datapath overhead
+を減らす選択肢を増やしたこと</strong>である。</p>
+<hr />
+<h2 id="tcp--udp--transport">TCP / UDP / transport</h2>
+<p>この節は <strong>transport protocol 自体の semantics / feedback /
+path management</strong> に絞る。 TCP
+上で使われるという理由だけで、memory、aggregation、programmability の
+milestone を ここへ再収容しない。</p>
+<h3 id="transport-protocol-evolution">Transport protocol evolution</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Theme</th>
+<th>Representative milestones</th>
+<th>この節で追う意味</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>connection establishment</td>
+<td>TFO client / server</td>
+<td>handshake latency / early data</td>
+</tr>
+<tr class="even">
+<td>congestion control / feedback</td>
+<td>DCTCP · BBR · PLB · AccECN</td>
+<td>congestion signal と sender behavior</td>
+</tr>
+<tr class="odd">
+<td>multipath</td>
+<td>MPTCP</td>
+<td>複数 path / subflow の transport semantics</td>
+</tr>
+<tr class="even">
+<td>authentication</td>
+<td>TCP-AO</td>
+<td>TCP connection authentication</td>
+</tr>
+</tbody>
+</table>
+<p>これらも一本の派生系列ではない。</p>
+<pre class="text"><code>connection establishment:       TFO
+congestion control / feedback:  DCTCP ∥ BBR ∥ PLB ∥ AccECN
+multipath:                       MPTCP
+authentication:                  TCP-AO</code></pre>
+<p>MPTCP は initial upstream から multi-subflow、userspace path
+manager、Generic Netlink、BPF integration へ発展し、7.2 の PM limit
+expansion は operational scale を広げたが、BBR や BIG TCP
+の後継ではない。</p>
+<h3 id="他の-architecture-lineage-へ置く-tcp-関連機能">他の architecture
+lineage へ置く TCP 関連機能</h3>
+<ul>
+<li><strong>BIG TCP</strong> — <code>Packet aggregation</code>
+を参照。</li>
+<li><strong>Device Memory TCP</strong> — <code>Packet memory</code>
+を参照。</li>
+<li><strong>BPF congestion control / struct_ops</strong> —
+<code>BPF</code> を参照。</li>
+<li><strong><code>TCP_ZEROCOPY_RECEIVE</code> / io_uring ZCRX</strong> —
+zero-copy / memory-delivery mechanism として
+<code>io_uring networking</code> および <code>Packet memory</code>
+を参照。</li>
+</ul>
+<h3 id="udp">UDP</h3>
+<p>UDP でも <code>MSG_ZEROCOPY</code> と GRO/GSO は copy cost と
+per-packet processing を減らす重要な PERFORMANCE milestone
+だが、protocol semantics の変更ではない。前者は socket zero-copy、
+後者は aggregation の lineage として位置付ける。</p>
+<p>UDP は GRO/GSO、tunnel/encapsulation、high packet-rate
+RX、receive-buffer scaling の 基盤として発展してきた。ここでは UDP
+固有の protocol lineage と、PERFORMANCE / VIRTUAL-OVERLAY 側で扱う
+packet aggregation・tunnel acceleration を混同しない。</p>
+<hr />
+<h2 id="routing--netlink--rtnl">Routing / Netlink / RTNL</h2>
+<p>6.19 の WireGuard YNL-described Netlink は、個別 security protocol
+の説明ではなく、machine-readable Netlink schema が実 subsystem へ広がる
+CONTROL PLANE の例としてここに置く。</p>
+<p>routing は nexthop object により:</p>
+<pre class="text"><code>route → embedded nexthop</code></pre>
+<p>だけでなく:</p>
+<pre class="text"><code>route → reusable nexthop object → group / resilient group</code></pre>
+<p>へ進んだ。</p>
+<p>Netlink は YNL により:</p>
+<pre class="text"><code>YAML specification
+├─ UAPI
+├─ policy
+├─ generated helper
+├─ documentation
+└─ userspace client</code></pre>
+<p>という machine-readable API の方向へ進む。</p>
+<p>RTNL は:</p>
+<pre class="text"><code>global RTNL
+ → unlocked operations
+ → RCU readers
+ → per-netns RTNL
+ → subsystem locks/refcounts
+ → RTNL-less FIB rule updates (7.3-rc/mainline)</code></pre>
+<p>この <code>→</code> は direct extension を意味せず、global RTNL
+dependency を縮小する複数の locking / refactoring techniques
+が同じ設計方向に進んだことを示す。</p>
+<p>7.3向けnetworking pullでは <code>RTM_NEWRULE</code> /
+<code>RTM_DELRULE</code> のFIB rule変更が RTNL-lock-less化され、further
+RTNL-dependency reductionやlock-less GET準備と 同じ「global
+RTNL依存を減らす」流れとしてmainlineへ入った。</p>
+<p>さらに 7.3 cycle では per-netns netdev unregistration infrastructure
+が入り、 per-netns RTNL の大きな blocker だった device unregistration
+path の分解も進んだ。 これは 6.13 以降の per-netns RTNL lineage
+の継続として扱う。</p>
+<hr />
+<h2 id="netfilter--nftables--conntrack">netfilter / nftables /
+conntrack</h2>
+<pre class="text"><code>iptables/netfilter
+      ↓
+nftables maturation
+      ↓
+flowtable
+      ↓
+hardware offload</code></pre>
+<p>一方で BPF と nftables は単純な新旧置換ではない。</p>
+<p>conntrack では performance だけでなく lifetime/GC、per-netns
+scalability、 hardware flow offload race、BPF kfunc access
+が重要なテーマとなった。</p>
+<hr />
+<h2
+id="part-iii-から-part-iv-へ--feature-lineage-から-driver-contract-へ">Part
+III から Part IV へ — feature lineage から driver contract へ</h2>
+<p>前章では networking mechanism を end-to-end の lineage
+として追った。Part IV では視点を変え、個々の driver の責務のうち何が共通
+networking-core framework へ移されたかを見る。</p>
+<h1 id="part-iv--network-device-driver-framework-の進化">Part IV —
+Network Device Driver Framework の進化</h1>
+<p>本章では networking core と driver の間の contract
+に焦点を当てる。<code>page_pool</code>、AF_XDP、Device Memory
+TCP、io_uring は Part III にも登場するが、ここでは feature
+全体の歴史ではなく、<strong>driver から見た queue / memory
+ownership</strong> の役割を扱う。</p>
+<h2 id="driver-framework-projection">Driver-framework projection</h2>
+<p>Part VI で DRIVER FRAMEWORK を主軸または副軸に持つ milestone を
+architecture story の観点から投影する。 release attribution / Evidence
+class はここでは再定義しない。</p>
+<table>
+<thead>
+<tr class="header">
+<th>Release</th>
+<th>Driver-framework milestone</th>
+<th>Architectural effect</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>3.3</td>
+<td>DQL/BQL</td>
+<td>common TX queue accounting / backpressure</td>
+</tr>
+<tr class="even">
+<td>3.19</td>
+<td>switchdev origin</td>
+<td>kernel forwarding objects と switch-ASIC offload の接続</td>
+</tr>
+<tr class="odd">
+<td>4.6</td>
+<td>devlink</td>
+<td>device/ASIC-wide resource/control object</td>
+</tr>
+<tr class="even">
+<td>4.14</td>
+<td>phylink</td>
+<td>common MAC/PHY/PCS/SFP state machine</td>
+</tr>
+<tr class="odd">
+<td>4.16 / 5.3</td>
+<td>Net DIM → <code>lib/dim</code></td>
+<td>adaptive interrupt moderation の common library 化</td>
+</tr>
+<tr class="even">
+<td>4.16</td>
+<td>netdevsim</td>
+<td>physical hardware なしで common offload API を test</td>
+</tr>
+<tr class="odd">
+<td>5.1</td>
+<td>devlink health</td>
+<td>common health reporting/recovery</td>
+</tr>
+<tr class="even">
+<td>5.6</td>
+<td>ethtool Generic Netlink</td>
+<td>structured/extensible driver management ABI</td>
+</tr>
+<tr class="odd">
+<td>5.11</td>
+<td>auxiliary bus</td>
+<td>complex device subfunction の独立 binding</td>
+</tr>
+<tr class="even">
+<td>5.12 / 6.19</td>
+<td>threaded NAPI → kthread busy-poll extension</td>
+<td>NAPI execution model の明示化/拡張</td>
+</tr>
+<tr class="odd">
+<td>6.2</td>
+<td>XFRM packet offload</td>
+<td>packet-level IPsec offload contract</td>
+</tr>
+<tr class="even">
+<td>6.8</td>
+<td>Rust phylib</td>
+<td>safe driver abstraction の networking-side representative
+milestone</td>
+</tr>
+<tr class="odd">
+<td>6.8</td>
+<td>queue/NAPI netdev-genl visibility</td>
+<td>queue/NAPI identity を generic object として公開</td>
+</tr>
+<tr class="even">
+<td>7.1</td>
+<td>RX HW queue leasing</td>
+<td>physical queue assignment を explicit contract 化</td>
+</tr>
+</tbody>
+</table>
+<p>page_pool / memory providers は MEMORY 軸を主とするため、この
+projection table ではなく Part III <code>Packet memory</code>
+と本章後半の memory-contract 説明で扱う。</p>
+<h3 id="長期的な-architecture-の変化">長期的な architecture の変化</h3>
+<pre class="text"><code>driver-private mechanisms
+        ↓
+common queue/backpressure · link · offload · device-control contracts
+        ↓
+structured/testable userspace-visible APIs
+        ↓
+queue / NAPI / page-pool objects
+        ↓
+queue-bound memory providers
+
+parallel language-safety track:
+C driver APIs ⇒ Rust-safe abstractions ⇒ Rust PHY / driver-core expansion</code></pre>
+<p>後半の変化は特に重要である。modern netdev では、従来 driver
+内部の不透明な実装詳細だったものを、ID と関係性を持つ generic object
+として公開する方向が強まっている。</p>
+<p>本章では個々の NIC driver を網羅的には列挙しない。Linux network
+driver に要求される実装を変化させ、driver
+ごとに重複していた仕組みを再利用可能な kernel framework へ移した common
+infrastructure を追う。</p>
+<h2 id="linux-30-時点の出発点">Linux 3.0 時点の出発点</h2>
+<p>Linux 3.0 の時点で NAPI と multiqueue networking
+はすでに確立していた。RPS/RFS は 2.6.35、XPS は 2.6.38
+で導入済みであり、v3.x の driver model
+はすでに次の要素を中心としていた。</p>
+<pre class="text"><code>RX/TX descriptor rings
+IRQ / MSI-X
+NAPI poll contexts
+multiple RX/TX queues
+RSS in hardware
+RPS/RFS/XPS in the stack
+ethtool + net_device_ops</code></pre>
+<p>したがって v3.x における重要な変化は NAPI の発明ではなく、driver
+と共通 networking-core algorithm の協調が強まったことである。</p>
+<h2 id="linux-33--dqlbql-queue-control-が共通-core-へ移る">Linux 3.3 —
+DQL/BQL: queue control が共通 core へ移る</h2>
+<p>DQL/BQL は、この変化を示す初期の代表例である。</p>
+<pre class="text"><code>old:
+  each driver/hardware queue can accumulate excessive TX backlog
+
+DQL/BQL:
+  common dynamic queue-limit algorithm
+  + driver reports queued/completed bytes
+  + core dynamically controls outstanding data</code></pre>
+<p>Exact commit provenance は Part VII にのみ保持する。</p>
+<p>LWN series: <a
+href="https://lwn.net/Articles/469651/">https://lwn.net/Articles/469651/</a>
+<a
+href="https://lwn.net/Articles/469652/">https://lwn.net/Articles/469652/</a></p>
+<p>Driver Framework の観点では、performance policy が個々の driver
+から再利用可能な net core infrastructure
+へ移り始めたことに意味がある。</p>
+<h2
+id="offload--device-object-contracts--hardware-が-linux-networking-の-first-class-object-になる">Offload
+/ device-object contracts — hardware が Linux networking の first-class
+object になる</h2>
+<h3 id="switchdev--linux-319-で始まり-4x-で拡大">switchdev — Linux 3.19
+で始まり 4.x で拡大</h3>
+<p>The initial switchdev infrastructure belongs to the Linux 3.19
+generation. The 4.x era is where the model expands into the broader
+hardware-offload architecture discussed below.</p>
+<p>switchdev は switch ASIC forwarding を proprietary SDK
+だけが制御する孤立した仕組みではなく、Linux driver model
+の一部として扱えるようにする。</p>
+<p>LWN: <a
+href="https://lwn.net/Articles/675826/">https://lwn.net/Articles/675826/</a>
+<a
+href="https://lwn.net/Articles/676096/">https://lwn.net/Articles/676096/</a></p>
+<p>The model represents physical switch ports as normal netdevices and
+lets bridge, VLAN, routing and related kernel objects drive hardware
+offload.</p>
+<pre class="text"><code>Linux bridge / FIB / VLAN / TC
+          ↓
+     switchdev model
+          ↓
+     switch ASIC driver
+          ↓
+        hardware</code></pre>
+<p>これは driver の責務における大きな変化であり、driver は Linux
+networking semantics を hardware 上へ実装する役割を担うようになる。</p>
+<h3 id="devlink--device-全体を扱う-control-plane">devlink — device
+全体を扱う control plane</h3>
+<p>devlink series (v3): <a
+href="https://lwn.net/Articles/677967/">https://lwn.net/Articles/677967/</a></p>
+<p>devlink fills a gap left by <code>net_device</code>: many settings
+belong to the whole ASIC/device, not one network interface.</p>
+<p>Examples include:</p>
+<pre class="text"><code>device resources
+port splitting
+shared buffers
+eswitch mode
+device parameters
+firmware / health</code></pre>
+<p>Linux 5.1 later adds devlink health reporting/recovery as a generic
+mechanism.</p>
+<p>This establishes a useful split:</p>
+<pre class="text"><code>net_device / ethtool
+  interface-facing behavior
+
+devlink
+  device / ASIC / resource / health behavior</code></pre>
+<h3 id="phylink-と-sfp">phylink と SFP</h3>
+<p>phylink/SFP の初期 RFC は design provenance として扱い、mainline
+anchor と release containment は Part VII / Part VI に委ねる。</p>
+<p>The 2015 phylink/SFP RFC addresses a recurring driver problem: MAC,
+PHY, PCS/SerDes and hot-pluggable SFP combinations could not be modeled
+cleanly by simple PHY attachment.</p>
+<p>RFC: <a
+href="https://lwn.net/Articles/667055/">https://lwn.net/Articles/667055/</a></p>
+<p>Conceptually:</p>
+<pre class="text"><code>MAC driver
+   │
+ phylink
+   ├── PHY
+   ├── PCS / SerDes
+   └── SFP module</code></pre>
+<p>This progressively removes link-mode state-machine duplication from
+Ethernet MAC drivers.</p>
+<h3 id="vf-representor-と-smartnicdpu-control">VF representor と
+SmartNIC/DPU control</h3>
+<p>Representors extend the switchdev idea to SR-IOV embedded switches
+and later SmartNIC/DPU architectures.</p>
+<p>LWN: <a
+href="https://lwn.net/Articles/692942/">https://lwn.net/Articles/692942/</a></p>
+<p>A representor is both a control-plane representation of a VF/SF and a
+netdevice endpoint through which the normal Linux stack can control the
+virtual switch.</p>
+<p>This is the foundation for the now-familiar:</p>
+<pre class="text"><code>PF / uplink
+   │
+embedded switch
+ ├─ VF representor
+ ├─ VF representor
+ └─ SF / other representors
+       ↓
+bridge / TC / OVS / routing
+       ↓
+hardware offload</code></pre>
+<h3 id="xdp-が-driver-fast-path-を変える">XDP が driver fast path
+を変える</h3>
+<p>Linux 4.8 introduces first-generation XDP. From the driver’s point of
+view the important change is that the RX path gains a programmable hook
+before skb allocation / normal stack processing.</p>
+<p>Kernel Recipes 2018 explicitly describes XDP as a programmable layer
+running in device driver context: <a
+href="https://archives.kernel-recipes.org/document/xdp-a-new-programmable-network-layer/">https://archives.kernel-recipes.org/document/xdp-a-new-programmable-network-layer/</a></p>
+<p>This creates new common driver responsibilities:</p>
+<pre class="text"><code>construct xdp_buff
+run XDP program
+handle PASS / DROP / TX / REDIRECT
+support ndo_xdp_xmit
+manage RX memory so buffers can move between RX/XDP/TX</code></pre>
+<p>The last point is one of the pressures that increased the value of a
+common RX-memory recycling infrastructure such as page_pool; page_pool
+was not created solely for XDP.</p>
+<h3 id="usenix-research-に見る-xdp--smartnic-offload">USENIX research
+に見る XDP / SmartNIC offload</h3>
+<p>OSDI 2020 の <strong>hXDP</strong> は、Linux XDP/eBPF の program
+model、map、helper semantics を FPGA NIC 上へ持ち込み、unmodified eBPF
+program を NIC 側で実行する研究である。これは upstream XDP
+hardware-offload の release provenance ではないが、XDP が <strong>Linux
+の programmable-datapath semantics を hardware execution target
+へ投影できる abstraction</strong> として研究されたことを示す。USENIX ATC
+2022 の program-warping work はこの方向をさらに最適化した。</p>
+<p>NSDI 2023 の <strong>IO-TCP</strong> は TCP stack の control plane を
+CPU 側に保持しつつ、disk I/O と TCP packet-transfer data plane を
+SmartNIC へ offload する split-stack design を示した。upstream feature
+そのものではないが、「canonical semantics/control は host に保持し、data
+movement / fast path を device へ移す」という driver/offload
+architecture の比較材料になる。</p>
+<h3 id="dim--interrupt-moderation-の共通-library-化">DIM — interrupt
+moderation の共通 library 化</h3>
+<p>DIM の release attribution と evidence class は Part VI、未解決
+boundary は Part VII にのみ置く。</p>
+<p>Netdev 0x12 (2018) presented DIM as a driver-independent Dynamic
+Interrupt Moderation library.</p>
+<p><a
+href="https://www.netdevconf.info/0x12/">https://www.netdevconf.info/0x12/</a></p>
+<p>Rather than every driver inventing adaptive interrupt/coalescing
+algorithms:</p>
+<pre class="text"><code>driver samples events/bytes/packets
+        ↓
+common DIM algorithm
+        ↓
+profile decision
+        ↓
+driver programs hardware moderation</code></pre>
+<p>This is another example of extracting policy from drivers into common
+netdev infrastructure.</p>
+<h3
+id="page_pool--rx-memory-management-の共通-infrastructure-化">page_pool
+— RX memory management の共通 infrastructure 化</h3>
+<p>The page_pool work was motivated by drivers independently reinventing
+high-speed DMA page recycling. A 2016 RFC explicitly described it as a
+generic API for streaming-DMA page pools, and the refurbished
+implementation appears in the 2018 XDP-era work.</p>
+<p>Key late series: <a
+href="https://lists.openwall.net/netdev/2018/03/31/91">https://lists.openwall.net/netdev/2018/03/31/91</a></p>
+<p>Modern page_pool provides a common allocation/recycling/DMA model for
+skb and XDP buffers.</p>
+<pre class="text"><code>before:
+ driver-specific RX allocator
+ driver-specific recycling
+ driver-specific DMA lifetime tricks
+
+after:
+        page_pool
+       /         \
+     skb       xdp_frame
+       \         /
+     common recycling</code></pre>
+<p>Its importance grows well beyond the original XDP motivation. By
+Netdev 0x19, page_pool is described as the standard RX datapath
+memory-management mechanism, and newer zero-copy features require
+drivers to integrate with it.</p>
+<h2
+id="operational-driver-infrastructure--management-apihealth共通-library">Operational
+driver infrastructure — management API・health・共通 library</h2>
+<h3 id="devlink-health">devlink health</h3>
+<p>Linux 5.1 adds generic devlink health reporting and recovery.</p>
+<p>Netdev 0x13 describes the goals as:</p>
+<pre class="text"><code>real-time alerting
+driver debug information
+self-healing / recovery
+vendor-support data collection</code></pre>
+<p>Conference provenance は Appendix に集約する。</p>
+<p>This changes hardware error handling from driver-specific
+logs/private tools toward a common operational model.</p>
+<h3 id="ethtool-ioctl--generic-netlink">ethtool ioctl → Generic
+Netlink</h3>
+<p>The ethtool netlink work addresses limitations of the old ioctl ABI:
+extensibility, races, error reporting and lack of notifications.</p>
+<p>Series: <a
+href="https://lwn.net/Articles/808028/">https://lwn.net/Articles/808028/</a>
+<a
+href="https://lwn.net/Articles/810618/">https://lwn.net/Articles/810618/</a></p>
+<p>Architecturally this is not just a userspace-tool rewrite. It creates
+a structured, extensible management API between userspace, networking
+core and drivers.</p>
+<h3 id="netdevsim-と-selftest-driven-driver-api-design">netdevsim と
+selftest-driven driver API design</h3>
+<p><code>netdevsim</code> becomes an important test vehicle for
+driver-facing APIs. Current netdev maintainer documentation explicitly
+encourages new driver configuration APIs to have netdevsim/selftest
+coverage, while also requiring a real driver use case.</p>
+<p>This changes the development model:</p>
+<pre class="text"><code>new driver API
+   ↓
+generic implementation
+   ↓
+netdevsim model + selftests
+   ↓
+real hardware driver</code></pre>
+<p>Driver frameworks are increasingly expected to be testable without
+the physical NIC.</p>
+<h3
+id="auxiliary-bus--1つの-pci-device-と複数-subsystem-driver">auxiliary
+bus — 1つの PCI device と複数 subsystem driver</h3>
+<p>Merged for Linux 5.11, the auxiliary bus addresses complex devices
+exposing Ethernet, RDMA, vDPA and related functions from shared
+hardware.</p>
+<p>Instead of ad-hoc cross-driver glue:</p>
+<pre class="text"><code>              PCI function
+                   │
+              parent/core
+             /      |      \
+        netdev     RDMA    vDPA
+       auxiliary drivers / devices</code></pre>
+<p>This becomes increasingly important for SmartNIC/IPU/DPU
+architectures.</p>
+<h2
+id="explicit-queue--memory-contracts--queuenapimemory-provider-の-object-化">Explicit
+queue / memory contracts — queue・NAPI・memory provider の object
+化</h2>
+<h3 id="page_pool-の可観測化">page_pool の可観測化</h3>
+<p>2023 page_pool netlink introspection associates pools with netdevices
+and NAPI IDs and exports allocation/recycling/memory information.</p>
+<p>LWN: <a
+href="https://lwn.net/Articles/948718/">https://lwn.net/Articles/948718/</a></p>
+<p>This is an important architectural transition:</p>
+<pre class="text"><code>page_pool as hidden driver implementation detail
+                 ↓
+page_pool as identifiable / observable netdev resource</code></pre>
+<h3 id="queue--napi-object-の-generic-netdev-api-化">queue / NAPI object
+の generic netdev API 化</h3>
+<p>Netdev 0x17 discusses exposing queues and NAPI instances through
+<code>netdev-genl</code>.</p>
+<p><a
+href="https://netdevconf.info/0x17/sessions/talk/netlink-apis-to-exposeconfigure-netdev-objects.html">https://netdevconf.info/0x17/sessions/talk/netlink-apis-to-exposeconfigure-netdev-objects.html</a></p>
+<p>The proposed/ongoing model makes properties such as these
+explicit:</p>
+<pre class="text"><code>queue
+ ├─ NAPI instance
+ ├─ stats
+ ├─ memory model
+ └─ XDP / zero-copy capabilities
+
+NAPI
+ ├─ NAPI ID
+ ├─ device
+ ├─ IRQ
+ └─ thread / CPU relationship</code></pre>
+<p>This is a conceptual shift from “the driver owns opaque rings” toward
+explicit queue / NAPI / memory objects with stable identities and
+API-defined properties.</p>
+<p>ただし <strong>可視化・設定・割り当て・ownership
+は同義ではない</strong>。API ごとに許される操作は異なり、 ある object を
+userspace から列挙・参照できても、その lifetime や ownership を
+userspace が自由に 変更できるとは限らない。netdev-genl の
+read/configuration API、memory-provider registration、 queue-leasing
+のような assignment mechanism は、それぞれ capability と permission
+boundary を個別に読む必要がある。</p>
+<p>This connects conceptually to Device Memory TCP, io_uring ZCRX and
+queue-leasing work elsewhere in this document, but does not imply that
+one generic API grants all of those control operations.</p>
+<h3 id="page_pool--netmem--memory-providers">page_pool → netmem → memory
+providers</h3>
+<p>The driver-framework view of the memory lineage is:</p>
+<pre class="text"><code>driver-private RX recycling
+        ↓
+page_pool
+        ↓
+page_pool as common driver contract
+        ↓
+netmem abstraction
+        ↓
+memory providers
+        ↓
+host pages / userspace memory / device memory</code></pre>
+<p>Kernel Recipes 2024 の公開 abstract が直接述べるのは、kernel network
+stack を利用し、vanilla TCP と互換性のある zero-copy receive
+の設計である。NIC / firmware / driver support、page_pool、netmem、queue
+configuration という具体的な実装依存関係は abstract 自体ではなく、同
+conference の live blog と後続 upstream implementation
+から確認する。</p>
+<p>つまり modern high-speed network driver は、単に
+<code>struct page</code> を allocate するだけではなく、次第に
+<strong>memory-provider-aware</strong> であることを求められている。</p>
+<h3 id="xfrm-device--ipsec-packet-offload">XFRM device / IPsec packet
+offload</h3>
+<p>XFRM device offload is another common driver-framework contract. The
+important 6.2 generation extends the model from crypto acceleration to
+packet offload, where the NIC can own SA/policy processing as well as
+encryption/decryption.</p>
+<pre class="text"><code>XFRM core
+   ↓ state + policy synchronization
+xfrmdev_ops
+   ↓
+NIC driver
+   ↓
+IPsec hardware pipeline</code></pre>
+<p>This is the same architectural pattern seen in switchdev and TC
+offload: the kernel keeps the canonical networking semantics while the
+driver maps those semantics onto hardware.</p>
+<h2
+id="rust--common-driver-contracts-を-safe-abstraction-として表現する-parallel-track">Rust
+— common driver contracts を safe abstraction として表現する parallel
+track</h2>
+<p>Rust は networking architecture の主 lineage ではなく、common C
+driver contracts が明確になるほど、 その ownership / lifetime /
+state-machine boundary を型安全な abstraction として表現できる、という
+<strong>parallel language-safety track</strong> として扱う。</p>
+<p>Linux 6.1 の Rust-for-Linux 導入は kernel-wide context
+であり、networking の canonical milestone ではない。本書での networking
+milestone は、6.8 の Rust PHY abstraction / Asix reference PHY
+を代表点とする。release attribution と exact anchor は Part VI / VII
+にのみ置く。</p>
+<pre class="text"><code>common C driver contracts
+  phylib · NAPI · devlink · page_pool · DMA / device lifecycle
+                         ⇒
+             explicit lifetime / state boundaries
+                         ⇒
+                safe Rust abstractions</code></pre>
+<p>重要なのは C implementation を Rust に置換したことではなく、driver
+framework が持つ lifetime、ownership、state transition、resource cleanup
+の contract を <code>unsafe</code> boundary の内側へ 閉じ込め、safe code
+から利用できる API として表現できることである。</p>
+<p>real NIC driver には PHY だけでなく PCI/platform
+probing、DMA、MMIO、IRQ、device removal など kernel-wide driver-core
+abstraction も必要である。したがって Rust networking の成熟は networking
+subsystem 単独では完結しない。ただし conference/review
+の詳細年表は本文の主題ではない。Appendix には architecture
+を補助する代表例だけを置く。</p>
+<h2 id="conference-に見る-lineage">Conference に見る lineage</h2>
+<h3 id="netdev">Netdev</h3>
+<p>Netdev is the strongest conference source for driver-framework
+implementation:</p>
+<pre class="text"><code>2016  switchdev / hardware-offload model (conference provenance not independently re-verified here)
+2018  DIM, switchdev/NOS, offload and driver API work
+2019  devlink health
+2023  Rust networking tutorial
+      queue/NAPI netdev-genl objects
+2024  Driver and H/W APIs workshop
+      memory pools / queues / devlink / fwctl
+2025  page_pool leak diagnostics
+2026  dedicated Device Driver Workshop</code></pre>
+<h3 id="kernel-recipes">Kernel Recipes</h3>
+<p>Kernel Recipes は zero-copy networking と Rust/C driver abstraction
+の architecture context を補う。 代表的な講演 provenance は Appendix
+に置く。網羅的な Rust networking conference history
+は本書の対象外とする。</p>
+<h2
+id="part-iv-から-part-v-へ--common-contracts-から-operability-へ">Part
+IV から Part V へ — common contracts から operability へ</h2>
+<p>fast path、memory ownership、offload は、operator/developer が kernel
+の動作を理解できて初めて運用可能になる。Part V
+では、それと並行して進化した visibility、tracing、explainability
+を追う。</p>
+<h1 id="part-v--observability--explainability">Part V — Observability /
+Explainability</h1>
+<p>Part V は <strong>kernel 側の observability primitive
+の進化</strong>に限定します。Observability
+は独立した軸であると同時に、programmable / offloaded / zero-copy path
+が増えて複雑化した networking を <strong>operationally explainable
+にする evidence layer</strong> と位置付けます。 Retis / pwru
+はこれらを利用する case study であり、kernel release chronology
+そのものではないため Appendix に移します。</p>
+<h2 id="kernel-observability-primitive">Kernel observability
+primitive</h2>
+<p>Linux networking の observability は、単純な interface counter /
+packet capture から、 kernel 内部の typed event と packet-lifecycle
+metadata を相関できる方向へ進化しました。</p>
+<pre class="text"><code>Observability primitives (parallel / complementary)
+
+  tracepoints / perf / kprobes ─┐
+  eBPF tracing + BTF ────────────┼─► tool-side correlation ─► higher-level inference
+  structured drop reasons ───────┤
+  timestamping ──────────────────┤
+  queue / NAPI identity ─────────┤
+  page_pool stats/diagnostics ───┘
+
+※ 左側の primitive は一本道に「進化」した関係ではない。異なる種類の evidence を並行して提供する。
+  packet-journey reconstruction は、それらを相関する tool / analysis 側の目標である。</code></pre>
+<h3 id="primitive-が提供する情報と限界">Primitive
+が提供する情報と限界</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Primitive</th>
+<th style="text-align: left;">主に提供するもの</th>
+<th style="text-align: left;">境界 / 注意点</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">BTF</td>
+<td style="text-align: left;">kernel type / field metadata</td>
+<td style="text-align: left;">runtime event や packet trajectory
+自体は記録しない</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">eBPF tracing</td>
+<td style="text-align: left;">attach point での event / state</td>
+<td style="text-align: left;">coverage、attach point、権限、overhead
+に依存</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>skb_drop_reason</code></td>
+<td style="text-align: left;">対応箇所での structured drop reason</td>
+<td style="text-align: left;">全 drop path が必ず reason
+を付与するわけではない</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">timestamping</td>
+<td style="text-align: left;">特定地点での時刻情報</td>
+<td style="text-align: left;">clock、取得地点、HW/SW timestamp semantics
+に依存</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">netdev-genl</td>
+<td style="text-align: left;">queue / NAPI 等の
+identity、state、configuration</td>
+<td style="text-align: left;">可視化できることと自由に
+ownership/configuration できることは別</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">page_pool introspection</td>
+<td style="text-align: left;">pool identity / stats / diagnostics</td>
+<td style="text-align: left;">packet 単位の end-to-end trajectory
+ではない</td>
+</tr>
+</tbody>
+</table>
+<p>したがって cross-layer packet journey は単一 primitive
+の機能ではなく、tool が複数の identifier、event、 timestamp、metadata
+を相関して <strong>推論する目標</strong>として扱う。</p>
+<h3 id="btf-と-ebpf-tracing">BTF と eBPF tracing</h3>
+<p>BTF により running kernel の型情報を利用できるため、observability
+tool は private kernel structure
+の固定offsetに依存する必要を減らせます。これは networking
+のように内部構造の変化が 速い領域で特に重要です。</p>
+<h3 id="structured-drop-reason">Structured drop reason</h3>
+<p>Linux 5.17 の <code>kfree_skb_reason()</code> /
+<code>skb_drop_reason</code> 世代は、「packet が消えた」という観測を
+「どの理由でdropされたか」という structured metadata
+へ変えました。その後、coverage は networking stack
+の各所へ拡張されています。</p>
+<p>7.1 の dedicated qdisc-drop tracepoint は、qdisc 内の drop context を
+generic tracing から直接観測しやすくした例であり、structured drop reason
+と補完関係にある。</p>
+<h3 id="timestamping-と-packet-lifecycle">Timestamping と packet
+lifecycle</h3>
+<p><code>SO_TIMESTAMPING</code>、driver/hardware
+timestamp、BPFから取得できる時刻・contextは、 単一地点のpacket
+captureでは見えない queueing / scheduling / offload
+の時間軸を補います。</p>
+<h3 id="queue--napi--page_pool-observability">Queue / NAPI / page_pool
+observability</h3>
+<p>Part IVで説明した queue、NAPI、page_pool のobject化は、control
+planeだけでなくobservabilityにも 効きます。packet memory、polling
+context、queue identityをuserspace-visible objectとして関連付ける
+ことで、zero-copy /
+memory-provider時代の問題を説明しやすくなります。ただし、readable な
+identity / stats と、 userspace が queue や NAPI の
+ownership/configuration を変更できる control-plane capability
+は区別する。</p>
+<p>この軸を Part VI の確定 milestone に対応させると、代表的な
+observability milestone
+の<strong>時系列</strong>は次のようになる。これは機能間の依存関係を示す図ではない。</p>
+<pre class="text"><code>4.1   kprobe-attached eBPF / tracing foundation
+  ∥
+5.17  kfree_skb_reason / structured drop-reason foundation
+  ⇒
+5.19  drop-reason coverage expansion
+  ∥
+6.8   queue/NAPI netdev-genl visibility
+  ∥
+7.1   dedicated qdisc-drop tracepoint</code></pre>
+<p><code>netdev-genl</code> による queue / NAPI identity と stats
+は、従来の interface-level counter だけでは説明しにくかった「どの queue
+/ poller で問題が起きているか」を userspace
+から関連付ける基盤になる。page_pool 側でも pool identity、allocation /
+recycle information、leak diagnostics が整備され、packet-memory
+ownership 自体が 観測対象へ移っている。ここでの release attribution は
+Part VI の値を参照する。</p>
+<h2 id="tool-の-case-study">Tool の case study</h2>
+<p>Retis と pwru は上記primitiveを利用する代表例ですが、本書ではkernel
+evolutionそのものと区別します。</p>
+<ul>
+<li><strong>pwru</strong>: 広いkernel function
+trajectoryから「packetがどこを通ったか」を探索する。</li>
+<li><strong>Retis</strong>: networking event、skb metadata、OVS/OVN
+contextなどを意味的にenrichして相関する。</li>
+</ul>
+<p>詳細なconference/source provenanceはAppendixのcase-study
+indexに集約します。</p>
+<h1 id="synthesis--thesis-への回帰と未完の仕事">Synthesis — thesis
+への回帰と未完の仕事</h1>
+<p>15年間を通じて一貫して観察できるのは、単なる packet/s
+の増加ではない。 driver-private / implicit / global だった state と
+convention の一部が、 <strong>object / accounting / API / assignment /
+lifetime / synchronization</strong> という kernel 共通 contract
+として明示されてきたことである。</p>
+<p>同時に、従来の system-RAM + <code>skb</code> path
+は消えていない。XDP/AF_XDP、offload、 Device Memory TCP、io_uring
+zero-copy などはそれを全面置換するのではなく、 用途と hardware
+capability に応じて <strong>複数の execution / memory-ownership model
+を共存</strong> させる方向へ Linux networking を拡張した。</p>
+<p>この変化には未完の領域もある。TX-side queue leasing は RX-side
+と同じ意味で完成しておらず、 per-netns RTNL は global RTNL
+を一括置換したものではない。Rust networking も現時点では PHY/core
+abstraction を中心とする段階で、一般的な high-performance NIC driver
+ecosystem が Rust に移行したことを意味しない。これらは「次の release
+の機能」ではなく、 <strong>explicit contracts
+の適用範囲が今後どこまで広がるか</strong>という継続課題である。</p>
+<h2 id="6軸への回帰">6軸への回帰</h2>
+<ul>
+<li><strong>PERFORMANCE:</strong> queueing は driver-local tuning から
+accounting / pacing / multi-layer scheduling へ進み、同時に BIG TCP や
+scalable TX のような contract 外の高速化も進んだ。</li>
+<li><strong>PROGRAMMABILITY:</strong> BPF/XDP は単一 fast path から
+socket / protocol / qdisc / virtual-device へ広がり、再利用可能な
+infrastructure になった。</li>
+<li><strong>MEMORY:</strong> page_pool から netmem / memory providers /
+device memory へ、allocation・lifetime・assignment
+が明示的になった。</li>
+<li><strong>CONTROL PLANE:</strong> reusable objects、YNL
+schema、per-netns/fine-grained locking により embedded/global state
+の範囲が縮小した。</li>
+<li><strong>OBSERVABILITY:</strong> typed reason / identity / tracing
+は、複雑化した programmable/offloaded/zero-copy path を operationally
+explainable にする evidence layer になった。</li>
+<li><strong>DRIVER FRAMEWORK:</strong>
+BQL、switchdev、devlink、phylink、DIM、page_pool、netdev-genl は
+driver-local convention を common contract へ引き上げた。</li>
+</ul>
+<p>したがって本書の thesis は未来予測ではなく、既存 milestone
+を横断した説明モデルである。 次の Part VI では、この story
+からいったん離れ、各 milestone の release attribution を
+1行1項目で正規化する。</p>
+<h1 id="part-vi--canonical-release-chronology">Part VI — Canonical
+release chronology</h1>
+<p>ここだけが <strong>release attribution と Evidence class
+の正本</strong>である。Part I–V の version 表記は story/lineage
+の参照であり、この表を上書きしない。</p>
+<h2 id="採用基準">採用基準</h2>
+<p>Part VI は release note
+の網羅表ではない。採用するのは、本文で追う6軸の長期 lineage、 または
+TRANSPORT / VIRTUAL-OVERLAY / SECURITY の cross-cutting domain
+を理解するために必要な <strong>origin / integration / enablement
+milestone</strong> と、architecture 上の operational range
+を大きく変える milestone である。</p>
+<p>単発の機能追加、局所的な数値上限変更、後続 lineage を変えない個別
+protocol/offload enhancement は 原則として採用しない。「Axis
+を付けられる」だけでは採用理由にならず、Part I–V の story で役割を
+説明できることを要求する。</p>
+<p><strong>Axis と Domain は独立である。</strong> Axis は architecture
+上の主問題を示す。Domain は単なる実装場所ではなく、 protocol semantics /
+path management / authentication / virtual-overlay behavior
+自体が主題となる場合に付与する。 Axis があることは
+<code>explicit contracts</code> thesis
+で説明可能であることを意味しない。たとえば BIG TCP は PERFORMANCE
+軸だが、contract 化ではなく processing-unit expansion
+として説明する。</p>
+<h2 id="evidence-model">Evidence model</h2>
+<p>development stage は混同しない。</p>
+<pre class="text"><code>RFC / review
+    ≠ subsystem tree / net-next
+    ≠ Linus mainline
+    ≠ released tag</code></pre>
+<p>Evidence class は次の語彙だけを用いる。</p>
+<ul>
+<li><strong>TAG</strong> — final release containment / authoritative
+release evidence を確認。</li>
+<li><strong>TAG+ANCHOR</strong> — TAG に加え、Part VII に完全な40桁
+mainline anchor を保持。</li>
+<li><strong>SERIES+TAG</strong> — relevant series/pull と final release
+containment を確認。</li>
+<li><strong>SERIES</strong> — series/pull evidence は強いが exact
+release boundary の監査を残す。</li>
+<li><strong>GENERATION</strong> — release-generation attribution
+は強いが exact origin/integration boundary を残す。</li>
+<li><strong>MAINLINE</strong> — Linus mainline merge 済み、final tag
+未公開。</li>
+</ul>
+<p>旧 Grade は独立列として持たない。必要なら
+<code>TAG / TAG+ANCHOR / SERIES+TAG → A</code>、
+<code>GENERATION / SERIES → B</code>、<code>MAINLINE → A-rc</code>
+と機械的に導出できる。</p>
+<p><strong>Part VI ↔︎ Part VII invariant:</strong>
+<code>TAG+ANCHOR</code> を使う milestone には Part VII に完全な40桁 SHA
+が 存在しなければならない。</p>
+<h2 id="canonical-milestone-table">Canonical milestone table</h2>
+<h3 id="30318">3.0–3.18</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Release</th>
+<th style="text-align: left;">Milestone</th>
+<th style="text-align: left;">Axis</th>
+<th style="text-align: left;">Domain</th>
+<th>Evidence class</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">3.0</td>
+<td style="text-align: left;">namespace FD / setns()</td>
+<td style="text-align: left;">CONTROL PLANE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">3.3</td>
+<td style="text-align: left;">DQL/BQL</td>
+<td style="text-align: left;">PERFORMANCE / DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">3.5</td>
+<td style="text-align: left;">CoDel</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">3.5</td>
+<td style="text-align: left;">fq_codel</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">3.6</td>
+<td style="text-align: left;">TSQ</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">3.6</td>
+<td style="text-align: left;">TFO client</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">TRANSPORT</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">3.6</td>
+<td style="text-align: left;">IPv4 route-cache removal</td>
+<td style="text-align: left;">CONTROL PLANE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">3.7</td>
+<td style="text-align: left;">VXLAN</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">VIRTUAL / OVERLAY</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">3.7</td>
+<td style="text-align: left;">TFO server</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">TRANSPORT</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">3.9</td>
+<td style="text-align: left;">TCP/UDP SO_REUSEPORT</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">3.11</td>
+<td style="text-align: left;">SO_BUSY_POLL</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">3.12</td>
+<td style="text-align: left;">sch_fq / TCP pacing / TSO autosizing
+generation</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">3.13</td>
+<td style="text-align: left;">nftables</td>
+<td style="text-align: left;">CONTROL PLANE</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">3.15</td>
+<td style="text-align: left;">internal BPF ISA rework</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">3.18</td>
+<td style="text-align: left;">bpf() / maps / verifier generation</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">3.18</td>
+<td style="text-align: left;">DCTCP</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">TRANSPORT</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">3.18</td>
+<td style="text-align: left;">Geneve</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">VIRTUAL / OVERLAY</td>
+<td>TAG</td>
+</tr>
+</tbody>
+</table>
+<h3 id="319420">3.19–4.20</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Release</th>
+<th style="text-align: left;">Milestone</th>
+<th style="text-align: left;">Axis</th>
+<th style="text-align: left;">Domain</th>
+<th>Evidence class</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">3.19</td>
+<td style="text-align: left;">switchdev origin</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">3.19</td>
+<td style="text-align: left;">ipvlan</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">VIRTUAL / OVERLAY</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">3.19</td>
+<td style="text-align: left;">SO_ATTACH_BPF</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.1</td>
+<td style="text-align: left;">cls_bpf / act_bpf eBPF support</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>GENERATION</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.1</td>
+<td style="text-align: left;">kprobe BPF milestone</td>
+<td style="text-align: left;">OBSERVABILITY</td>
+<td style="text-align: left;">—</td>
+<td>GENERATION</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.6</td>
+<td style="text-align: left;">devlink</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.7</td>
+<td style="text-align: left;">TC BPF direct packet access</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.8</td>
+<td style="text-align: left;">XDP</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>SERIES+TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.9</td>
+<td style="text-align: left;">BBR</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">TRANSPORT</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.10</td>
+<td style="text-align: left;">cgroup BPF</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>SERIES+TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.10</td>
+<td style="text-align: left;">BPF LWT</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>SERIES+TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.13</td>
+<td style="text-align: left;">SOCK_OPS</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">TRANSPORT</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.13</td>
+<td style="text-align: left;">kTLS TX</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">SECURITY / TRANSPORT</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.14</td>
+<td style="text-align: left;">phylink</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.14</td>
+<td style="text-align: left;">SOCKMAP</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.14</td>
+<td style="text-align: left;">XDP devmap</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.14</td>
+<td style="text-align: left;">TCP MSG_ZEROCOPY</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.15</td>
+<td style="text-align: left;">XDP cpumap</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.16</td>
+<td style="text-align: left;">netdevsim</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.16</td>
+<td style="text-align: left;">Net DIM generation</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>GENERATION</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.16</td>
+<td style="text-align: left;">nftables software flowtable</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.17</td>
+<td style="text-align: left;">BPF_PROG_TYPE_SK_MSG</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.18</td>
+<td style="text-align: left;">AF_XDP</td>
+<td style="text-align: left;">MEMORY / PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>SERIES+TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.18</td>
+<td style="text-align: left;">page_pool origin / XDP memory return</td>
+<td style="text-align: left;">MEMORY</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.18</td>
+<td style="text-align: left;">TCP_ZEROCOPY_RECEIVE</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.19</td>
+<td style="text-align: left;">SO_TXTIME</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.19</td>
+<td style="text-align: left;">CAKE</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.20</td>
+<td style="text-align: left;">TCP EDT</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">4.20</td>
+<td style="text-align: left;">taprio</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">4.20</td>
+<td style="text-align: left;">BPF flow dissector</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+</tbody>
+</table>
+<h3 id="5061">5.0–6.1</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Release</th>
+<th style="text-align: left;">Milestone</th>
+<th style="text-align: left;">Axis</th>
+<th style="text-align: left;">Domain</th>
+<th>Evidence class</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">5.0</td>
+<td style="text-align: left;">UDP GRO</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">5.0</td>
+<td style="text-align: left;">UDP MSG_ZEROCOPY</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">5.1</td>
+<td style="text-align: left;">devlink health</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">5.1</td>
+<td style="text-align: left;">mac80211 airtime
+accounting/scheduling</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">5.3</td>
+<td style="text-align: left;">nexthop objects</td>
+<td style="text-align: left;">CONTROL PLANE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">5.3</td>
+<td style="text-align: left;">DIM generalized into lib/dim</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>GENERATION</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">5.5</td>
+<td style="text-align: left;">mac80211 AQL</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">5.6</td>
+<td style="text-align: left;">MPTCP</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">TRANSPORT</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">5.6</td>
+<td style="text-align: left;">WireGuard</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">SECURITY / VIRTUAL / OVERLAY</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">5.6</td>
+<td style="text-align: left;">BPF struct_ops / TCP CC</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">TRANSPORT</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">5.6</td>
+<td style="text-align: left;">ethtool Generic Netlink</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">5.9</td>
+<td style="text-align: left;">BPF_PROG_TYPE_SK_LOOKUP</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">5.11</td>
+<td style="text-align: left;">auxiliary bus</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">5.12</td>
+<td style="text-align: left;">threaded NAPI</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">5.17</td>
+<td style="text-align: left;">structured drop-reason foundation</td>
+<td style="text-align: left;">OBSERVABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">5.18</td>
+<td style="text-align: left;">XDP multi-buffer / frags generation</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>GENERATION</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">5.19</td>
+<td style="text-align: left;">IPv6 BIG TCP</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">5.19</td>
+<td style="text-align: left;">drop-reason expansion</td>
+<td style="text-align: left;">OBSERVABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">6.0</td>
+<td style="text-align: left;">io_uring SEND_ZC</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6.0</td>
+<td style="text-align: left;">io_uring multishot receive</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+</tbody>
+</table>
+<h3 id="6273-rc">6.2–7.3-rc</h3>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Release</th>
+<th style="text-align: left;">Milestone</th>
+<th style="text-align: left;">Axis</th>
+<th style="text-align: left;">Domain</th>
+<th>Evidence class</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">6.2</td>
+<td style="text-align: left;">TCP PLB</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">TRANSPORT</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6.2</td>
+<td style="text-align: left;">XFRM/IPsec packet offload</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">SECURITY</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">6.3</td>
+<td style="text-align: left;">YNL / YAML Netlink tooling</td>
+<td style="text-align: left;">CONTROL PLANE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6.3</td>
+<td style="text-align: left;">IPv4 BIG TCP</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">6.6</td>
+<td style="text-align: left;">AF_XDP multi-buffer</td>
+<td style="text-align: left;">MEMORY / PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6.6</td>
+<td style="text-align: left;">TCX / bpf_mprog</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">6.7</td>
+<td style="text-align: left;">netkit</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">VIRTUAL / OVERLAY</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6.7</td>
+<td style="text-align: left;">TCP-AO</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">SECURITY / TRANSPORT</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">6.8</td>
+<td style="text-align: left;">Rust phylib / Asix reference PHY</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>TAG+ANCHOR</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6.8</td>
+<td style="text-align: left;">queue/NAPI netdev-genl visibility</td>
+<td style="text-align: left;">DRIVER FRAMEWORK / OBSERVABILITY</td>
+<td style="text-align: left;">—</td>
+<td>GENERATION</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">6.11</td>
+<td style="text-align: left;">virtio-net AF_XDP RX zero-copy</td>
+<td style="text-align: left;">MEMORY</td>
+<td style="text-align: left;">VIRTUAL / OVERLAY</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6.12</td>
+<td style="text-align: left;">Device Memory TCP RX</td>
+<td style="text-align: left;">MEMORY</td>
+<td style="text-align: left;">—</td>
+<td>SERIES</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">6.13</td>
+<td style="text-align: left;">per-netns RTNL infrastructure
+milestone</td>
+<td style="text-align: left;">CONTROL PLANE</td>
+<td style="text-align: left;">—</td>
+<td>SERIES</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6.15</td>
+<td style="text-align: left;">io_uring ZCRX</td>
+<td style="text-align: left;">MEMORY</td>
+<td style="text-align: left;">—</td>
+<td>SERIES+TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">6.15</td>
+<td style="text-align: left;">further RTNL breakup</td>
+<td style="text-align: left;">CONTROL PLANE</td>
+<td style="text-align: left;">—</td>
+<td>SERIES+TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6.16</td>
+<td style="text-align: left;">Device Memory TCP TX</td>
+<td style="text-align: left;">MEMORY</td>
+<td style="text-align: left;">—</td>
+<td>SERIES+TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">6.16</td>
+<td style="text-align: left;">BPF qdisc</td>
+<td style="text-align: left;">PROGRAMMABILITY</td>
+<td style="text-align: left;">—</td>
+<td>SERIES+TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6.18</td>
+<td style="text-align: left;">AccECN core</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">TRANSPORT</td>
+<td>GENERATION</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">6.18</td>
+<td style="text-align: left;">UDP RX evolution</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>GENERATION</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6.19</td>
+<td style="text-align: left;"><code>dev_queue_xmit()</code> llist TX
+scheduling</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">6.19</td>
+<td style="text-align: left;">threaded-NAPI kthread busy-poll
+extension</td>
+<td style="text-align: left;">DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">6.19</td>
+<td style="text-align: left;">WireGuard YNL-described Netlink</td>
+<td style="text-align: left;">CONTROL PLANE</td>
+<td style="text-align: left;">SECURITY</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">7.0</td>
+<td style="text-align: left;">cake_mq</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">7.0</td>
+<td style="text-align: left;">IPv6 BIG TCP without synthetic HBH jumbo
+header</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">7.0</td>
+<td style="text-align: left;">AccECN enablement</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">TRANSPORT</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">7.0</td>
+<td style="text-align: left;">large RX buffers for memory providers /
+io_uring ZCRX</td>
+<td style="text-align: left;">MEMORY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">7.1</td>
+<td style="text-align: left;">RX HW queue leasing</td>
+<td style="text-align: left;">MEMORY / DRIVER FRAMEWORK</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">7.1</td>
+<td style="text-align: left;">dedicated qdisc-drop tracepoint</td>
+<td style="text-align: left;">OBSERVABILITY</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">7.2</td>
+<td style="text-align: left;">MPTCP PM limit expansion</td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">TRANSPORT</td>
+<td>TAG</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">7.2</td>
+<td style="text-align: left;">PPPoE GRO/GSO</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">—</td>
+<td>TAG</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">7.3-rc</td>
+<td style="text-align: left;">BIG TCP over VXLAN/GENEVE</td>
+<td style="text-align: left;">PERFORMANCE</td>
+<td style="text-align: left;">VIRTUAL / OVERLAY</td>
+<td>MAINLINE</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">7.3-rc</td>
+<td style="text-align: left;">RTNL-less FIB-rule updates</td>
+<td style="text-align: left;">CONTROL PLANE</td>
+<td style="text-align: left;">—</td>
+<td>MAINLINE</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">7.3-rc</td>
+<td style="text-align: left;">devmem buffers &gt;PAGE_SIZE</td>
+<td style="text-align: left;">MEMORY</td>
+<td style="text-align: left;">—</td>
+<td>MAINLINE</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">7.3-rc</td>
+<td style="text-align: left;">per-netns netdev-unregistration
+infrastructure</td>
+<td style="text-align: left;">CONTROL PLANE</td>
+<td style="text-align: left;">—</td>
+<td>MAINLINE</td>
+</tr>
+</tbody>
+</table>
+<h3 id="provenance-正規化を残す-architecture-critical-items">provenance
+正規化を残す architecture-critical items</h3>
+<p><code>netmem</code>、memory providers、page_pool
+introspection、BTF、vDPA は本文の architecture story 上重要だが、
+この版では origin / integration / enablement のどれを1行の canonical
+milestone とするかを 一次 evidence
+で再正規化できていない。<strong>したがって Part VI
+に行がないことは意図的であり、重要度が低いことを意味しない。</strong>
+release を推測して <code>GENERATION</code> 行を作らず、Part VII の
+<strong>Open provenance items</strong> に明示的に残す。</p>
+<h2 id="part-vi-から-part-vii-へ--chronology-から-provenance-へ">Part VI
+から Part VII へ — chronology から provenance へ</h2>
+<p>Part VI は「いつ」を正規化し、Part VII はその attribution
+を再監査できる exact anchor と 未解決 boundary を保持する。</p>
+<h1 id="part-vii--正規-provenance-ledger">Part VII — 正規 provenance
+ledger</h1>
+<p><strong>Evidence model:</strong> Part VII の SHA は feature series
+の「代表 anchor」であり、anchor の存在だけで series 全体を証明しない。
+各項目は <strong>SHA identity / feature correspondence / release
+containment</strong> を別々に監査する。</p>
+<p><strong>Evidence status:</strong> <code>MAINLINE</code> は
+authoritative な pull/merge evidence により Linus mainline への merge
+を確認済みだが、final release tag が未公開の状態を示す。Part VI の
+Evidence class と一致させる。</p>
+<h2 id="exact-mainline-anchor-inventory">Exact mainline anchor
+inventory</h2>
+<p>ここに示すのは feature series の全 commit ではなく、再監査可能な代表
+anchor である。<code>Anchor type</code> は
+<code>origin / integration / enablement / merge</code>
+の役割を示す。<code>First containing tag</code>
+を本版で再正規化していない項目は <code>open</code>
+とし、推測で補わない。</p>
+<table>
+<thead>
+<tr class="header">
+<th>Item</th>
+<th>Anchor type</th>
+<th>Exact mainline anchor</th>
+<th>Subject / role</th>
+<th>First containing tag</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>DQL</td>
+<td>origin</td>
+<td><code>75957ba36c05b979701e9ec64b37819adc12f830</code></td>
+<td><code>dql: Dynamic queue limits</code></td>
+<td>open</td>
+</tr>
+<tr class="even">
+<td>CoDel</td>
+<td>origin</td>
+<td><code>76e3cc126bb223013a6b9a0e2a51238d1ef2e409</code></td>
+<td>CoDel qdisc core anchor</td>
+<td>open</td>
+</tr>
+<tr class="odd">
+<td>SO_REUSEPORT infrastructure</td>
+<td>origin</td>
+<td><code>055dc21a1d1d219608cd4baac7d0683fb2cbbe8a</code></td>
+<td><code>soreuseport: infrastructure</code></td>
+<td>open</td>
+</tr>
+<tr class="even">
+<td>nftables core</td>
+<td>origin</td>
+<td><code>96518518cc417bb0a8c80b9fb736202e28acdf96</code></td>
+<td><code>netfilter: add nftables</code></td>
+<td>open</td>
+</tr>
+<tr class="odd">
+<td>nftables set API</td>
+<td>integration</td>
+<td><code>20a69341f2d00cd042e81c82289fba8a13c05a25</code></td>
+<td>set-API anchor; not core origin</td>
+<td>open</td>
+</tr>
+<tr class="even">
+<td>devlink</td>
+<td>origin</td>
+<td><code>bfcd3a46617209454cfc0947ab093e37fd1e84ef</code></td>
+<td><code>Introduce devlink infrastructure</code></td>
+<td>v4.6-rc1</td>
+</tr>
+<tr class="odd">
+<td>BBR</td>
+<td>origin</td>
+<td><code>0f8782ea14974ce992618b55f0c041ef43ed0b78</code></td>
+<td>initial BBR mainline anchor</td>
+<td>open</td>
+</tr>
+<tr class="even">
+<td>phylink</td>
+<td>origin</td>
+<td><code>9525ae83959b60c6061fe2f2caabdc8f69a48bc6</code></td>
+<td><code>phylink: add phylink infrastructure</code></td>
+<td>open</td>
+</tr>
+<tr class="odd">
+<td>netdevsim</td>
+<td>origin</td>
+<td><code>83c9e13aa39aed5cf9a2f8dd69770b7c35ba1281</code></td>
+<td>hardware-independent offload test device</td>
+<td>v4.16-rc1</td>
+</tr>
+<tr class="even">
+<td>SK_MSG</td>
+<td>enablement</td>
+<td><code>4f738adba30a7cfc006f605707e7aee847ffefa0</code></td>
+<td>socket-message verdict / <code>BPF_PROG_TYPE_SK_MSG</code></td>
+<td>open</td>
+</tr>
+<tr class="odd">
+<td>TCP MSG_ZEROCOPY</td>
+<td>enablement</td>
+<td><code>f214f915e7db99091f1312c48b30928c1e0c90b7</code></td>
+<td><code>tcp: enable MSG_ZEROCOPY</code></td>
+<td>open</td>
+</tr>
+<tr class="even">
+<td>page_pool origin</td>
+<td>origin</td>
+<td><code>ff7d6b27f894f1469dc51ccb828b7363ccd9799f</code></td>
+<td>page_pool core origin anchor</td>
+<td>open</td>
+</tr>
+<tr class="odd">
+<td>page_pool/XDP integration</td>
+<td>integration</td>
+<td><code>60bbf7eeef10dc647430646d7fe5e3d8d132dbec</code></td>
+<td>mlx5 page_pool/XDP integration</td>
+<td>open</td>
+</tr>
+<tr class="even">
+<td>ethtool Generic Netlink</td>
+<td>origin</td>
+<td><code>2b4a8990b7df55875745a80a609a1ceaaf51f322</code></td>
+<td><code>ethtool: introduce ethtool netlink interface</code></td>
+<td>open</td>
+</tr>
+<tr class="odd">
+<td>SK_LOOKUP</td>
+<td>origin</td>
+<td><code>e9ddbb7707ff5891616240026062b8c1e29864ca</code></td>
+<td>dedicated SK_LOOKUP program type / attach point</td>
+<td>open</td>
+</tr>
+<tr class="even">
+<td>auxiliary bus</td>
+<td>origin</td>
+<td><code>7de3697e9cbd4bd3d62bafa249d57990e1b8f294</code></td>
+<td><code>Add auxiliary bus support</code></td>
+<td>v5.11-rc1</td>
+</tr>
+<tr class="odd">
+<td>IPv6 BIG TCP / GRO</td>
+<td>enablement</td>
+<td><code>0fe79f28bfaf73b66b7b1562d2468f94aa03bd12</code></td>
+<td>allow <code>gro_max_size</code> &gt; 65536</td>
+<td>open</td>
+</tr>
+<tr class="even">
+<td>IPv6 BIG TCP / GSO</td>
+<td>enablement</td>
+<td><code>7c4e983c4f3cf94fcd879730c6caa877e0768a4d</code></td>
+<td>allow <code>gso_max_size</code> &gt; 65536</td>
+<td>open</td>
+</tr>
+<tr class="odd">
+<td>XFRM packet offload</td>
+<td>enablement</td>
+<td><code>d14f28b8c1de668bab863bf5892a49c824cb110d</code></td>
+<td>add packet offload flag</td>
+<td>open</td>
+</tr>
+<tr class="even">
+<td>netkit</td>
+<td>origin</td>
+<td><code>35dfaad7188cdc043fde31709c796f5a692ba2bd</code></td>
+<td>netkit core anchor</td>
+<td>open</td>
+</tr>
+<tr class="odd">
+<td>Rust PHY abstractions</td>
+<td>integration</td>
+<td><code>f20fd5449ada3872dcd67aca397f0e27ca2e8ad6</code></td>
+<td>Rust core abstractions for network PHY drivers</td>
+<td>v6.8-rc1</td>
+</tr>
+<tr class="even">
+<td>netdev-genl queue object</td>
+<td>integration</td>
+<td><code>bc877956272f0521fef107838555817112a450dc</code></td>
+<td>YAML spec for queue object</td>
+<td>v6.8-rc1</td>
+</tr>
+<tr class="odd">
+<td>MPTCP subflow / accepted ADD_ADDR limits</td>
+<td>enablement</td>
+<td><code>c8646664fbf1c0beb0990cef391cb52d3c909e78</code></td>
+<td>limits expanded to 64</td>
+<td>open</td>
+</tr>
+<tr class="even">
+<td>MPTCP endpoint limit</td>
+<td>enablement</td>
+<td><code>e845e6397d78bf6b842cfa8b5818ca8189f7e22e</code></td>
+<td>endpoint limit expanded to 255</td>
+<td>open</td>
+</tr>
+<tr class="odd">
+<td>net-next 7.3 merge</td>
+<td>merge</td>
+<td><code>91ec2035134982b98fab0609a9fd8480e8217dc1</code></td>
+<td>merge tag <code>net-next-7.3</code></td>
+<td>mainline snapshot</td>
+</tr>
+</tbody>
+</table>
+<p>Net DIM / <code>lib/dim</code> は algorithm の driver-local origin と
+common-library generalization の exact boundary
+を本版で再確認できていないため、この exact inventory には追加せず Open
+provenance items に残す。</p>
+<h2 id="open-provenance-items">Open provenance items</h2>
+<p>Part VI の <code>GENERATION</code> / <code>SERIES</code>
+全行を複製する表ではない。Part VI にまだ独立 milestone
+を立てられていない architecture-critical item、または exact-anchor
+inventory と canonical row の対応に追加監査が必要な item だけを置く。各
+<code>GENERATION</code> / <code>SERIES</code> 行の evidence status
+自体は Part VI が正本である。</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Item</th>
+<th style="text-align: left;">Unresolved boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Net DIM / <code>lib/dim</code></td>
+<td style="text-align: left;">driver-local origin と common-library
+generalization の exact anchors</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">queue/NAPI netdev-genl</td>
+<td style="text-align: left;">queue-object anchor
+は保持済みだが、composite milestone 全体の boundary</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>netmem</code></td>
+<td style="text-align: left;">canonical origin / first containing
+tag</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">memory providers</td>
+<td style="text-align: left;">provider model の canonical integration /
+enablement boundary</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">page_pool introspection</td>
+<td style="text-align: left;">observability milestone として採用する
+canonical boundary</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">BTF networking observability</td>
+<td style="text-align: left;">networking history 上どの milestone
+を代表点とするか</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">vDPA</td>
+<td style="text-align: left;">本書の virtual-networking story で採用する
+origin/integration boundary</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">RX HW queue leasing</td>
+<td style="text-align: left;">v7.1 final containment は確定。exact
+40-digit representative anchor を inventory に追加する余地</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Queue-leasing release boundary:</strong> v7.0 merge window の
+initial merge <code>77b9c4a438fc66e2ab004c411056b3fb71a54f2c</code> は
+<code>8766d61a1d33cb5f15bfdd6ce9832bbe1fc649c2</code> で revert
+され、v7.0 final には含まれない。 v7.1 final には revised RX
+queue-leasing series が含まれる。短縮 SHA <code>7789c6bb76ac</code> は
+exact 40-digit inventory には登録しない。TX queue leasing は未 merge
+である。</p>
+<h1 id="appendix--source-index非正規">Appendix — Source
+index（非正規）</h1>
+<p>Appendix は supporting evidence / research provenance
+の索引である。本文の release attribution や lineage を再定義しない。</p>
+<h2
+id="usenix-research-index--architecture-motivation--design-space-evidence">USENIX
+research index — architecture motivation / design-space evidence</h2>
+<p>以下は upstream release attribution の根拠ではなく、Linux networking
+architecture の design space と、その機能が解こうとする問題を説明する
+research evidence である。</p>
+<ul>
+<li><strong>NSDI 2011 — Multipath TCP congestion control</strong> —
+Linux implementation を用いた multipath congestion control の研究。MPTCP
+design lineage の前史として参照する。</li>
+<li><strong>NSDI 2014 — mTCP</strong> — kernel TCP/syscall/packet-I/O
+overhead に対する user-level TCP stack という設計点。</li>
+<li><strong>OSDI 2020 — hXDP</strong> — Linux XDP/eBPF semantics を FPGA
+NIC execution target へ展開。</li>
+<li><strong>USENIX ATC 2022 — eBPF Program Warping</strong> — hXDP
+を発展させ、eBPF program の一部を FPGA pipeline へ変換。</li>
+<li><strong>NSDI 2023 — Electrode</strong> — XDP/eBPF により
+kernel-stack traversal と user/kernel crossing を削減。</li>
+<li><strong>NSDI 2023 — IO-TCP</strong> — TCP control plane を CPU
+側に保持し、packet-transfer/data plane を SmartNIC へ offload。</li>
+<li><strong>NSDI 2023 — Valinor</strong> — eBPF を利用して
+qdisc、CC、scheduler、NIC、hardware offload を複数 vantage point
+から観測。</li>
+<li><strong>NSDI 2024 — DINT</strong> — kernel-bypass-like performance
+と kernel stack の security/isolation/maintainability
+の両立を狙う。</li>
+<li><strong>NSDI 2025 — eTran</strong> — eBPF によって kernel transport
+を extensible にし、TCP/DCTCP と Homa を実装。</li>
+</ul>
+<p>これらは Part VI / Part VII の canonical release/commit evidence
+と混同しない。</p>
+<h2 id="kernel-documentation--primary-source-index">Kernel documentation
+/ primary-source index</h2>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Source topic</th>
+<th style="text-align: left;">Canonical destination</th>
+<th style="text-align: left;">What it supports</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">NAPI / <code>SO_BUSY_POLL</code></td>
+<td style="text-align: left;">Part VI 3.11; Part IV</td>
+<td style="text-align: left;">busy polling and NAPI execution model</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">BPF DEVMAP</td>
+<td style="text-align: left;">Part VI 4.14; Part III XDP / AF_XDP</td>
+<td style="text-align: left;">XDP redirect via devmap</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">BPF CPUMAP</td>
+<td style="text-align: left;">Part VI 4.15; Part III XDP / AF_XDP</td>
+<td style="text-align: left;">XDP redirect to remote CPU</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">nftables flowtable</td>
+<td style="text-align: left;">Part VI 4.16; Part III netfilter /
+nftables / conntrack</td>
+<td style="text-align: left;">software flowtable fast path; later
+HW-offload evolution</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">TCX / <code>bpf_mprog</code></td>
+<td style="text-align: left;">Part VI 6.6; Part III BPF</td>
+<td style="text-align: left;">link-based TC attachment and multi-program
+ordering</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Device Memory TCP / memory providers</td>
+<td style="text-align: left;">Part VI 6.12/6.16; Part III packet
+memory</td>
+<td style="text-align: left;">RX/TX device-memory zero-copy
+evolution</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">io_uring ZCRX</td>
+<td style="text-align: left;">Part VI 6.15; Part III io_uring
+networking</td>
+<td style="text-align: left;">queue-bound zero-copy receive</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>net-next-7.1</code></td>
+<td style="text-align: left;">Part VI 7.1</td>
+<td style="text-align: left;">RX HW queue leasing</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>net-next-7.3</code></td>
+<td style="text-align: left;">Part VI 7.3-rc</td>
+<td style="text-align: left;">tunnel BIG TCP, RTNL-less FIB rules,
+&gt;PAGE_SIZE devmem buffers</td>
+</tr>
+</tbody>
+</table>
+<h2 id="exact-anchor-index">Exact anchor index</h2>
+<p>Exact SHA の正本は Part VII に置きます。Appendix では同じcommit
+listを複製しません。</p>
+<h2 id="conference-provenance-index">Conference provenance index</h2>
+<p>Conference talk は設計意図や当時のproblem
+statementを補足する資料として扱い、 release
+attributionには使用しません。</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Conference lineage</th>
+<th style="text-align: left;">Canonical destination</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Netdev: XDP / AF_XDP / TC / BPF</td>
+<td style="text-align: left;">Part III BPF / XDP</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Netdev: BIG TCP</td>
+<td style="text-align: left;">Part III packet aggregation</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Netdev: Device Memory TCP / zero-copy</td>
+<td style="text-align: left;">Part III packet memory</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Netdev 0x19: Diagnosing Page Pool
+Leaks</td>
+<td style="text-align: left;">Part IV page_pool</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Netdev: queue/NAPI/netdev-genl</td>
+<td style="text-align: left;">Part IV driver framework</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Netdev: MPTCP / TCP
+state-of-the-union</td>
+<td style="text-align: left;">Part III transport</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Kernel Recipes: XDP / BPF / io_uring</td>
+<td style="text-align: left;">Parts III–IV</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">OVS/OVN Conf: Retis</td>
+<td style="text-align: left;">Part V case-study note</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">LPC / FOSDEM: pwru and tracing</td>
+<td style="text-align: left;">Part V case-study note</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="additional-architecture--implementation-conference-references">Additional
+architecture / implementation conference references</h3>
+<ul>
+<li><strong>Netdev 0x13 — devlink health reporting and recovery
+system:</strong> <a
+href="https://netdevconf.info/wiki/doku.php?id=0x13:reports:d2t3t07-devlink-health-reporting-and-recovery-system">https://netdevconf.info/wiki/doku.php?id=0x13:reports:d2t3t07-devlink-health-reporting-and-recovery-system</a></li>
+<li><strong>Kernel Recipes 2024 — Efficient zero-copy networking using
+io_uring:</strong> <a
+href="https://kernel-recipes.org/en/2024/schedule/efficient-zero-copy-networking-using-io_uring/">https://kernel-recipes.org/en/2024/schedule/efficient-zero-copy-networking-using-io_uring/</a></li>
+<li><strong>Kernel Recipes 2024 — live blog (io_uring zero-copy / netmem
+/ queue API context):</strong> <a
+href="https://kernel-recipes.org/en/2024/2024/09/23/live-blog-day-1-afternoon/">https://kernel-recipes.org/en/2024/2024/09/23/live-blog-day-1-afternoon/</a></li>
+<li><strong>Kernel Recipes 2024 — Interfacing Kernel C APIs from
+Rust:</strong> <a
+href="https://kernel-recipes.org/en/2024/schedule/interfacing-kernel-c-apis-from-rust/">https://kernel-recipes.org/en/2024/schedule/interfacing-kernel-c-apis-from-rust/</a></li>
+</ul>
+<p>これらは design/context provenance であり、Part VI の release
+attribution には使用しない。</p>
+<h2 id="retis--pwru-case-study-index">Retis / pwru case-study index</h2>
+<p>Retis と pwru
+の詳細説明は本文から外しました。両者の位置づけは次の一文で十分です。</p>
+<pre class="text"><code>pwru  = broad kernel-function packet trajectory
+Retis = networking-event-centric semantic enrichment / correlation</code></pre>
+<p>これらは BTF、eBPF tracing、drop reason、timestamp、OVS/OVN metadata
+などの kernel primitiveを利用する <strong>consumer/tooling
+examples</strong> であり、独立したkernel evolution
+axisではありません。</p>
+<h2 id="provenance-policy">Provenance policy</h2>
+<pre class="text"><code>conference / RFC
+      ↓ design intent
+patch series
+      ↓ landing evidence
+subsystem pull / Linus mainline
+      ↓ canonical integration
+released tag</code></pre>
+<h1 id="changelog--errata非正規">Changelog / Errata（非正規）</h1>
+<ul>
+<li><p><strong>r24:</strong> RTNL の progression を <code>⇒</code> から
+<code>→</code> に変更。一つの feature の direct extension
+ではなく、global RTNL dependency を縮小する複数の locking/refactoring
+techniques の lineage として扱う。BIG TCP など direct extension
+が明確な系列の <code>⇒</code> は維持。</p></li>
+<li><p><strong>r23:</strong> WireGuard 5.6 を
+<code>SECURITY / VIRTUAL / OVERLAY</code>
+とし、<code>evidence grade</code> の残語を <code>Evidence class</code>
+へ修正。netmem / memory providers の Part VI 未収載が意図的な open
+provenance であることを明記。</p></li>
+<li><p><strong>r23:</strong> XDP frags と USENIX subsection
+の配置を修正し、io_uring networking を Packet memory の直後へ移動。Era 1
+の重複 queueing 図を削減。</p></li>
+<li><p><strong>r23:</strong> BIG TCP / RTNL / drop-reason の直接
+extension に <code>⇒</code> を適用し、Virtual networking
+の凡例重複を削除。</p></li>
+<li><p><strong>r23:</strong> Part VII の2つの anchor 表と MPTCP anchor
+を単一 inventory に統合。未監査の first-containing tag は
+<code>open</code> として推測を避けた。</p></li>
+<li><p><strong>r22:</strong> r21 の編集事故で欠落した USENIX research /
+Virtual networking / TCP-UDP transport の3ブロックを r20
+から復元。</p></li>
+<li><p><strong>r22:</strong> r20 から落ちていた PPPoE
+GRO/GSO、qdisc-drop tracepoint、conference provenance、Open provenance
+説明を復元。</p></li>
+<li><p><strong>r22:</strong> Part VI の Era 見出しを release range
+のみに戻し、WireGuard の cross-cutting domain を VIRTUAL / OVERLAY
+に整理。Part V の observability timeline を canonical milestone
+に合わせて更新。</p></li>
+<li><p><strong>r21:</strong> r20 の編集事故で欠落した Part I 前半と Part
+III <code>XDP / AF_XDP</code> を r19 から復元し、r20 の Queueing /
+Packet memory 改善だけを選択的に再適用。</p></li>
+<li><p><strong>r21:</strong> Part VI の採用基準を一本化し、長期
+architecture story に役割を持たない10 milestone を canonical table
+から除外。TCP MSG_ZEROCOPY と XDP frags は本文 lineage
+に明示して維持。</p></li>
+<li><p><strong>r21:</strong> Domain 定義、Era-label
+残骸、Programmability foundation の重複、Part V qdisc-drop
+配置、Appendix の編集履歴見出しを整理。</p></li>
+<li><p><strong>r20:</strong> Packet memory と Queueing を thesis の中核
+lineage として拡充。netmem / memory providers / AQL / taprio / cake_mq /
+large-buffer devmem を本文へ統合。</p></li>
+<li><p><strong>r20:</strong> Part VI の除外基準を復活させ、本文の長期
+lineage を変えない局所 milestone を整理。</p></li>
+<li><p><strong>r20:</strong> Part I の検証表に previous state と Era 3
+例を追加し、Snapshot 行名を6軸へ統一。</p></li>
+<li><p><strong>r20:</strong> 宙に浮いていた Netdev 0x13 / Kernel Recipes
+2024 provenance を Appendix に復元。</p></li>
+<li><p><strong>r20:</strong> Part IV projection と Part V observability
+projection を Part VI の分類に合わせて再整理。</p></li>
+<li><p><strong>r19:</strong> TCP/UDP 節を transport semantics
+に限定し、BIG TCP / Device Memory TCP / BPF CC / zero-copy を各
+architecture lineage へ戻した。</p></li>
+<li><p><strong>r19:</strong> Virtual networking を datapath と
+queue-assignment の parallel lineage
+に再描画し、<code>netkit → queue leasing</code>
+の派生表現を廃止。</p></li>
+<li><p><strong>r19:</strong> Part IV の Rust 本文を architecture
+上の意味に圧縮し、conference/review の細部を Appendix
+側へ寄せた。</p></li>
+<li><p><strong>r19:</strong> Part VI の range 見出しから Era
+名を除去し、Era=Part II / chronology=Part VI
+の役割分担を明確化。</p></li>
+<li><p><strong>r18:</strong> Part VI を Axis / Domain
+の独立列へ変更し、Era/Grade 列を削除。束ね行を分割し、Evidence class
+を唯一の evidence-status 列とした。</p></li>
+<li><p><strong>r18:</strong> Part I の baseline を v3.0 / v5.0 / 2026
+に整理し、軸→本文節の地図と図記法を追加。</p></li>
+<li><p><strong>r18:</strong> PERFORMANCE の queueing lineage
+を独立化し、io_uring / 6.19 cross-lineage の重複を整理。</p></li>
+<li><p><strong>r18:</strong> Part IV から raw SHA / release-attribution
+/ 編集経緯を除去し、Part VII の open items を未解決 provenance
+に限定。</p></li>
+</ul>
+<p>この節は canonical chronology / provenance
+の一部ではない。版間の編集上の変更だけを記録する。</p>
+<ul>
+<li><strong>r17:</strong> Part VI を1行1
+milestoneへ正規化し、Axis/domain・Era・Evidence class を追加。 evidence
+語彙を統制し、selection policy を Part VI 冒頭へ移動。</li>
+<li><strong>r17:</strong> Part I に axis/contract 対応表と thesis
+の非適用領域を追加。</li>
+<li><strong>r17:</strong> Part IV の major-version 見出しを
+architecture-oriented headings に変更。</li>
+<li><strong>r17:</strong> conclusion/synthesis を chronology
+の前に追加。</li>
+<li><strong>r17:</strong> Part VII から旧版監査経緯を分離し、短縮 SHA を
+exact inventory として扱わない方針を明記。</li>
+</ul>
+</body>
+</html>
