@@ -105,7 +105,6 @@ The arrows describe the usual path, not a guarantee that every project passes th
  │
 3.9   SO_REUSEPORT / conntrack labels / VM sockets
  │
-3.10  networking scalability/offload continuation
  │
 3.12  TCP pacing + FQ-era TCP scheduling
  │
@@ -637,6 +636,8 @@ per-netns RTNL
 
 ------------------------------------------------------------------------
 
+**Pacing boundary:** Linux 3.12 pacing here means `sch_fq` consuming `sk_pacing_rate`. TCP-internal pacing/fallback, which no longer requires `sch_fq`, arrived later (4.13 generation). Consequently early BBR deployments (4.9–4.12) effectively depended on `fq` for pacing.
+
 ## From foundations to the modern datapath
 
 Part I intentionally stops the detailed narrative at the point where the main architectural building blocks are visible. The exact release-by-release attribution from Linux 4.x onward belongs to Part II.
@@ -707,8 +708,8 @@ released mainline version
 | 3.6 | TSQ; TFO client; IPv4 route-cache removal | release + exact anchors |
 | 3.7 | VXLAN; TFO server; IPv6 NAT | release verified |
 | 3.9 | TCP/UDP `SO_REUSEPORT`; conntrack labels; VM sockets | release; exact SO_REUSEPORT infrastructure anchor |
-| 3.12 | `sch_fq`; TCP pacing; TSO autosizing generation | release-generation |
-| 3.13 | nftables | release + exact core anchor |
+| 3.12 | `sch_fq`; `sk_pacing_rate`-driven pacing; TSO autosizing generation | qdisc-based pacing milestone; TCP-internal fallback comes later |
+| 3.13 | nftables | release + verified 12-hex core anchor (`96518518cc41`); full SHA not reproduced |
 | 3.14 | TCP autocorking | release-generation |
 | 3.15 | internal BPF interpreter ISA rework toward eBPF/native-JIT-friendly format | final series + release-generation |
 | 3.18 | `bpf()` syscall/maps/verifier generation; DCTCP; Geneve/FOU | release + exact anchors |
@@ -732,7 +733,7 @@ released mainline version
 | 5.3 | nexthop objects; DIM generalized into common `lib/dim` infrastructure | release; DIM generalization series verified |
 | 5.5 | mac80211 Airtime Queue Limits (AQL) | release-generation |
 | 5.6 | MPTCP; WireGuard; BPF `struct_ops`/TCP CC; ethtool Generic Netlink groundwork | release; exact ethtool core anchor |
-| 5.9 | `BPF_PROG_TYPE_SK_LOOKUP` | release + exact anchor |
+| 5.9 | `BPF_PROG_TYPE_SK_LOOKUP` | release + verified 12-hex introduction anchor (`e9ddbb7707ff`); full SHA pending re-audit |
 | 5.11 | auxiliary bus | release + final-series/tag evidence |
 | 5.12 | threaded NAPI | release |
 | 5.15 | IPv6 IOAM core; MCTP; bridge per-VLAN multicast | release |
@@ -753,7 +754,7 @@ released mainline version
 | 6.16 | Device Memory TCP TX; BPF qdisc; DCCP removal | final series verified; key BPF-qdisc anchors retained |
 | 6.18 | AccECN core; UDP RX evolution; DIBS as a separate shared-memory lineage | release-generation |
 | 7.0 | `cake_mq` / multi-queue-aware `sch_cake` | `net-next-7.0` pull; release generation verified |
-| 7.1-era | RX queue leasing: initial merge → revert → revised re-merge | net-next history verified; exact released-tag containment pending |
+| 7.1 | RX HW queue leasing: initial merge → revert → revised re-merge | `net-next-7.1` pull explicitly lists HW queue leasing; released-generation attribution confirmed |
 | 7.2-era | MPTCP PM limits: subflows 8→64; accepted `ADD_ADDR` 8→64; endpoints 8→255 | merge series verified; 7.2 is released; exact per-commit tag-containment audit pending |
 | 7.3-rc / mainline | BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > `PAGE_SIZE` | `net-next-7.3` merged 2026-08-20; final 7.3 release pending |
 
@@ -1113,7 +1114,7 @@ This is the Driver Framework projection of the Part II release map. It is not a 
 
   4.8       XDP                                                                     driver RX path gains a programmable pre-skb execution point
 
-  4.13      phylink                                                                 common MAC/PHY/PCS/SFP link-management state machine
+  4.14      phylink                                                                 common MAC/PHY/PCS/SFP link-management state machine
 
   4.16      netdevsim                                                               common offload APIs become testable without physical hardware
 
@@ -2063,7 +2064,7 @@ same logical network packet
 
 ### 2024 OVSCon --- from upcall tracing to flow enrichment
 
-OVSCon 2024では2023年のarchitectureを維持しつつ、Retisはさらに:
+OVS/OVN Conf 2024では2023年のarchitectureを維持しつつ、Retisはさらに:
 
 ``` text
 skb
@@ -6012,7 +6013,7 @@ It captures a major conclusion of the multi-source research:
 ### Packet memory / zero copy
 
 ``` text
-RX memory pressure → page_pool → DMA-BUF/P2P + memory providers → netmem
+RX memory pressure → page_pool → netmem abstraction → DMA-BUF/P2P + memory providers
                                                         ├→ Device Memory TCP
                                                         └→ io_uring ZCRX
                                                              ↓
