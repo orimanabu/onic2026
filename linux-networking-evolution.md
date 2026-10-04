@@ -8265,38 +8265,39 @@ so the status remains **merged-development**, not "released".
 
 # 76. Updated provenance matrix
 
-  ---------------------------------------------------------------------------------------
-  Feature                    Kernel        Exact anchor(s)                  Quality
-  -------------------------- ------------- -------------------------------- -------------
-  initial MPTCP              5.6           `048d19d444be` selftest + native B
-                                           API/release verification         
+  -----------------------------------------------------------------------------------
+  Feature                    Kernel      Exact anchor(s)                  Quality
+  -------------------------- ----------- -------------------------------- -----------
+  initial MPTCP              5.6         `048d19d444be` selftest + native B
+                                         API/release verification         
 
-  BPF                        later         `0dd061a6a115`                   **A**
-  `update_socket_protocol`   MPTCP/BPF era                                  
+  BPF                        later       `0dd061a6a115`                   **A**
+  `update_socket_protocol`   MPTCP/BPF                                    
+                             era                                          
 
-  IPv6 IOAM data plane       5.x           `9ee11f0fff20`                   **A**
+  IPv6 IOAM data plane       5.x         `9ee11f0fff20`                   **A**
 
-  IPv6 BIG TCP               5.19          `0fe79f28bfaf...` + release pull A/B
+  IPv6 BIG TCP               5.19        `0fe79f28bfaf...` + release pull A/B
 
-  IPv4 BIG TCP               6.3           `9eefedd58ae1`, `b1a78b9b9886`   **A**
+  IPv4 BIG TCP               6.3         `9eefedd58ae1`, `b1a78b9b9886`   **A**
 
-  BIG TCP VXLAN              7.3 dev       `f3d0f753f066`                   **A**
+  BIG TCP VXLAN              7.3 dev     `f3d0f753f066`                   **A**
 
-  BIG TCP GENEVE             7.3 dev       `03ebe91b0f61`                   **A**
+  BIG TCP GENEVE             7.3 dev     `03ebe91b0f61`                   **A**
 
-  AF_XDP multi-buffer        6.6           `804627751b42` et al.            **A**
+  AF_XDP multi-buffer        6.6         `804627751b42` et al.            **A**
 
-  Device Memory TCP RX       6.12          `8f0b3cc9a4c1` + series          **A**
+  Device Memory TCP RX       6.12        `8f0b3cc9a4c1` + series          **A**
 
-  io_uring ZCRX              6.15          merge `ca0b04ba0b35...`          B
+  io_uring ZCRX              6.15        merge `ca0b04ba0b35...`          B
 
-  BPF qdisc                  2025-era      `c8240344956e...`                **A**
+  BPF qdisc                  2025-era    `c8240344956e...`                **A**
 
-  netkit core                6.7           `35dfaad7188c...`                **A**
+  netkit core                6.7         `35dfaad7188c...`                **A**
 
-  netkit queue leasing       2026          merge→revert→`15089225889b...`   **A**
-                                           remerge                          
-  ---------------------------------------------------------------------------------------
+  netkit queue leasing       2026        merge→revert→`15089225889b...`   **A**
+                                         remerge                          
+  -----------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -8560,42 +8561,43 @@ multi-buffer XDP program support
 
 # 79. virtio-net AF_XDP capability matrix
 
-  ---------------------------------------------------------------------------------------
-  Capability        Status            Mainline / series   Interpretation
-                                      anchor              
-  ----------------- ----------------- ------------------- -------------------------------
-  virtqueue reset   merged            pre-AF_XDP work     enables queue reconfiguration
-  prerequisite      prerequisite                          
+  ----------------------------------------------------------------------------------
+  Capability      Status         Mainline / series   Interpretation
+                                 anchor              
+  --------------- -------------- ------------------- -------------------------------
+  virtqueue reset merged         pre-AF_XDP work     enables queue reconfiguration
+  prerequisite    prerequisite                       
 
-  premapped DMA     merged            virtio-core work    avoids ordinary per-buffer
-  prerequisite      prerequisite                          mapping path
+  premapped DMA   merged         virtio-core work    avoids ordinary per-buffer
+  prerequisite    prerequisite                       mapping path
 
-  XDP refactoring   merged            pre-6.11 work       prepares common RX/XDP path
-                    prerequisite                          
+  XDP refactoring merged         pre-6.11 work       prepares common RX/XDP path
+                  prerequisite                       
 
-  AF_XDP RX         **merged**        `a4e7ba702701`      Linux 6.11 networking milestone
-  zero-copy, small                                        
-  mode                                                    
+  AF_XDP RX       **merged**     `a4e7ba702701`      Linux 6.11 networking milestone
+  zero-copy,                                         
+  small mode                                         
 
-  AF_XDP RX         **merged**        `99c861b44eb1`      mergeable receive mode
-  zero-copy,                                              supported
-  mergeable mode                                          
+  AF_XDP RX       **merged**     `99c861b44eb1`      mergeable receive mode
+  zero-copy,                                         supported
+  mergeable mode                                     
 
-  AF_XDP TX         **merged**        v4/13 applied Nov   separate later series
-  zero-copy                           2024;               
-                                      `21a4e3ce6dc7...`   
+  AF_XDP TX       **merged**     v4/13 applied Nov   separate later series
+  zero-copy                      2024;               
+                                 `21a4e3ce6dc7...`   
 
-  XSK ZC feature    **merged**        `37e0ca657a3d`      `NETDEV_XDP_ACT_XSK_ZEROCOPY`
-  advertisement                                           
+  XSK ZC feature  **merged**     `37e0ca657a3d`      `NETDEV_XDP_ACT_XSK_ZEROCOPY`
+  advertisement                                      
 
-  zero-copy         **not established 2025 RFC v2         separate XDP-frags problem
-  multi-buffer XDP  by base 6.11                          
-  in mergeable RX   work**                                
+  zero-copy       **not          2025 RFC v2         separate XDP-frags problem
+  multi-buffer    established by                     
+  XDP in          base 6.11                          
+  mergeable RX    work**                             
 
-  unsupported       **fixed**         `1ab665817448...`   prevents silent XDP bypass
-  multi-buffer                                            
-  handling                                                
-  ---------------------------------------------------------------------------------------
+  unsupported     **fixed**      `1ab665817448...`   prevents silent XDP bypass
+  multi-buffer                                       
+  handling                                           
+  ----------------------------------------------------------------------------------
 
 ### Canonical wording
 
@@ -8706,27 +8708,538 @@ subjects from `git.kernel.org`.
 
 # 82. Quality update after capability audit
 
-  -----------------------------------------------------------------------
-  Feature                             Quality
-  ----------------------------------- -----------------------------------
-  virtio-net AF_XDP RX ZC small mode  **A**
+  ---------------------------------------------------------------------
+  Feature                            Quality
+  ---------------------------------- ----------------------------------
+  virtio-net AF_XDP RX ZC small mode **A**
 
-  virtio-net AF_XDP RX ZC mergeable   **A**
-  mode                                
+  virtio-net AF_XDP RX ZC mergeable  **A**
+  mode                               
 
-  virtio-net AF_XDP TX ZC             **A**
+  virtio-net AF_XDP TX ZC            **A**
 
-  virtio-net multi-buffer ZC XDP      **D/RFC for 2025 proposal; boundary
-                                      verified A**
+  virtio-net multi-buffer ZC XDP     **D/RFC for 2025 proposal;
+                                     boundary verified A**
 
-  MPTCP early BPF subflow visibility  **C/B**
+  MPTCP early BPF subflow visibility **C/B**
 
-  MPTCP `update_socket_protocol`      **A**
+  MPTCP `update_socket_protocol`     **A**
 
-  2019 nexthop initial series         **B**, exact 20-hash enumeration
-                                      pending
-  -----------------------------------------------------------------------
+  2019 nexthop initial series        **B**, exact 20-hash enumeration
+                                     pending
+  ---------------------------------------------------------------------
 
 The most important result of this pass is that virtio-net can now be
 represented without the misleading binary label "AF_XDP zero-copy
 supported".
+
+------------------------------------------------------------------------
+
+# 83. Provenance verification pass 5 --- RTNL migration map and MPTCP lineage
+
+## 83.1 RTNL: release-by-release migration, not a single feature
+
+The RTNL work is now represented as a migration program.
+
+### Before Linux 6.13: reader-side preparation
+
+By the first per-netns RTNL proposal in September 2024:
+
+``` text
+dumpit handlers:
+15 / 44 already converted to RCU
+
+doit handlers:
+12 / 87 converted
+mostly reader-side RTM_GET*
+```
+
+The proposal explicitly notes two earlier infrastructure milestones:
+
+``` text
+Linux 4.14
+RTNL_FLAG_DOIT_UNLOCKED
+
+Linux 6.9
+RTNL_FLAG_DUMP_UNLOCKED
+```
+
+These allow individual rtnetlink handlers to declare that they do not
+require the global RTNL lock.
+
+Jakub Kicinski's 2024 networking retrospective summarizes the work as
+two tracks:
+
+``` text
+Track A
+read operations
+global RTNL
+    ↓
+RCU / fine-grained locking
+    ↓
+6.9 / 6.10-era progress
+
+Track B
+writer/configuration operations
+global RTNL
+    ↓
+per-network-namespace RTNL
+    ↓
+preparations entering 6.13
+```
+
+### Linux 6.13: per-netns RTNL infrastructure
+
+Final early series:
+
+``` text
+[PATCH v3 net-next 0/4]
+rtnetlink: Per-netns RTNL.
+2024-10-04
+```
+
+It adds:
+
+``` text
+rtnl_net_lock(net)
+rtnl_net_unlock(net)
+per-netns RTNL mutex
+assertion/debug helpers
+CONFIG_DEBUG_NET_SMALL_RTNL
+```
+
+The series describes itself as:
+
+``` text
+the first step of the per-netns RTNL conversion
+```
+
+and the 6.13 LWN merge-window coverage calls it only one step in a long
+process, with the per-namespace behavior disabled by default because of
+regression risk.
+
+Therefore:
+
+``` text
+Linux 6.13
+≠ "RTNL became per-netns"
+
+Linux 6.13
+= infrastructure + first conversions + debug migration mode
+```
+
+### Linux 6.15: breakup continues
+
+The 6.15 merge-window coverage still says:
+
+``` text
+Work continues toward the breaking up of the RTNL lock
+```
+
+This is important evidence that 6.13 was not the completion point.
+
+### 2025: subsystem-by-subsystem removal
+
+Example:
+
+``` text
+[PATCH v2 net-next 00/13]
+mpls: Remove RTNL dependency.
+2025-10-29
+```
+
+The series replaces RTNL with:
+
+-   device reference counting;
+-   RCU for dump/read paths;
+-   a dedicated per-netns mutex for MPLS platform labels.
+
+This illustrates the mature migration pattern:
+
+``` text
+global RTNL
+   │
+   ├── lifetime protection → refcount / RCU
+   ├── read serialization → RCU
+   └── configuration state → dedicated/per-netns mutex
+```
+
+### 2026: multicast routing and neighbour work
+
+IPv4 multicast routing:
+
+``` text
+[PATCH net-next 00/15]
+ipmr: No RTNL for RTNL_FAMILY_IPMR rtnetlink.
+2026-02
+```
+
+IPv6 multicast routing:
+
+``` text
+[PATCH ... 00/15]
+ip6mr: No RTNL for RTNL_FAMILY_IP6MR rtnetlink.
+2026-04
+```
+
+The IPv6 series is explicitly described as the IPv6 version of the IPv4
+work.
+
+By August/September 2026 the neighbour subsystem was described as:
+
+``` text
+almost ready to drop RTNL
+```
+
+but still had another global scalability problem: `arp_tbl` and `nd_tbl`
+themselves were global per-table objects. The proposed solution was to
+make them per-netns.
+
+This demonstrates the deeper point:
+
+``` text
+removing rtnl_lock()
+does not automatically mean
+the subsystem has no global serialization bottleneck
+```
+
+### Canonical RTNL timeline
+
+``` text
+pre-6.9
+global RTNL dominates rtnetlink slow path
+        │
+        ▼
+6.9 / 6.10
+more dump/read paths become RTNL-less via RCU
+        │
+        ▼
+6.13
+per-netns RTNL infrastructure
+DEBUG_NET_SMALL_RTNL
+first writer-side conversion framework
+        │
+        ▼
+6.15
+continued breakup
+        │
+        ▼
+2025
+MPLS and other subsystem-specific conversions
+        │
+        ▼
+2026
+IPMR / IP6MR conversions
+neighbour subsystem namespacing work
+        │
+        ▼
+target:
+RCU + refcounts + dedicated/per-netns locks
+instead of one networking "big lock"
+```
+
+**Quality: A for the migration architecture and release chronology.**
+
+------------------------------------------------------------------------
+
+## 83.2 MPTCP initial upstreaming --- precise interpretation
+
+The upstream MPTCP implementation guide confirms:
+
+``` text
+kernel < 5.6:
+IPPROTO_MPTCP unavailable
+
+kernel >= 5.6:
+native MPTCP socket protocol exists
+```
+
+Native API:
+
+``` c
+socket(AF_INET,  SOCK_STREAM, IPPROTO_MPTCP);
+socket(AF_INET6, SOCK_STREAM, IPPROTO_MPTCP);
+```
+
+with:
+
+``` text
+IPPROTO_MPTCP = 262
+```
+
+The October 2019 prerequisite RFC explains the upstreaming split:
+
+``` text
+series 1:
+TCP/socket prerequisites
+
+series 2:
+CONFIG_MPTCP
+MPTCP socket type
+basic protocol
+selftests
+```
+
+The prerequisite series itself contained work such as:
+
+-   widening `sk_protocol`;
+-   defining `IPPROTO_MPTCP`;
+-   MPTCP TCP option definitions;
+-   skb MPTCP extensions;
+-   preventing TCP coalesce/collapse where MPTCP metadata must survive;
+-   exporting/reusing TCP helpers.
+
+This is useful because it shows that MPTCP was deliberately integrated
+into the existing TCP machinery rather than introduced as an isolated
+parallel stack.
+
+Exact stable provenance anchor already verified:
+
+``` text
+048d19d444be1e42abca19a6b969343954ae4e17
+mptcp: add basic kselftest for mptcp
+```
+
+Later fixes repeatedly reference it through `Fixes:`.
+
+### Canonical initial-MPTCP interpretation
+
+``` text
+TCP infrastructure changes
+        │
+        ▼
+MPTCP skb/options/socket prerequisites
+        │
+        ▼
+native IPPROTO_MPTCP socket
+        │
+        ▼
+basic MPTCP protocol
+        │
+        ▼
+048d19d444be initial kselftest
+        │
+        ▼
+Linux 5.6
+```
+
+The selftest commit remains an **exact anchor**, not the whole feature.
+
+------------------------------------------------------------------------
+
+## 83.3 MPTCP+BPF --- 2020 subflow-control series
+
+Final reviewed development series found:
+
+``` text
+[PATCH bpf-next v3 0/5]
+bpf: add MPTCP subflow support
+2020-09-18
+```
+
+Before this work, `BPF_PROG_TYPE_SOCK_OPS` could not distinguish a
+normal TCP socket from a TCP socket used as an MPTCP subflow.
+
+The series adds:
+
+``` text
+bpf_tcp_sock.is_mptcp
+```
+
+and a MPTCP-specific BPF socket representation/helper.
+
+The practical purpose is not just identification. A BPF program can
+apply different per-subflow settings, for example:
+
+``` text
+socket mark
+TCP congestion-control algorithm
+other socket options
+```
+
+to different TCP subflows belonging to one MPTCP connection.
+
+### Correct BPF evolution
+
+``` text
+2020
+subflow visibility / per-subflow policy
+        │
+        ▼
+later
+update_socket_protocol()
+        │
+        └── transparently select MPTCP at socket creation
+        │
+        ▼
+later
+iterators / kfuncs
+        │
+        └── richer inspection and management
+```
+
+This is more accurate than treating BPF-MPTCP integration as beginning
+with `update_socket_protocol()`.
+
+**Quality: B for the 2020 series; A for its final v3 cover-letter
+provenance.**
+
+------------------------------------------------------------------------
+
+# 84. Nexthop-object provenance --- what is verified and what is not
+
+The final initial nexthop-object series is:
+
+``` text
+[PATCH v3 net-next 00/20]
+net: Enable nexthop objects with IPv4 and IPv6 routes
+David Ahern
+2019-06-07
+```
+
+The author explicitly calls it:
+
+``` text
+the final set of the initial nexthop object work
+```
+
+The original performance motivation is also unusually concrete:
+
+``` text
+700k+ IPv4 routes
+
+1-hop:
+~18 seconds
+
+4-path:
+~28 seconds
+```
+
+with excessive `synchronize_rcu()` and repeated validation of
+device/gateway/encapsulation information identified as major kernel-side
+costs.
+
+### Provenance policy
+
+Search/index results do not yet give a trustworthy one-to-one mapping of
+all 20 patch subjects to final mainline SHA-1s. Therefore this document
+deliberately does **not** invent or infer the missing hashes.
+
+Current confidence:
+
+``` text
+final series identity       A
+date/author                  A
+20-patch structure          A
+motivation/design           A
+all 20 final mainline SHA   pending
+```
+
+This is preferable to presenting mirror/rebase hashes as if they were
+canonical mainline objects.
+
+------------------------------------------------------------------------
+
+# 85. IOAM and MPTCP remaining exact-hash policy
+
+The same rule now applies to the remaining multi-commit sets.
+
+### IOAM
+
+Already exact:
+
+``` text
+9ee11f0fff205b4b3df9750bff5e94f97c71b6a0
+ipv6: ioam: Data plane support for Pre-allocated Trace
+```
+
+Still to enumerate:
+
+``` text
+UAPI
+namespace/schema configuration
+output/tunnel path
+selftests
+```
+
+### MPTCP 5.6
+
+Already exact:
+
+``` text
+048d19d444be...
+initial MPTCP selftest
+```
+
+Still to enumerate from canonical mainline history:
+
+``` text
+socket type
+protocol registration
+basic send/receive
+DSS/options
+initial protocol state
+```
+
+No SHA will be added merely because a similarly named commit appears in
+an old MPTCP development branch.
+
+------------------------------------------------------------------------
+
+# 86. RTNL architectural conclusion
+
+The 2019--2026 networking history shows a broader locking transition:
+
+``` text
+one global lock
+      │
+      ▼
+mark selected operations unlocked
+      │
+      ▼
+RCU for readers
+      │
+      ▼
+per-netns lock for namespace-local writers
+      │
+      ▼
+dedicated locks/refcounts for subsystem state
+      │
+      ▼
+remove remaining hidden global tables/serialization
+```
+
+RTNL is therefore best treated in the canonical inventory as a
+**multi-year architectural program**, not as a feature introduced by
+Linux 6.13.
+
+This is analogous to the way the document treats:
+
+``` text
+page_pool → netmem → devmem
+```
+
+and:
+
+``` text
+GRO/GSO → BIG TCP → tunnel BIG TCP
+```
+
+as evolving architectural lineages rather than isolated release notes.
+
+------------------------------------------------------------------------
+
+# 87. Provenance backlog after pass 5
+
+Highest-value unresolved exact mappings are now:
+
+1.  all 20 final mainline SHA-1s for the 2019 nexthop-object series;
+2.  complete initial MPTCP 5.6 SHA set;
+3.  complete IOAM v5 SHA set;
+4.  exact 2020 MPTCP+BPF five-commit SHA set;
+5.  later MPTCP iterator/kfunc SHA set;
+6.  selected RTNL conversion SHA sets where a subsystem reaches a clear
+    lock-removal milestone.
+
+The discovery/architecture phase for these topics is effectively
+complete; remaining work is now canonical Git provenance normalization.
