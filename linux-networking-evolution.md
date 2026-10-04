@@ -7,18 +7,21 @@
 > evidence, not an alternate release map.
 
 **調査基準日:** 2026-10-02\
-**構成改訂:** 2026-10-03
+**構成改訂:** 2026-10-04
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel
 networking がどのように進化したかを読む順序**に再構成した版である。
 
+**対象範囲:** wired / host networking を中心に扱う。RDMA、Wi-Fi 全般、QUIC や
+security protocol の網羅的な歴史は対象外とし、mac80211 は queue management
+（airtime / AQL）の観点から選択的に扱う。
+
 ## この文書の読み方
 
-> **Canonicalization note (2026-10-03):** Release chronology is
-> authoritative only in **Part II**. Development-series dates and
-> mainline release dates are intentionally separated. The document uses
-> one six-axis architecture model. Appendix material is
-> provenance/research history and is non-normative.
+> **Canonicalization rule:** release attribution と evidence grade を決定する唯一の正本は
+> **Part II** とする。Part III--VI は Part II の release 番号を説明・lineage のために
+> 参照してよいが、独立した attribution や grade を定義しない。Part VII は exact
+> commit / unresolved boundary、Appendix は supporting evidence を保持する。
 
 本文は次の流れで構成する。
 
@@ -60,30 +63,15 @@ Appendix  evidence catalog
 
 本書では以下の用語を一貫して次の意味で使用する。
 
-  -----------------------------------------------------------------------------
-  Term              Meaning
-  ----------------- -----------------------------------------------------------
-  **design / RFC**  proposal or architecture under discussion; no merge is
-                    implied
-
-  **series**        a posted patch series; `final series` means the latest
-                    merge-near revision identified by this research
-
-  **landing**       acceptance into the relevant subsystem tree or `net-next`;
-                    this is not automatically a released kernel
-
-  **mainline        a verified commit in Linus's mainline history that anchors
-  anchor**          part of a feature
-
-  **release**       a feature is present in a released mainline kernel version
-
-  **generation**    a release-era milestone spanning multiple commits or
-                    incremental follow-ups; not necessarily a single origin
-                    commit
-
-  **development**   accepted, merged into a development tree, or posted for a
-                    future cycle, but not treated here as a released baseline
-  -----------------------------------------------------------------------------
+| Term | Meaning |
+|---|---|
+| **design / RFC** | proposal or architecture under discussion; no merge is implied |
+| **series** | a posted patch series; `final series` means the latest merge-near revision identified by this research |
+| **landing** | acceptance into the relevant subsystem tree or `net-next`; this is not automatically a released kernel |
+| **mainline anchor** | a verified commit in Linus's mainline history that anchors part of a feature |
+| **release** | a feature is present in a released mainline kernel version |
+| **generation** | a release-era milestone spanning multiple commits or incremental follow-ups; not necessarily a single origin commit |
+| **development** | accepted, merged into a development tree, or posted for a future cycle, but not treated here as a released baseline |
 
 A mainline anchor can be a core/origin commit, an integration commit, or
 a protocol-specific enablement commit. The text names the anchor type
@@ -126,10 +114,13 @@ passes through each stage in exactly this form.
  │
 3.9   SO_REUSEPORT / conntrack labels / VM sockets
  │
+3.11  SO_BUSY_POLL / low-latency busy polling
  │
 3.12  TCP pacing + FQ-era TCP scheduling
  │
 3.13  nftables
+ │
+3.14  TCP autocorking
  │
 3.15–3.17
  │     classic BPF → extended/generalized BPF architecture
@@ -680,10 +671,7 @@ attribution を上書きしない。
 
 # Part II --- 正規 release chronology
 
-この表は、本書における **release attribution と evidence grade
-の唯一の正本**です。 Part IV の driver-framework projection、Part VII の
-commit anchor、Appendix の source index は この表を補足しますが、別の
-release chronology を定義しません。
+この表に release attribution と evidence grade を集約する。
 
 欠落している kernel release
 は「重要な変更がなかった」という意味ではなく、本書が選んだ architecture
@@ -767,8 +755,8 @@ C/D は現在の canonical milestone table では使用していないが、将�
 | 6.16 | Device Memory TCP TX; BPF qdisc; DCCP removal | A | release/final-series generation; BPF-qdisc exact inventory pending |
 | 6.18 | AccECN core; UDP RX evolution; DIBS separate shared-memory lineage | B | release-generation |
 | 7.0 | cake_mq / multi-queue-aware sch_cake; IPv6 BIG TCP without synthetic HBH jumbo header | A | net-next-7.0 / v7.0 release generation |
-| 7.1 | RX HW queue leasing | A | revised RX merge contained in v7.1-rc1; TX remains unmerged |
-| 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255 | A | two limit-expansion commits contained in v7.2-rc1; remaining series patches are preparation/selftests |
+| 7.1 | RX HW queue leasing | A | revised RX implementation is contained in final `v7.1`; TX remains unmerged |
+| 7.2 | MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255 | A | two limit-expansion commits are contained in final `v7.2`; remaining series patches are preparation/selftests |
 | 7.3-rc / mainline | BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE | A-rc | net-next-7.3 merged 2026-08-20; final 7.3 pending |
 
 **7.3 status note:** 調査基準日時点では final 7.3 は未リリースのため `A-rc` とする。正式リリースを確認した時点で `A` へ更新する。
@@ -953,7 +941,7 @@ one packet
 ``` text
 v5.0: XDP / TC / cgroup BPF
           ↓
-5.3–5.4: socket hooks / SYN-cookie integration
+5.x: socket hooks / SYN-cookie integration
           ↓
 5.6: struct_ops → tcp_congestion_ops
           ↓
@@ -1019,7 +1007,7 @@ container:
 veth → netkit → BPF-native datapath → RX queue leasing
 ```
 
-v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、2026 の netkit queue leasing
+v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、v7.1 RX HW queue leasing
 は 「full kernel bypass」よりも、
 
 **kernel が ownership/control を保持し、data movement を最小化する**
@@ -1041,7 +1029,6 @@ v5.0 era (EDT pacing already present since 4.20)
   ├─ BIG TCP (5.19)
   ├─ TCP-AO/security
   ├─ Device Memory TCP
-  ├─ TCP_RTO_MAX_MS
   └─ AccECN
 ```
 
@@ -1168,54 +1155,21 @@ III にも登場するが、ここでは feature 全体の歴史ではなく、*
 の観点から投影したものであり、独立した第2の chronology ではない。以下の
 release attribution はすべて Part II と一致させる。
 
-  ----------------------------------------------------------------------------
-  Release   Driver-framework milestone      Architectural effect
-  --------- ------------------------------- ----------------------------------
-  3.3       DQL/BQL                         common queue-pressure control
-                                            replaces driver-local queue sizing
-                                            policy
-
-  3.19      switchdev origin                Linux forwarding objects begin to
-                                            drive switch-ASIC offload
-
-  4.6       devlink                         device/ASIC-wide resources and
-                                            control separated from one
-                                            `net_device`
-
-  4.8       XDP                             driver RX path gains a
-                                            programmable pre-skb execution
-                                            point
-
-  4.14      phylink                         common MAC/PHY/PCS/SFP
-                                            link-management state machine
-
-  4.16      netdevsim                       common offload APIs become
-                                            testable without physical hardware
-
-  4.18      refurbished page_pool/XDP       RX allocation/recycling begins
-            memory return                   moving into common memory
-                                            infrastructure
-
-  5.1       devlink health                  common reporting/recovery model
-                                            for device health
-
-  5.6       ethtool Generic Netlink         driver management ABI becomes
-                                            structured/extensible
-
-  5.11      auxiliary bus                   complex devices can expose
-                                            independently bound subfunctions
-
-  5.12      threaded NAPI                   NAPI execution model becomes more
-                                            explicitly configurable
-
-  6.8       Rust phylib + queue/NAPI        safe driver abstraction and
-            netdev-genl objects             explicit netdev objects develop in
-                                            parallel
-
-  6.x→7.x   page_pool introspection →       queue, poller and memory ownership
-            queue/NAPI configuration →      become first-class driver/core
-            memory providers                contracts
-  ----------------------------------------------------------------------------
+| Release | Driver-framework milestone | Architectural effect |
+|---|---|---|
+| 3.3 | DQL/BQL | common queue-pressure control replaces driver-local queue sizing policy |
+| 3.19 | switchdev origin | Linux forwarding objects begin to drive switch-ASIC offload |
+| 4.6 | devlink | device/ASIC-wide resources and control separated from one `net_device` |
+| 4.8 | XDP | driver RX path gains a programmable pre-skb execution point |
+| 4.14 | phylink | common MAC/PHY/PCS/SFP link-management state machine |
+| 4.16 | netdevsim | common offload APIs become testable without physical hardware |
+| 4.18 | refurbished page_pool/XDP memory return | RX allocation/recycling begins moving into common memory infrastructure |
+| 5.1 | devlink health | common reporting/recovery model for device health |
+| 5.6 | ethtool Generic Netlink | driver management ABI becomes structured/extensible |
+| 5.11 | auxiliary bus | complex devices can expose independently bound subfunctions |
+| 5.12 | threaded NAPI | NAPI execution model becomes more explicitly configurable |
+| 6.8 | Rust phylib + queue/NAPI netdev-genl objects | safe driver abstraction and explicit netdev objects develop in parallel |
+| 6.x→7.x | page_pool introspection → queue/NAPI configuration → memory providers | queue, poller and memory ownership become first-class driver/core contracts |
 
 ### 長期的な architecture の変化
 
@@ -1682,7 +1636,10 @@ providers」です。ここでは重複した図を再掲しません。
 
 ## Rust --- language support から safe driver model へ
 
-### Linux 6.1 --- Rust が kernel に入る
+### Context: Linux 6.1 --- Rust が kernel に入る
+
+> これは networking milestone として Part II に採用した項目ではなく、6.8 の Rust PHY
+> milestone を理解するための kernel-wide contextual reference である。
 
 Linux 6.1 introduces the initial Rust-for-Linux support. This does not
 yet mean that network drivers can generally be written in Rust;
@@ -1817,27 +1774,6 @@ Kernel Recipes is especially useful for architecture:
 2026  compile-time enforcement of driver lifecycle rules (Rust driver-core/device model; not networking-specific)
 ```
 
-## 今後 exact commit の確認が必要な項目
-
-Before assigning every item a precise kernel release/commit, a follow-up
-provenance pass should enumerate:
-
-``` text
-switchdev initial core series
-
-VF representor generic model
-DIM / net_dim introduction
-page_pool initial landing and subsequent DMA/recycle redesign
-ethtool-netlink merge boundary
-Rust net_device / PCI / DMA / IRQ abstraction landing status
-netdev-genl queue/NAPI object landing boundaries
-```
-
-As with the rest of this document, review proposals should not be
-promoted to mainline facts until landing is verified.
-
-------------------------------------------------------------------------
-
 ## Part IV から Part V へ --- mechanism から observability へ
 
 fast path、memory ownership、offload は、operator/developer が kernel
@@ -1898,6 +1834,24 @@ planeだけでなくobservabilityにも 効きます。packet memory、polling
 context、queue identityをuserspace-visible objectとして関連付ける
 ことで、zero-copy / memory-provider時代の問題を説明しやすくなります。
 
+この軸を Part II の確定 milestone に対応させると、次の流れになる。
+
+``` text
+5.17  kfree_skb_reason / structured drop-reason foundation
+  ↓
+5.19  drop-reason coverage expansion
+  ↓
+6.8   queue/NAPI netdev-genl visibility
+  ↓
+6.x–7.x  page_pool / queue / memory-provider diagnostics
+```
+
+`netdev-genl` による queue / NAPI identity と stats は、従来の interface-level
+counter だけでは説明しにくかった「どの queue / poller で問題が起きているか」を
+userspace から関連付ける基盤になる。page_pool 側でも pool identity、allocation /
+recycle information、leak diagnostics が整備され、packet-memory ownership 自体が
+観測対象へ移っている。ここでの release attribution は Part II の値を参照する。
+
 ## Tool の case study
 
 Retis と pwru は上記primitiveを利用する代表例ですが、本書ではkernel
@@ -1949,7 +1903,7 @@ async I/O             conventional     →      io_uring ZC TX/RX
         ▼               ▼                ▼
    struct_ops        BIG TCP       netmem / memory providers
    SK_LOOKUP             │                │
-        │                │             netmem
+        │                │                │
         ▼                │          ┌─────┴─────┐
      netkit              │          ▼           ▼
         │                │      Devmem TCP   io_uring ZCRX
@@ -2017,46 +1971,25 @@ boundaries that remain important for verification or future re-audit.
 Net DIMについては、algorithm自体は4.16以前からmlx5e内に存在しており、4.16は「共通libraryへの切り出し」という表現を維持する。本版では、提示されたDIM SHAを一次Git objectとして再確認できていないため exact inventory への追加は保留する。
 
 
-  ---------------------------------------------------------------------------------------------------------------------------------------------
-  Feature                 Mainline anchor                              Subject / role
-  ----------------------- -------------------------------------------- ------------------------------------------------------------------------
-  DQL                     `75957ba36c05b979701e9ec64b37819adc12f830`   `dql: Dynamic queue limits`
-
-  CoDel                   `76e3cc126bb223013a6b9a0e2a51238d1ef2e409`   CoDel qdisc core anchor
-
-  SO_REUSEPORT            `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a`   `soreuseport: infrastructure`
-  infrastructure                                                       
-
-  nftables core           `96518518cc417bb0a8c80b9fb736202e28acdf96`                            `netfilter: add nftables` --- core origin anchor
-
-  nftables set API        `20a69341f2d00cd042e81c82289fba8a13c05a25`   set-API anchor; not the core origin
-
-  BBR                     `0f8782ea14974ce992618b55f0c041ef43ed0b78`   initial BBR mainline anchor
-
-  phylink                 `9525ae83959b60c6061fe2f2caabdc8f69a48bc6`   `phylink: add phylink infrastructure`; Linux 4.14
-
-  TCP MSG_ZEROCOPY        `f214f915e7db99091f1312c48b30928c1e0c90b7`   `tcp: enable MSG_ZEROCOPY`
-
-  page_pool origin        `ff7d6b27f894f1469dc51ccb828b7363ccd9799f`   `page_pool: refurbish version of page_pool code`
-
-  page_pool/XDP           `60bbf7eeef10dc647430646d7fe5e3d8d132dbec`   mlx5 page_pool/XDP integration anchor
-  integration                                                          
-
-  ethtool Generic Netlink `2b4a8990b7df55875745a80a609a1ceaaf51f322`   `ethtool: introduce ethtool netlink interface`
-
-  SK_LOOKUP               `e9ddbb7707ff5891616240026062b8c1e29864ca`   `bpf: Introduce SK_LOOKUP program type with a dedicated attach point`;
-
-  XFRM packet offload     `d14f28b8c1de668bab863bf5892a49c824cb110d`   `xfrm: add new packet offload flag`
-
-  IPv6 BIG TCP / GRO      `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12`   `net: allow gro_max_size to exceed 65536`
-
-  IPv6 BIG TCP / GSO      `7c4e983c4f3cf94fcd879730c6caa877e0768a4d`   `net: allow gso_max_size to exceed 65536`
-
-  netkit                  `35dfaad7188cdc043fde31709c796f5a692ba2bd`   netkit core anchor
-
-  net-next 7.3 merge      `91ec2035134982b98fab0609a9fd8480e8217dc1`   `Merge tag 'net-next-7.3' ...`
-  ---------------------------------------------------------------------------------------------------------------------------------------------
-
+| Feature | Mainline anchor | Subject / role |
+|---|---|---|
+| DQL | `75957ba36c05b979701e9ec64b37819adc12f830` | `dql: Dynamic queue limits` |
+| CoDel | `76e3cc126bb223013a6b9a0e2a51238d1ef2e409` | CoDel qdisc core anchor |
+| SO_REUSEPORT infrastructure | `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a` | `soreuseport: infrastructure` |
+| nftables core | `96518518cc417bb0a8c80b9fb736202e28acdf96` | `netfilter: add nftables` — core origin anchor |
+| nftables set API | `20a69341f2d00cd042e81c82289fba8a13c05a25` | set-API anchor; not the core origin |
+| BBR | `0f8782ea14974ce992618b55f0c041ef43ed0b78` | initial BBR mainline anchor |
+| phylink | `9525ae83959b60c6061fe2f2caabdc8f69a48bc6` | `phylink: add phylink infrastructure`; Linux 4.14 |
+| TCP MSG_ZEROCOPY | `f214f915e7db99091f1312c48b30928c1e0c90b7` | `tcp: enable MSG_ZEROCOPY` |
+| page_pool origin | `ff7d6b27f894f1469dc51ccb828b7363ccd9799f` | `page_pool: refurbish version of page_pool code` |
+| page_pool/XDP integration | `60bbf7eeef10dc647430646d7fe5e3d8d132dbec` | mlx5 page_pool/XDP integration anchor |
+| ethtool Generic Netlink | `2b4a8990b7df55875745a80a609a1ceaaf51f322` | `ethtool: introduce ethtool netlink interface` |
+| SK_LOOKUP | `e9ddbb7707ff5891616240026062b8c1e29864ca` | `bpf: Introduce SK_LOOKUP program type with a dedicated attach point` |
+| XFRM packet offload | `d14f28b8c1de668bab863bf5892a49c824cb110d` | `xfrm: add new packet offload flag` |
+| IPv6 BIG TCP / GRO | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | `net: allow gro_max_size to exceed 65536` |
+| IPv6 BIG TCP / GSO | `7c4e983c4f3cf94fcd879730c6caa877e0768a4d` | `net: allow gso_max_size to exceed 65536` |
+| netkit | `35dfaad7188cdc043fde31709c796f5a692ba2bd` | netkit core anchor |
+| net-next 7.3 merge | `91ec2035134982b98fab0609a9fd8480e8217dc1` | `Merge tag 'net-next-7.3' ...` |
 
 **MPTCP 7.2 limit expansion anchors:** 8-patch series のうち上限値を直接引き上げる commit は2つである。
 
@@ -2071,7 +2004,27 @@ Grade の正本は Part II と canonical dataset です。Part VII は
 commit-level anchor と、 まだ解消していない attribution boundary
 のみを記録します。
 
-## Appendix の読み方
+Appendix は evidence catalog である。そこに現れる日付は RFC date、posting date、review base、conference date の場合があり、Part II に明記されない限り release attribution として読まない。
+
+## Open attribution items and evidence grade
+
+以下は Part II の Grade を再定義する表ではなく、未解決の attribution boundary を記録する補助表である。Grade を記載する場合は Part II と完全に一致させる。
+
+| Item | Canonical Grade | Current treatment |
+|---|---|---|
+| RX HW queue leasing | A | revised RX implementation is contained in final `v7.1`; TX queue leasing remains unmerged |
+| devmem buffers > `PAGE_SIZE` | A-rc | explicitly listed in the `net-next-7.3` pull merged to Linus mainline; final 7.3 pending |
+| MPTCP PM limit expansion | A | limit-expansion commits are contained in final `v7.2`; endpoint maximum is 255 because ID 0 is reserved |
+| DIM / `net_dim` | B | Linux 4.16 Net DIM generation; Linux 5.3 common `lib/dim` generalization; exact SHAs pending |
+| `cake_mq` | A | `net-next-7.0` pull explicitly lists multi-queue-aware `sch_cake`; canonical generation Linux 7.0 |
+
+**Queue-leasing release boundary:** initial merge `77b9c4a438fc66e2ab004c411056b3fb71a54f2c` と revert `8766d61a1d33cb5f15bfdd6ce9832bbe1fc649c2` はともに v7.0 merge window 内で相殺され、v7.0 release には含まれない。revised RX implementation `15089225889ba4b29f0263757cd66932fa676cb0` は final `v7.1` に含まれる。TX queue leasing は未 merge である。
+
+# Appendix --- Source index（非正規）
+
+Appendix は supporting evidence / research provenance の索引である。本文の release
+attribution や lineage を再定義しない。
+
 ## USENIX research index --- architecture motivation / design-space evidence
 
 以下は upstream release attribution の根拠ではなく、Linux networking architecture の design space と、その機能が解こうとする問題を説明する research evidence である。
@@ -2089,69 +2042,19 @@ commit-level anchor と、 まだ解消していない attribution boundary
 これらは Part II / Part VII の canonical release/commit evidence と混同しない。
 
 
-Appendix は evidence catalog である。そこに現れる日付は RFC date、posting date、review base、conference date の場合があり、Part II に明記されない限り release attribution として読まない。
-
-## Open attribution items and evidence grade
-
-以下は Part II の Grade を再定義する表ではなく、未解決の attribution boundary を記録する補助表である。Grade を記載する場合は Part II と完全に一致させる。
-
-| Item | Canonical Grade | Current treatment |
-|---|---|---|
-| RX HW queue leasing | A | revised RX implementation is contained in v7.1-rc1; TX queue leasing remains unmerged |
-| devmem buffers > `PAGE_SIZE` | A-rc | explicitly listed in the `net-next-7.3` pull merged to Linus mainline; final 7.3 pending |
-| MPTCP PM limit expansion | A | v7.2-rc1 containment confirmed; endpoint maximum is 255 because ID 0 is reserved |
-| DIM / `net_dim` | B | Linux 4.16 Net DIM generation; Linux 5.3 common `lib/dim` generalization; exact SHAs pending |
-| `cake_mq` | A | `net-next-7.0` pull explicitly lists multi-queue-aware `sch_cake`; canonical generation Linux 7.0 |
-
-**Queue-leasing release boundary:** initial merge `77b9c4a438fc66e2ab004c411056b3fb71a54f2c` と revert `8766d61a1d33cb5f15bfdd6ce9832bbe1fc649c2` はともに v7.0 merge window 内で相殺され、v7.0 release には含まれない。revised RX implementation `15089225889ba4b29f0263757cd66932fa676cb0` は v7.1-rc1 に含まれる。TX queue leasing は未 merge である。
-
-# Appendix --- Source index（非正規）
-
-Appendix は chronology や lineage を再定義しません。正本は以下です。
-
--   release attribution / grade: **Part II**
--   feature lineage: **Part III**
--   driver-framework projection: **Part IV**
--   kernel observability primitives: **Part V**
--   exact commit anchors / unresolved boundaries: **Part VII**
-
-ここでは「source → 対応する正本」の索引だけを保持します。
-
 ## Kernel documentation / primary-source index
 
-  -----------------------------------------------------------------------
-  Source topic            Canonical destination   What it supports
-  ----------------------- ----------------------- -----------------------
-  NAPI / `SO_BUSY_POLL`   Part II 3.11; Part IV   busy polling and NAPI
-                                                  execution model
-
-  BPF DEVMAP              Part II 4.14; Part III  XDP redirect via devmap
-                          XDP                     
-
-  BPF CPUMAP              Part II 4.15; Part III  XDP redirect to remote
-                          XDP                     CPU
-
-  nftables flowtable      Part II 4.16; Part III  software flowtable fast
-                          netfilter               path; later HW-offload
-                                                  evolution
-
-  TCX / `bpf_mprog`       Part II 6.6; Part III   link-based TC
-                          BPF                     attachment and
-                                                  multi-program ordering
-
-  Device Memory TCP /     Part II 6.12/6.16; Part RX/TX device-memory
-  memory providers        III memory              zero-copy evolution
-
-  io_uring ZCRX           Part II 6.15; Part III  queue-bound zero-copy
-                          io_uring                receive
-
-  `net-next-7.1`          Part II 7.1             RX HW queue leasing
-
-  `net-next-7.3`          Part II 7.3-rc          tunnel BIG TCP,
-                                                  RTNL-less FIB rules,
-                                                  \>PAGE_SIZE devmem
-                                                  buffers
-  -----------------------------------------------------------------------
+| Source topic | Canonical destination | What it supports |
+|---|---|---|
+| NAPI / `SO_BUSY_POLL` | Part II 3.11; Part IV | busy polling and NAPI execution model |
+| BPF DEVMAP | Part II 4.14; Part III XDP | XDP redirect via devmap |
+| BPF CPUMAP | Part II 4.15; Part III XDP | XDP redirect to remote CPU |
+| nftables flowtable | Part II 4.16; Part III netfilter | software flowtable fast path; later HW-offload evolution |
+| TCX / `bpf_mprog` | Part II 6.6; Part III BPF | link-based TC attachment and multi-program ordering |
+| Device Memory TCP / memory providers | Part II 6.12/6.16; Part III memory | RX/TX device-memory zero-copy evolution |
+| io_uring ZCRX | Part II 6.15; Part III io_uring | queue-bound zero-copy receive |
+| `net-next-7.1` | Part II 7.1 | RX HW queue leasing |
+| `net-next-7.3` | Part II 7.3-rc | tunnel BIG TCP, RTNL-less FIB rules, >PAGE_SIZE devmem buffers |
 
 ## Exact anchor index
 
@@ -2165,16 +2068,17 @@ statementを補足する資料として扱い、 release
 attributionには使用しません。
 
   Conference lineage                        Canonical destination
-  ----------------------------------------- -----------------------------
-  Netdev: XDP / AF_XDP / TC / BPF           Part III programmability
-  Netdev: BIG TCP                           Part III packet aggregation
-  Netdev: Device Memory TCP / zero-copy     Part III packet memory
-  Netdev 0x19: Diagnosing Page Pool Leaks   Part IV page_pool
-  Netdev: queue/NAPI/netdev-genl            Part IV driver framework
-  Netdev: MPTCP / TCP state-of-the-union    Part III transport
-  Kernel Recipes: XDP / BPF / io_uring      Parts III--IV
-  OVS/OVN Conf: Retis                       Part V case-study note
-  LPC / FOSDEM: pwru and tracing            Part V case-study note
+| Conference lineage | Canonical destination |
+|---|---|
+| Netdev: XDP / AF_XDP / TC / BPF | Part III programmability |
+| Netdev: BIG TCP | Part III packet aggregation |
+| Netdev: Device Memory TCP / zero-copy | Part III packet memory |
+| Netdev 0x19: Diagnosing Page Pool Leaks | Part IV page_pool |
+| Netdev: queue/NAPI/netdev-genl | Part IV driver framework |
+| Netdev: MPTCP / TCP state-of-the-union | Part III transport |
+| Kernel Recipes: XDP / BPF / io_uring | Parts III--IV |
+| OVS/OVN Conf: Retis | Part V case-study note |
+| LPC / FOSDEM: pwru and tracing | Part V case-study note |
 
 ## Retis / pwru case-study index
 
