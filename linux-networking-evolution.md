@@ -468,21 +468,112 @@ global RTNL
 **Contract takeaway:** routing object と synchronization scope を明示し、global RTNL dependency を縮小する方向へ進んだ。
 
 
-## netfilter / nftables / conntrack
+## netfilter / nftables / conntrack — rule engine から policy-selected fast path へ
+
+netfilter の15年間を単に `iptables → nftables` という userspace command の置換として見ると、本質を取りこぼす。大きな変化は、**packet filtering / NAT / conntrack という既存の Netfilter building blocks を残しながら、ruleset representation、更新モデル、hook、stateful processing、さらに forwarding fast path と hardware placement を段階的に明示化したこと**にある。
 
 ``` text
-iptables/netfilter
-      ↓
-nftables maturation
-      ↓
-flowtable
-      ↓
-hardware offload
+iptables / ip6tables / ebtables / arptables
+        │
+        │ duplicated protocol-specific rule machinery
+        ▼
+nftables core (3.13)
+  ├─ VM / expression-based rule representation
+  ├─ Netlink control plane
+  ├─ sets / maps
+  └─ transactional ruleset updates
+        │
+        ├────────────→ ingress hook / netdev family (4.2)
+        │
+        ├────────────→ bridge-family filtering + conntrack integration
+        │
+        └────────────→ flowtable fast path (4.16)
+                              │
+                              ├─ software forwarding bypass
+                              └─ hardware flow offload
 ```
 
-一方で BPF と nftables は単純な新旧置換ではない。
+### nftables — firewall replacement ではなく ruleset model の再設計
 
-conntrack では performance だけでなく lifetime/GC、per-netns scalability、 hardware flow offload race、BPF kfunc access が重要なテーマとなった。
+nftables は 3.13 で mainline に入り、従来の `{ip,ip6,arp,eb}tables` が protocol / family ごとに持っていた rule machinery の重複を、**汎用 expression/VM と Netlink API** に寄せる方向を取った。Kernel Recipes 2013 は、iptables の課題として large ruleset の更新コスト、code duplication、maintenance difficulty を挙げ、nftables の incremental/atomic update と pseudo-machine representation を設計上の回答として説明している。
+
+このため重要なのは syntax の違いではない。Netdev 0.1/1.1 の説明が示すように、nftables は既存の Netfilter hook、conntrack、NAT、queueing、logging を再利用しつつ、ruleset を kernel 内の extensible representation として扱う。さらに Netlink API による更新、2-phase/transactional update、sets/maps、monitoring/tracing が、**ruleset を個別 xtables extension の集合から操作可能な policy object へ変えた**と見る方が、この資料の thesis に合う。
+
+### ingress / bridge — Netfilter policy の適用点を広げる
+
+4.2 世代では `prerouting` より前の ingress hook が入り、nftables を L3 forwarding/firewall だけでなく ingress packet classification に使えるようになった。これは TC を置き換えたという意味ではなく、**Netfilter policy をより早い datapath point に配置できるようにした**という意味である。
+
+bridge filtering でも同様に、nftables は ebtables の単純な syntax replacement ではなかった。従来の bridge/netfilter integration は L2 と L3 hook の境界、VLAN header representation、stateful filtering で複雑さを抱えていた。Netdev 1.1 の bridge filtering work は、nft bridge family に conntrack と NFQUEUE を統合する方向を示している。ここでも変化は「新しい firewall command」ではなく、**L2/L3 をまたぐ policy/state integration の整理**である。
+
+### conntrack — packet rule から flow state へ
+
+conntrack は nftables より古い基盤であり、nftables に置換されたものではない。flow の direction/state、NAT mapping、mark/label、timeout/lifetime といった状態を保持し、nftables、TC `ct`、flowtable など複数の consumer が利用する shared state substrate になった。
+
+``` text
+packet
+  │
+  ▼
+Netfilter hook
+  │
+  ├─ stateless expression
+  │
+  └─ conntrack lookup / create
+           │
+           ├─ state / direction
+           ├─ NAT mapping
+           ├─ mark / label
+           └─ lifetime / accounting
+                    │
+                    ├─ nftables policy
+                    ├─ TC ct action
+                    └─ flowtable
+```
+
+したがって conntrack の長期的な課題は lookup performance だけではない。flow lifetime / GC、per-netns scalability、state synchronization、offload された flow と software state の整合性も architecture issue になる。TC `ct` が 5.3 世代で conntrack metadata を TC classifier/action pipeline から利用可能にしたことも、conntrack が firewall 専用 subsystem ではなく **shared flow-state object** へ広がった例として読める。
+
+### flowtable — policy と fast path を分離する
+
+4.16 の Netfilter flowtable は、この lineage の中で特に重要である。最初の packet は classic IP forwarding / conntrack / nftables policy を通り、policy が選択した established flow を flowtable に登録する。その後の flowtable hit は `neigh_xmit()` へ進み、ingress より後ろの classic forwarding hooks を bypass する。flowtable entry は NAT information も保持する。
+
+``` text
+                         miss / exception
+ingress ──→ flowtable lookup ─────────────→ classic forwarding path
+                │                               │
+                │ hit                           │ policy / conntrack
+                ▼                               │
+          fast forwarding  ←──── flow add ──────┘
+                │
+                ▼
+            neigh_xmit()
+```
+
+ここで重要なのは **fast path が policy engine を捨てたのではない**ことである。どの flow を fast path に入れるかは nftables policy が決め、FIN/RST、fragment、MTU exception などは classic path に戻る。これは本書の「置換ではなく共存」という thesis の非常に分かりやすい例である。
+
+その後 flowtable は software fast path だけでなく hardware offload にも拡張された。hardware mode では flow を `flow_rule` として driver/hardware datapath に写像し、software `[OFFLOAD]` と hardware `[HW_OFFLOAD]` は区別される。また VLAN、PPPoE、bridge VLAN filtering、DSA など topology handling も後から拡張されており、fast path は単純な5-tuple cacheから、Linux forwarding topology と接続する infrastructure へ発展した。
+
+この点は前節の TC offload と似ているが同一ではない。**TC flower/`ndo_setup_tc` path と Netfilter flowtable hardware-offload path は別の policy/control path** であり、driver/hardware 側で共通の flow-offload representation や callback infrastructure と接続する場合がある。
+
+### BPF / XDP との関係 — replacement ではなく接続点が増える
+
+BPF/XDP と nftables も新旧置換ではない。XDP は非常に早い packet-processing point と programmable execution model を提供する一方、nftables/conntrack は stateful policy、NAT、transactional ruleset、flow lifecycle を提供する。近年は XDP/BPF から Netfilter flowtable を lookup する kfunc のように、両者を接続する方向も現れている。
+
+したがってこの lineage は、
+
+``` text
+rule-by-rule packet filtering
+        ↓
+generic / transactional policy representation
+        ↓
+shared stateful flow model
+        ↓
+policy-selected software fast path
+        ↓
+optional hardware execution
+```
+
+と要約できる。ただし各段階は前段を廃止しておらず、**slow path / policy path / state path / fast path / hardware path を workload と capability に応じて共存させる方向**に進んだ。
+
+**Contract takeaway:** Netfilter で明示化されたのは単なる firewall rule ではなく、**policy representation、transactional update、flow state、fast-path eligibility、software/hardware execution placement** である。これは「explicit contracts が複数 execution model の共存を可能にする」という本書の中心命題を CONTROL PLANE 側から示す代表例である。
 
 ------------------------------------------------------------------------
 
@@ -1361,7 +1452,9 @@ Appendix は supporting evidence / research provenance の索引である。本�
 | NAPI / `SO_BUSY_POLL`                | Part VI 3.11; Part IV                                   | busy polling and NAPI execution model                           |
 | BPF DEVMAP                           | Part VI 4.14; Part III XDP / AF_XDP                     | XDP redirect via devmap                                         |
 | BPF CPUMAP                           | Part VI 4.15; Part III XDP / AF_XDP                     | XDP redirect to remote CPU                                      |
-| nftables flowtable                   | Part VI 4.16; Part III netfilter / nftables / conntrack | software flowtable fast path; later HW-offload evolution        |
+| nftables core / architecture            | Part VI 3.13; Part III netfilter / nftables / conntrack | VM/expression model, Netlink control, transactional ruleset evolution |
+| nftables ingress / bridge                | Part III netfilter / nftables / conntrack                | earlier hook placement and L2/L3 policy integration             |
+| nftables flowtable                       | Part VI 4.16; Part III netfilter / nftables / conntrack | policy-selected software fast path; later HW-offload evolution  |
 | TCX / `bpf_mprog`                    | Part VI 6.6; Part III BPF                               | link-based TC attachment and multi-program ordering             |
 | Device Memory TCP / memory providers | Part VI 6.12/6.16; Part III packet memory               | RX/TX device-memory zero-copy evolution                         |
 | io_uring ZCRX                        | Part VI 6.15; Part III io_uring networking              | queue-bound zero-copy receive                                   |
@@ -1384,6 +1477,9 @@ Conference talk は設計意図や当時のproblem statementを補足する資�
 | Netdev 0x19: Diagnosing Page Pool Leaks | Part IV page_pool           |
 | Netdev: queue/NAPI/netdev-genl          | Part IV driver framework    |
 | Netdev: MPTCP / TCP state-of-the-union  | Part III transport          |
+| Netdev 0.1/1.1: nftables architecture / ingress / bridge | Part III netfilter |
+| Netdev: Netfilter flowtable / TC conntrack offload | Part III netfilter / Routing-TC-offload |
+| Kernel Recipes: nftables Why and how / What's new | Part III netfilter |
 | Kernel Recipes: XDP / BPF / io_uring    | Parts III–IV                |
 | OVS/OVN Conf: Retis                     | Part V case-study note      |
 | LPC / FOSDEM: pwru and tracing          | Part V case-study note      |
