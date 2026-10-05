@@ -953,7 +953,6 @@ Observability primitives (parallel / complementary)
 | `skb_drop_reason`       | 対応箇所での structured drop reason              | 全 drop path が必ず reason を付与するわけではない               |
 | timestamping            | 特定地点での時刻情報                             | clock、取得地点、HW/SW timestamp semantics に依存               |
 | netdev-genl             | queue / NAPI 等の identity、state、configuration | 可視化できることと自由に ownership/configuration できることは別 |
-| page_pool introspection | pool identity / stats / diagnostics              | packet 単位の end-to-end trajectory ではない                    |
 
 したがって cross-layer packet journey は単一 primitive の機能ではなく、tool が複数の identifier、event、 timestamp、metadata を相関して **推論する目標**として扱う。
 
@@ -1214,11 +1213,6 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | Item | Axis | なぜ本編に必要か | Open boundary |
 |---|---|---|---|
 | `netmem` | MEMORY | `struct page` と packet memory identity の分離 | canonical origin / first final release |
-| memory providers | MEMORY | queue-bound external/device memory の provider model | integration / enablement boundary |
-| BTF | OBSERVABILITY / PROGRAMMABILITY | typed kernel metadata と CO-RE/tracing の基盤 | networking history 上の代表 milestone |
-| vDPA | DRIVER FRAMEWORK / VIRTUAL-OVERLAY | virtio datapath と hardware/control separation の代表 | origin / integration boundary |
-| page_pool introspection | OBSERVABILITY / MEMORY | packet-memory object を観測可能にする | canonical observability boundary |
-| Net DIM / `lib/dim` | DRIVER FRAMEWORK | adaptive interrupt moderation の共通library化 | driver-local origin / common-library generalization boundary |
 
 ## Part VI から Part VII へ — chronology から provenance へ
 
@@ -1266,6 +1260,14 @@ Part VI は「いつ」を正規化し、Part VII はその attribution を再�
 | auxiliary bus | origin | `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` | `Add auxiliary bus support` | v5.11 |
 | IPv6 BIG TCP / GRO | enablement | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | allow `gro_max_size` > 65536 | v5.19 |
 | IPv6 BIG TCP / GSO | enablement | `7c4e983c4f3cf94fcd879730c6caa877e0768a4d` | allow `gso_max_size` > 65536 | v5.19 |
+| BTF origin | origin | `69b693f0aefa0ed521e8bd02260523b5ae446ad7` | `bpf: btf: Introduce BPF Type Format (BTF)`; typed metadata for BPF program/map | v4.18 |
+| Net DIM common-library integration | integration | `4f75da3666c0c572967729a2401ac650be5581b6` | `linux/dim: Move implementation to .c files`; driver-local/header logic becomes common `lib/dim` implementation | v5.3 |
+| vDPA bus | origin | `961e9c84077f6c8579d7a628cbe94a675cb67ae4` | `vDPA: introduce vDPA bus`; common virtio datapath / vendor-control abstraction | v5.7 |
+| netmem abstraction | origin | `18ddbf5cf0e7553fd05c3e1a02d740514ee3f0a6` | `net: introduce abstraction for network memory`; `netmem_ref` decouples network memory references from `struct page` | v6.9 |
+| page_pool userspace identity | enablement | `f17c69649c698e4df3cfe0010b7bbf142dec3e40` | `net: page_pool: id the page pools`; creates stable IDs for uAPI references | v6.8 |
+| page_pool netlink GET | enablement | `950ab53b77ab829defeb22bc98d40a5e926ae018` | `net: page_pool: implement GET in the netlink API`; exposes pool identity / ifindex / NAPI ID | v6.8 |
+| page_pool netlink statistics | integration | `d49010adae737638447369a4eff8f1aab736b076` | `net: page_pool: expose page pool stats via netlink`; driver-independent observability | v6.8 |
+| page_pool custom memory providers | integration | `57afb483015768903029c8336ee287f4b03c1235` | `net: page_pool: create hooks for custom memory providers`; shared allocator hook for devmem TCP and io_uring ZCRX | v6.15 |
 | Device Memory TCP RX | merge | `9410645520e9b820069761f3450ef6661418e279` | merge tag `net-next-6.12`; Device Memory TCP RX generation | v6.12 |
 | per-netns RTNL start | merge | `fcc79e1714e8c2b8e216dc3149812edd37884eef` | merge tag `net-next-6.13`; initial per-netns RTNL conversion wave, explicitly in-progress | v6.13 |
 | io_uring ZCRX | merge | `71f0dd5a3293d75d26d405ffbaedfdda4836af32` | merge branch `io_uring-zero-copy-rx`; queue-bound userspace-page RX / memory-provider integration | v6.15 |
@@ -1277,6 +1279,18 @@ Part VI は「いつ」を正規化し、Part VII はその attribution を再�
 | RX HW queue leasing / queue-create | enablement | `7789c6bb76acf21539c2c74b0cc869bb57de99e6` | `net: Add queue-create operation`; virtual RX queue may lease a physical RX queue | v7.1 |
 | RX HW queue leasing generation | merge | `91a4855d6c03e770e42f17c798a36a3c46e63de2` | merge tag `net-next-7.1`; pull message explicitly lists HW queue leasing | v7.1 |
 | net-next 7.3 merge | merge | `91ec2035134982b98fab0609a9fd8480e8217dc1` | merge tag `net-next-7.3` | 7.3 final pending |
+
+### Boundary-open register resolution audit
+
+r34 まで boundary-open としていた6項目は、単一の「origin」だけを探すのではなく、本文でその項目に与えている architecture 上の役割に対応する anchor を選ぶことで解消した。
+
+| Item | Canonical boundary | Exact anchor | 判断 |
+|---|---:|---|---|
+| Net DIM common library | 5.3 | `4f75da3666c0c572967729a2401ac650be5581b6` | `net_dim` logic を `lib/dim` の `.c` implementation へ移した integration point |
+
+ここで `netmem` と `memory providers` は別の boundary である。6.9 の `netmem_ref` は **memory type を `struct page` から抽象化する型/API contract**、6.15 の memory-provider hooks は **page_pool が custom allocator/provider を選択する lifecycle/integration contract** である。Device Memory TCP はこの2つを利用するconsumerの一つであり、三者を同じoriginとして扱わない。
+
+page_pool introspection も単一commitへ無理に縮約しない。`f17c6964...` が pool ID、`950ab53b...` がNetlink GET、`d49010ad...` がstats exposureを導入しているため、本文の「page_pool objectをdriver-independentに観測可能にした」という主張にはこの3段階が最も監査しやすい。
 
 ### Era 4 exact-anchor audit
 
