@@ -127,7 +127,7 @@ DRIVER FRAMEWORK  switchdev / devlink / phylink / DIM / common driver contracts
 
 この分布は Era の違いも示す。Era 1 では accounting / API の基礎、Era 2–3 では reusable object / programmability、Era 4 では assignment / lifetime / synchronization の明示化が目立つ。ただし 各 Era は重なりを許し、この表は厳密な periodization ではない。
 
-この表は release attribution の正本ではない。version と Ref / status は Part VI に従う。
+この表は release attribution の正本ではない。version と Verification status は Part VI に従う。
 
 ### この thesis が説明しないもの
 
@@ -391,6 +391,8 @@ system RAM   non-page / device-backed memory
 
 ### memory providers / queue binding — memory lifetime と RX queue を接続する
 
+Device Memory TCP RX は6.12で先に mainline 化され、この時点では page_pool の `mp_priv` など devmem 用の専用経路を利用していた。6.15で `memory_provider_ops` / page_pool custom-provider hooks が導入され、devmem TCP と io_uring ZCRX が同じ **汎用 memory-provider contract** に接続できる形へ整理された。したがって `Device Memory TCP RX (6.12) → generic memory-provider hooks (6.15)` は、**consumer-specific path の先行 → provider API の一般化**という順序である。
+
 io_uring ZCRX や Device Memory TCP では、memory pool を用意するだけでは不十分である。 どの RX queue がどの memory provider を使うか、buffer がいつ application/device から返却されるか、 queue reconfiguration 中に lifetime をどう保つかを kernel/driver/userspace 間で合意する必要がある。
 
 ``` text
@@ -466,9 +468,11 @@ bridge / FIB / VLAN objects → switchdev notifications / objects → switch dri
 ------------------------------------------------------------------------
 
 
+**Takeaway:** forwarding semantics を kernel の canonical state として保ちながら、bridge/FIB/TC policy を software または hardware execution へ写像できるようになった。switchdev と TC offload は同じ直列 API ではなく、別の control path が driver/hardware で交差する。
+
 ### XFRM packet offload — security state と forwarding placement
 
-6.2 の XFRM packet offload は、従来の crypto offload より広く packet-level IPsec processing をdeviceへ配置する仕組みである。kernel/XFRM が policy/state のcanonical control planeを保持しながら、executionをsoftwareまたはdeviceへ置ける点で switchdev/TC offload と共通する。ただし security semantics は独立したcross-cutting domainなので、詳細はSECURITY lineageで扱う。
+6.2 の XFRM packet offload は、従来の crypto offload より広く packet-level IPsec processing をdeviceへ配置する仕組みである。kernel/XFRM が policy/state のcanonical control planeを保持しながら、executionをsoftwareまたはdeviceへ置ける点で switchdev/TC offload と共通する。security semantics は独立した cross-cutting domain であり、ここでは hardware execution placement との接点だけを扱う。
 
 ## Routing / Netlink / RTNL
 
@@ -893,28 +897,26 @@ physical netdev
 
 ここでqueue identityはOBSERVABILITYとCONTROL PLANEの接点になる。
 
-## Research pressure — programmable / offloaded NIC datapath
-
-hXDP、IO-TCP、Valinor などの研究は mainline framework そのものではないため canonical milestone にはしない。一方、XDP hardware execution、SmartNIC、host/NIC間のstate placementをどこまで共通化できるかという設計圧力を示す case study として Appendix に保持する。ここでは **research chronology と mainline lineage を混同しない**ことを優先する。
 
 ## Driver framework の synthesis
 
 15年間を通して見ると、driver framework の変化は次のように要約できる。
 
-| 以前 driver 内に埋もれていたもの | 共通化した代表 framework | 代表 release | 主な contract / source |
-|---|---|---:|---|
-| outstanding TX work | DQL/BQL | 3.3 | accounting / backpressure |
-| switch forwarding state | switchdev | 3.19 | object / notification |
-| device-wide resource | devlink | 4.6 | object / API — https://docs.kernel.org/networking/devlink/ |
-| hardware-independent API test | netdevsim | 4.16 | selftest / contract validation — https://docs.kernel.org/networking/devlink/netdevsim.html |
-| interrupt moderation logic | DIM | 4.16→5.3 | measurement / policy |
-| RX packet-memory recycling | page_pool | 4.18 | lifetime / object |
-| device health/recovery | devlink health | 5.1 | lifecycle / observability — https://docs.kernel.org/networking/devlink/devlink-health.html |
-| NIC configuration | ethtool netlink | 5.6 | structured API |
-| multi-function driver binding | auxiliary bus | 5.11 | composition / lifetime |
-| NAPI execution placement | threaded NAPI | 5.12; busy-poll 6.19 | execution choice |
-| queue / NAPI identity | netdev-genl | 6.8+ | object / assignment — https://docs.kernel.org/networking/netlink_spec/netdev.html |
-| MAC–PHY/PCS topology | phylink | 4.14 | API / state coordination |
+| 以前 driver 内に埋もれていたもの | 共通化した代表 framework | 代表 release | 主な contract | Source |
+|---|---|---:|---|---|
+| outstanding TX work | DQL/BQL | 3.3 | accounting / backpressure | Part VII / source index |
+| switch forwarding state | switchdev | 3.19 | object / notification | Part VII / source index |
+| device-wide resource | devlink | 4.6 | object / API | kernel devlink docs |
+| MAC–PHY/PCS topology | phylink | 4.14 | API / state coordination | Part VII |
+| hardware-independent API test | netdevsim | 4.16 | selftest / contract validation | kernel netdevsim docs |
+| interrupt moderation logic | DIM | 4.16→5.3 | measurement / policy | Part VII |
+| RX packet-memory recycling | page_pool | 4.18 | lifetime / object | Part VII |
+| device health/recovery | devlink health | 5.1 | lifecycle / observability | kernel devlink-health docs |
+| NIC configuration | ethtool netlink | 5.6 | structured API | source index |
+| multi-function driver binding | auxiliary bus | 5.11 | composition / lifetime | source index |
+| NAPI execution placement | threaded NAPI | 5.12; busy-poll 6.19 | execution choice | source index |
+| queue / NAPI identity | netdev-genl | 6.8+ | object / assignment | kernel netdev spec |
+
 
 この表は各frameworkが同じ問題を解くという意味ではない。共通するのは、**driver-privateだったstate/resource/algorithm boundaryをkernel共通のcontractへ引き上げ、複数driver・複数hardware・複数execution modelから再利用可能にしたこと**である。
 
@@ -1019,7 +1021,7 @@ Part II–V を通過すると、この2段のつながりを具体的に言え�
 
 表中の `→` は図の記法どおり lineage continuation であり、直接依存を意味しない。また各行は「一つの contract が後続機能を直接生んだ」という因果を主張するものではなく、**共存を可能にした architecture 上の接続点**を要約している。
 
-この6行は Part I の6軸と一対一には対応しない。6軸は「何が変わったか」の分類であり、この表は「何が明示されたから、何が共存できたか」という読み方である。OBSERVABILITY は独立した行ではなく、typed drop reason、queue/NAPI identity、page_pool introspection などを通じ、これらの接続点で実際に何が起きているかを検証する evidence layer として全行にかかる。
+この表の各行は Part I の6軸と一対一には対応しない。6軸は「何が変わったか」の分類であり、この表は「何が明示されたから、何が共存できたか」という読み方である。OBSERVABILITY は独立した行ではなく、typed drop reason、queue/NAPI identity、page_pool introspection などを通じ、これらの接続点で実際に何が起きているかを検証する evidence layer として全行にかかる。
 
 ## Contract に還元しない並行系列
 
@@ -1042,7 +1044,7 @@ Part II–V を通過すると、この2段のつながりを具体的に言え�
 
 - **TX 側の queue assignment** — RX HW queue leasing は 7.1 に入ったが、TX queue leasing は未 merge である。assignment contract は RX 側に偏っている。
 - **global synchronization の縮小** — per-netns RTNL は global RTNL の一括置換ではなく、複数 release にわたる migration である。7.3-rc / mainline の RTNL-less FIB-rule 更新と per-netns netdev unregistration は、その途中経過にあたる。
-- **異種 memory の一般化** — netmem と memory providers は本書の story の中心にあるが、canonical boundary は確定していない（Part VI の boundary-open register）。driver 側も memory-provider-aware であることを次第に求められている段階である。
+- **異種 memory の一般化** — netmem（6.9）と汎用 page_pool memory-provider hooks（6.15）は canonical boundary を確定した。残る課題は、より多くの driver / memory type がこの provider-aware model を利用できるようにすることである。
 - **execution placement の共通化** — switchdev path と TC offload path は並行経路のままであり、XDP も native / generic / offload で実行位置と必要な driver support が異なる。software と hardware のどちらで実行するかを扱う単一の contract はない。
 - **observability の coverage** — drop reason はすべての drop path に付くわけではなく、cross-layer の packet journey は今も tool 側の推論に依存する。
 - **Rust** — networking 側は PHY / core abstraction が中心で、一般的な high-performance NIC driver が Rust へ移行した段階ではない。
@@ -1055,7 +1057,7 @@ Part II–V を通過すると、この2段のつながりを具体的に言え�
 
 # Part VI — Canonical release chronology
 
-ここだけが **release attribution と Ref / status の正本**である。Part I–V の version 表記は story/lineage の参照であり、この表を上書きしない。
+ここだけが **release attribution と Verification status の正本**である。Part I–V の version 表記は story/lineage の参照であり、この表を上書きしない。
 
 ## 採用基準
 
@@ -1067,7 +1069,7 @@ Part VI は release note の網羅表ではない。採用するのは、本文�
 
 ## Verification status
 
-Part VI は chronology であり、この列は **参照先ではなく attribution の検証状態**を示す。以前の `Ref / status` という名称は、`release` 行に直接参照が無いにもかかわらず reference 列に見えるため改めた。外部 source は Part VII の exact anchor と Appendix の source index から辿る。`Verification status` は次の語彙を用いる。
+Part VI は chronology であり、この列は **参照先ではなく attribution の検証状態**を示す。外部 source は Part VII の exact anchor と Appendix の source index から辿る。`Verification status` は次の語彙を用いる。
 
 - **release** — final release containment を確認済み。
 - **anchor: Part VII** — final release に加え、Part VII に40桁 representative mainline SHA がある。
@@ -1129,12 +1131,13 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 4.14    | TCP MSG_ZEROCOPY                     | PERFORMANCE              | —                    | anchor: Part VII     |
 | 4.15    | XDP cpumap                           | PROGRAMMABILITY          | —                    | release            |
 | 4.16    | netdevsim                            | DRIVER FRAMEWORK         | —                    | anchor: Part VII     |
-| 4.16    | Net DIM generation                   | DRIVER FRAMEWORK         | —                    | generation     |
+| 4.16    | Net DIM initial generation                   | DRIVER FRAMEWORK         | —                    | generation     |
 | 4.16    | nftables software flowtable          | PERFORMANCE              | —                    | release            |
 | 4.17    | BPF_PROG_TYPE_SK_MSG                 | PROGRAMMABILITY          | —                    | anchor: Part VII     |
 | 4.18    | AF_XDP                               | MEMORY / PROGRAMMABILITY | —                    | series + release     |
 | 4.18    | page_pool origin / XDP memory return | MEMORY                   | —                    | anchor: Part VII     |
 | 4.18    | TCP_ZEROCOPY_RECEIVE                 | PERFORMANCE              | —                    | release            |
+| 4.18    | BTF origin / typed BPF metadata                           | PROGRAMMABILITY / OBSERVABILITY | —                    | anchor: Part VII |
 | 4.19    | SO_TXTIME                            | PERFORMANCE              | —                    | release            |
 | 4.19    | CAKE                                 | PERFORMANCE              | —                    | release            |
 | 4.20    | TCP EDT                              | PERFORMANCE              | —                    | release            |
@@ -1152,6 +1155,7 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 5.3     | nexthop objects                        | CONTROL PLANE    | —                    | release            |
 | 5.3     | TC ct action                            | PROGRAMMABILITY  | —                    | anchor: Part VII     |
 | 5.3     | DIM generalized into lib/dim           | DRIVER FRAMEWORK | —                    | generation     |
+| 5.3     | Net DIM common-library integration                      | DRIVER FRAMEWORK                | —                    | anchor: Part VII |
 | 5.5     | nftables flowtable hardware offload          | PERFORMANCE / DRIVER FRAMEWORK | —          | release            |
 | 5.5     | mac80211 AQL                           | PERFORMANCE      | —                    | release            |
 | 5.6     | MPTCP                                  | —                | TRANSPORT            | release            |
@@ -1183,11 +1187,13 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 6.7     | TCP-AO                                                | —                                | SECURITY / TRANSPORT | release            |
 | 6.8     | Rust phylib / Asix reference PHY                      | DRIVER FRAMEWORK                 | —                    | anchor: Part VII     |
 | 6.8     | queue/NAPI netdev-genl visibility                     | DRIVER FRAMEWORK / OBSERVABILITY | —                    | generation     |
+| 6.8     | page_pool identity / Netlink introspection              | OBSERVABILITY / MEMORY          | —                    | anchor: Part VII |
 | 6.11    | virtio-net AF_XDP RX zero-copy                        | MEMORY                           | VIRTUAL / OVERLAY    | release            |
 | 6.12    | Device Memory TCP RX                                  | MEMORY                           | —                    | anchor: Part VII |
 | 6.13    | per-netns RTNL infrastructure milestone               | CONTROL PLANE                    | —                    | anchor: Part VII |
 | 6.15    | io_uring ZCRX                                         | MEMORY                           | —                    | anchor: Part VII |
 | 6.15    | further RTNL breakup                                  | CONTROL PLANE                    | —                    | series + release     |
+| 6.15    | page_pool custom memory-provider hooks                  | MEMORY / DRIVER FRAMEWORK       | —                    | anchor: Part VII |
 | 6.16    | Device Memory TCP TX                                  | MEMORY                           | —                    | anchor: Part VII |
 | 6.16    | BPF qdisc                                             | PROGRAMMABILITY                  | —                    | series + release     |
 | 6.18    | AccECN core                                           | —                                | TRANSPORT            | generation     |
@@ -1217,12 +1223,11 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 ## Part VI から Part VII へ — chronology から provenance へ
 
 Part VI は「いつ」を正規化し、Part VII はその attribution を再監査できる exact anchor を保持する。canonical boundary が未確定の項目は Part VI の boundary-open register に集約する。
-
 # Part VII — 正規 provenance ledger
 
 **Evidence model:** Part VII の SHA は feature series の「代表 anchor」であり、anchor の存在だけで series 全体を証明しない。 各項目は **SHA identity / feature correspondence / release containment** を別々に監査する。
 
-**Evidence status:** `mainline; final pending` は authoritative な pull/merge evidence により Linus mainline への merge を確認済みだが、final release tag が未公開の状態を示す。Part VI の Ref / status と一致させる。
+**Evidence status:** `mainline; final pending` は authoritative な pull/merge evidence により Linus mainline への merge を確認済みだが、final release tag が未公開の状態を示す。Part VI の Verification status と一致させる。
 
 ## Exact mainline anchor inventory
 
@@ -1280,32 +1285,13 @@ Part VI は「いつ」を正規化し、Part VII はその attribution を再�
 | RX HW queue leasing generation | merge | `91a4855d6c03e770e42f17c798a36a3c46e63de2` | merge tag `net-next-7.1`; pull message explicitly lists HW queue leasing | v7.1 |
 | net-next 7.3 merge | merge | `91ec2035134982b98fab0609a9fd8480e8217dc1` | merge tag `net-next-7.3` | 7.3 final pending |
 
-### Boundary-open register resolution audit
+### Exact-anchor interpretation notes
 
-r34 まで boundary-open としていた6項目は、単一の「origin」だけを探すのではなく、本文でその項目に与えている architecture 上の役割に対応する anchor を選ぶことで解消した。
+`netmem` と memory providers は別の boundary である。6.9 の `netmem_ref` は **memory type を `struct page` から抽象化する型/API contract**、6.15 の memory-provider hooks は **page_pool が custom allocator/provider を選択する lifecycle/integration contract** である。Device Memory TCP RX は6.12に専用経路で先行し、6.15でdevmem TCPとio_uring ZCRXが共通provider interfaceへ整理された。
 
-| Item | Canonical boundary | Exact anchor | 判断 |
-|---|---:|---|---|
-| Net DIM common library | 5.3 | `4f75da3666c0c572967729a2401ac650be5581b6` | `net_dim` logic を `lib/dim` の `.c` implementation へ移した integration point |
+page_pool introspection は単一commitへ縮約しない。`f17c69649...` が pool ID、`950ab53b...` がNetlink GET、`d49010ad...` がstats exposureを導入するため、この3段階を6.8 generationのrepresentative anchorsとする。
 
-ここで `netmem` と `memory providers` は別の boundary である。6.9 の `netmem_ref` は **memory type を `struct page` から抽象化する型/API contract**、6.15 の memory-provider hooks は **page_pool が custom allocator/provider を選択する lifecycle/integration contract** である。Device Memory TCP はこの2つを利用するconsumerの一つであり、三者を同じoriginとして扱わない。
-
-page_pool introspection も単一commitへ無理に縮約しない。`f17c6964...` が pool ID、`950ab53b...` がNetlink GET、`d49010ad...` がstats exposureを導入しているため、本文の「page_pool objectをdriver-independentに観測可能にした」という主張にはこの3段階が最も監査しやすい。
-
-### Era 4 exact-anchor audit
-
-Era 4 の中心4項目については、release row と exact anchor を次のように対応させる。
-
-| Milestone | Canonical anchor | Anchor interpretation |
-|---|---|---|
-| Device Memory TCP RX (6.12) | `9410645520e9b820069761f3450ef6661418e279` | `net-next-6.12` mainline merge。pull message が Device Memory TCP RX を明示するため generation-level canonical anchor とする |
-| per-netns RTNL start (6.13) | `fcc79e1714e8c2b8e216dc3149812edd37884eef` | `net-next-6.13` mainline merge。「very large, in-progress effort」の開始waveであり完成点とはしない |
-| io_uring ZCRX (6.15) | `71f0dd5a3293d75d26d405ffbaedfdda4836af32` | `io_uring-zero-copy-rx` branch merge。netdev側の queue/memory-provider integration をまとめる |
-| RX HW queue leasing (7.1) | `7789c6bb76acf21539c2c74b0cc869bb57de99e6` + `91a4855d6c03e770e42f17c798a36a3c46e63de2` | 前者を queue-create/lease API の enablement anchor、後者を `net-next-7.1` generation merge とする |
-
-queue leasing は単一 commit で完成した機能ではないため二段 anchor とする。`7789c6bb...` は virtual queue が physical queue を lease する generic `queue-create` API を導入し、`91a4855d...` は Linus mainline の `net-next-7.1` merge message で HW queue leasing generation 全体を明示する。TX queue leasing はこの時点では対象外である。
-
-Net DIM / `lib/dim` は algorithm の driver-local origin と common-library generalization の exact boundary を本版で再確認できていないため、この exact inventory には追加しない。Part VI では `generation` status として扱う。
+per-netns RTNLは6.13で完成した機能ではない。`fcc79e17...` は複数releaseにまたがるmigrationの開始waveをまとめたmerge anchorである。RX HW queue leasingも単一commitではなく、`7789c6bb...`をqueue-create/lease APIのenablement、`91a4855d...`を7.1 generationのmerge anchorとして扱う。
 
 
 # Appendix — Source index（非正規）
