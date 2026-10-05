@@ -131,7 +131,7 @@ DRIVER FRAMEWORK  switchdev / devlink / phylink / DIM / common driver contracts
 
 ### この thesis が説明しないもの
 
-`explicit resource / control contracts` は本書が観察する強い architecture tendency であり、 Linux networking の全変更を説明する万能則ではない。TFO / DCTCP / BBR / MPTCP / PLB / AccECN のような **transport algorithm / protocol evolution**、GRO/GSO / BIG TCP のような **処理単位の拡大**、`dev_queue_xmit()` llist 化のような **implementation scalability** は、それ自体を contract 化として説明しない。これらは対応する architecture axis または cross-cutting domain の lineage で扱う。
+`explicit resource / control contracts` は本書が観察する強い architecture tendency であり、 Linux networking の全変更を説明する万能則ではない。本書は15年間の変化を、少なくとも **(1) resource / control contract の明示化、(2) transport algorithm / protocol semantics の進化、(3) packet-processing unit / batching の拡大、(4) implementation scalability の改善**という並行する系列として読む。TFO / DCTCP / BBR / MPTCP / PLB / AccECN は (2)、GRO/GSO / BIG TCP は (3)、`dev_queue_xmit()` llist 化は (4) の代表例であり、(1) へ還元しない。中心 thesis はこれらを排除するのではなく、**どの系列を説明しているかを限定した上で、並行進化として同じ重みで扱う**。
 
 Observability も7番目の contract form とはしない。typed identity、drop reason、tracepoint、 timestamp などは、resource/control contract と runtime behavior を理解・検証する **evidence layer** と位置付ける。
 
@@ -518,6 +518,27 @@ UDP は GRO/GSO、tunnel/encapsulation、high packet-rate RX、receive-buffer sc
 
 ------------------------------------------------------------------------
 
+## Routing / TC / offload — forwarding semantics と hardware mapping の並行進化
+
+routing / forwarding control は BPF だけでは説明できない。bridge VLAN filtering、MPLS、VRF は Linux 内部の forwarding domain / lookup semantics を明示し、Flower と TC `ct` action は packet field と conntrack state を TC pipeline の match/action model に持ち込んだ。これらは後の hardware offload と接続するが、すべてが switchdev を経由するわけではない。
+
+``` text
+bridge VLAN filtering (3.9) ─┐
+MPLS routing (4.1)          ├─ Linux forwarding / routing semantics
+VRF device (4.3)            ┘
+
+Flower classifier (4.2) → TC match/action → ndo_setup_tc / flow-block callbacks → driver / hardware
+                                      ↘ TC ct action (5.3): conntrack state/metadata in TC
+
+bridge / FIB / VLAN objects → switchdev notifications / objects → switch driver / hardware
+```
+
+ここで2本の offload path を区別する。**bridge/FIB/VLAN の switchdev path** は kernel forwarding objects を switch ASIC へ同期する。一方、**TC offload path** は classifier/action semantics を `ndo_setup_tc`、flow block callbacks、representor 等を介して driver/hardware へ写像する。両者は同じ hardware offload architecture の一部として交差するが、`TC → switchdev → ASIC` という単一の直列 pipeline ではない。
+
+この短い lineage を Part VI の canonical milestone に昇格するのは、後続の routing / TC / offload story を変えた代表点に限定する。添付の未掲載候補のうち TLP/RACK、TUN/TAP multiqueue、ETF、preferred busy polling、XDP metadata、DualPI2 なども重要だが、この版では既存6軸の長期 lineage を変える代表点としては追加せず、候補集として保持する。
+
+------------------------------------------------------------------------
+
 ## Routing / Netlink / RTNL
 
 6.19 の WireGuard YNL-described Netlink は、個別 security protocol の説明ではなく、machine-readable Netlink schema が実 subsystem へ広がる CONTROL PLANE の例としてここに置く。
@@ -684,19 +705,23 @@ switchdev は switch ASIC forwarding を proprietary SDK だけが制御する�
 
 LWN: https://lwn.net/Articles/675826/ https://lwn.net/Articles/676096/
 
-The model represents physical switch ports as normal netdevices and lets bridge, VLAN, routing and related kernel objects drive hardware offload.
+The model represents physical switch ports as normal netdevices and lets bridge, VLAN, routing and related kernel objects drive hardware offload. TC offload は同じ hardware forwarding target と交差し得るが、driver callback path は switchdev notification path と同一ではない。
 
 ``` text
-Linux bridge / FIB / VLAN / TC
-          ↓
-     switchdev model
-          ↓
-     switch ASIC driver
-          ↓
-        hardware
+bridge / FIB / VLAN objects                 TC classifier / actions
+          │                                          │
+          ▼                                          ▼
+switchdev notifications / objects          ndo_setup_tc / flow-block callbacks
+          │                                          │
+          └───────────────┐          ┌───────────────┘
+                          ▼          ▼
+                      switch / NIC driver
+                              │
+                              ▼
+                           hardware
 ```
 
-これは driver の責務における大きな変化であり、driver は Linux networking semantics を hardware 上へ実装する役割を担うようになる。
+これは driver の責務における大きな変化であり、driver は Linux networking semantics を hardware 上へ実装する役割を担うようになる。図の左右は **並行する control/offload entry path** であり、TC が一律に switchdev model を経由することを意味しない。
 
 ### devlink — device 全体を扱う control plane
 
@@ -1114,6 +1139,8 @@ Retis と pwru は上記primitiveを利用する代表例ですが、本書で�
 
 同時に、従来の system-RAM + `skb` path は消えていない。XDP/AF_XDP、offload、 Device Memory TCP、io_uring zero-copy などはそれを全面置換するのではなく、 用途と hardware capability に応じて **複数の execution / memory-ownership model を共存** させる方向へ Linux networking を拡張した。
 
+ただし、この15年間を contract 化だけで要約しない。**transport/protocol** では TFO・DCTCP・BBR・MPTCP・PLB・AccECN が接続確立、輻輳制御、multipath、feedback semantics を更新し、**processing-unit / batching** では GRO/GSO と BIG TCP が1回の処理で扱う単位を拡大した。さらに routing / forwarding では bridge VLAN filtering、MPLS、VRF、Flower、TC conntrack が software forwarding semantics と hardware offload の接点を広げた。これらは explicit-contract lineage と並行して Linux networking の operational range を拡張した、同格の変化である。
+
 この変化には未完の領域もある。TX-side queue leasing は RX-side と同じ意味で完成しておらず、 per-netns RTNL は global RTNL を一括置換したものではない。Rust networking も現時点では PHY/core abstraction を中心とする段階で、一般的な high-performance NIC driver ecosystem が Rust に移行したことを意味しない。これらは「次の release の機能」ではなく、 **explicit contracts の適用範囲が今後どこまで広がるか**という継続課題である。
 
 ## 6軸への回帰
@@ -1163,6 +1190,10 @@ Evidence class は次の語彙だけを用いる。
 
 **Part VI ↔ Part VII invariant:** `TAG+ANCHOR` を使う milestone には Part VII に完全な40桁 SHA が 存在しなければならない。
 
+### Canonical verification bundle
+
+主要 milestone を再検証するときは、**(a) milestone role = origin / integration / enablement / merge、(b) representative 40-digit mainline SHA、(c) first-containing rc tag、(d) first final release** を別フィールドとして扱う。`vX.Y-rc1` と `vX.Y` は同義ではない。Part VI の Release は **first final release** を表し、Part VII の `First containing rc tag` は commit containment を追うための補助情報である。rc tag を未監査の項目は `open` のままにし、final release から逆算して埋めない。
+
 ## Canonical milestone table
 
 ### 3.0–3.18
@@ -1178,6 +1209,7 @@ Evidence class は次の語彙だけを用いる。
 | 3.6     | IPv4 route-cache removal                        | CONTROL PLANE                  | —                 | TAG            |
 | 3.7     | VXLAN                                           | —                              | VIRTUAL / OVERLAY | TAG            |
 | 3.7     | TFO server                                      | —                              | TRANSPORT         | TAG            |
+| 3.9     | bridge VLAN filtering infrastructure              | CONTROL PLANE                  | VIRTUAL / OVERLAY | TAG+ANCHOR     |
 | 3.9     | TCP/UDP SO_REUSEPORT                            | PERFORMANCE                    | —                 | TAG+ANCHOR     |
 | 3.11    | SO_BUSY_POLL                                    | PERFORMANCE                    | —                 | TAG            |
 | 3.12    | sch_fq / TCP pacing / TSO autosizing generation | PERFORMANCE                    | —                 | TAG            |
@@ -1194,8 +1226,11 @@ Evidence class は次の語彙だけを用いる。
 | 3.19    | switchdev origin                     | DRIVER FRAMEWORK         | —                    | TAG            |
 | 3.19    | ipvlan                               | —                        | VIRTUAL / OVERLAY    | TAG            |
 | 3.19    | SO_ATTACH_BPF                        | PROGRAMMABILITY          | —                    | TAG            |
+| 4.1     | MPLS routing / AF_MPLS              | CONTROL PLANE            | VIRTUAL / OVERLAY    | TAG+ANCHOR     |
 | 4.1     | cls_bpf / act_bpf eBPF support       | PROGRAMMABILITY          | —                    | GENERATION     |
 | 4.1     | kprobe BPF milestone                 | OBSERVABILITY            | —                    | GENERATION     |
+| 4.2     | Flower classifier                    | PROGRAMMABILITY          | —                    | TAG+ANCHOR     |
+| 4.3     | VRF device                            | CONTROL PLANE            | VIRTUAL / OVERLAY    | TAG+ANCHOR     |
 | 4.6     | devlink                              | DRIVER FRAMEWORK         | —                    | TAG+ANCHOR     |
 | 4.7     | TC BPF direct packet access          | PROGRAMMABILITY          | —                    | TAG            |
 | 4.8     | XDP                                  | PROGRAMMABILITY          | —                    | SERIES+TAG     |
@@ -1231,6 +1266,7 @@ Evidence class は次の語彙だけを用いる。
 | 5.1     | devlink health                         | DRIVER FRAMEWORK | —                    | TAG            |
 | 5.1     | mac80211 airtime accounting/scheduling | PERFORMANCE      | —                    | TAG            |
 | 5.3     | nexthop objects                        | CONTROL PLANE    | —                    | TAG            |
+| 5.3     | TC ct action                            | PROGRAMMABILITY  | —                    | TAG+ANCHOR     |
 | 5.3     | DIM generalized into lib/dim           | DRIVER FRAMEWORK | —                    | GENERATION     |
 | 5.5     | mac80211 AQL                           | PERFORMANCE      | —                    | TAG            |
 | 5.6     | MPTCP                                  | —                | TRANSPORT            | TAG            |
@@ -1302,35 +1338,40 @@ Part VI は「いつ」を正規化し、Part VII はその attribution を再�
 
 ## Exact mainline anchor inventory
 
-ここに示すのは feature series の全 commit ではなく、再監査可能な代表 anchor である。`Anchor type` は `origin / integration / enablement / merge` の役割を示す。`First containing tag` を本版で再正規化していない項目は `open` とし、推測で補わない。
+ここに示すのは feature series の全 commit ではなく、再監査可能な代表 anchor である。`Anchor type` は `origin / integration / enablement / merge` の役割を示す。`First containing rc tag` と `First final release` は分離する。前者を本版で再正規化していない項目は `open` とし、final release から `-rc1` を推測して補わない。
 
-| Item | Anchor type | Exact mainline anchor | Subject / role | First containing tag |
-|---|---|---|---|---|
-| DQL | origin | `75957ba36c05b979701e9ec64b37819adc12f830` | `dql: Dynamic queue limits` | open |
-| CoDel | origin | `76e3cc126bb223013a6b9a0e2a51238d1ef2e409` | CoDel qdisc core anchor | open |
-| SO_REUSEPORT infrastructure | origin | `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a` | `soreuseport: infrastructure` | open |
-| nftables core | origin | `96518518cc417bb0a8c80b9fb736202e28acdf96` | `netfilter: add nftables` | open |
-| nftables set API | integration | `20a69341f2d00cd042e81c82289fba8a13c05a25` | set-API anchor; not core origin | open |
-| devlink | origin | `bfcd3a46617209454cfc0947ab093e37fd1e84ef` | `Introduce devlink infrastructure` | v4.6-rc1 |
-| BBR | origin | `0f8782ea14974ce992618b55f0c041ef43ed0b78` | initial BBR mainline anchor | open |
-| phylink | origin | `9525ae83959b60c6061fe2f2caabdc8f69a48bc6` | `phylink: add phylink infrastructure` | open |
-| netdevsim | origin | `83c9e13aa39aed5cf9a2f8dd69770b7c35ba1281` | hardware-independent offload test device | v4.16-rc1 |
-| SK_MSG | enablement | `4f738adba30a7cfc006f605707e7aee847ffefa0` | socket-message verdict / `BPF_PROG_TYPE_SK_MSG` | open |
-| TCP MSG_ZEROCOPY | enablement | `f214f915e7db99091f1312c48b30928c1e0c90b7` | `tcp: enable MSG_ZEROCOPY` | open |
-| page_pool origin | origin | `ff7d6b27f894f1469dc51ccb828b7363ccd9799f` | page_pool core origin anchor | open |
-| page_pool/XDP integration | integration | `60bbf7eeef10dc647430646d7fe5e3d8d132dbec` | mlx5 page_pool/XDP integration | open |
-| ethtool Generic Netlink | origin | `2b4a8990b7df55875745a80a609a1ceaaf51f322` | `ethtool: introduce ethtool netlink interface` | open |
-| SK_LOOKUP | origin | `e9ddbb7707ff5891616240026062b8c1e29864ca` | dedicated SK_LOOKUP program type / attach point | open |
-| auxiliary bus | origin | `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` | `Add auxiliary bus support` | v5.11-rc1 |
-| IPv6 BIG TCP / GRO | enablement | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | allow `gro_max_size` > 65536 | open |
-| IPv6 BIG TCP / GSO | enablement | `7c4e983c4f3cf94fcd879730c6caa877e0768a4d` | allow `gso_max_size` > 65536 | open |
-| XFRM packet offload | enablement | `d14f28b8c1de668bab863bf5892a49c824cb110d` | add packet offload flag | open |
-| netkit | origin | `35dfaad7188cdc043fde31709c796f5a692ba2bd` | netkit core anchor | open |
-| Rust PHY abstractions | integration | `f20fd5449ada3872dcd67aca397f0e27ca2e8ad6` | Rust core abstractions for network PHY drivers | v6.8-rc1 |
-| netdev-genl queue object | integration | `bc877956272f0521fef107838555817112a450dc` | YAML spec for queue object | v6.8-rc1 |
-| MPTCP subflow / accepted ADD_ADDR limits | enablement | `c8646664fbf1c0beb0990cef391cb52d3c909e78` | limits expanded to 64 | open |
-| MPTCP endpoint limit | enablement | `e845e6397d78bf6b842cfa8b5818ca8189f7e22e` | endpoint limit expanded to 255 | open |
-| net-next 7.3 merge | merge | `91ec2035134982b98fab0609a9fd8480e8217dc1` | merge tag `net-next-7.3` | mainline snapshot |
+| Item | Anchor type | Exact mainline anchor | Subject / role | First containing rc tag | First final release |
+|---|---|---|---|---|---|
+| DQL | origin | `75957ba36c05b979701e9ec64b37819adc12f830` | `dql: Dynamic queue limits` | open | v3.3 |
+| CoDel | origin | `76e3cc126bb223013a6b9a0e2a51238d1ef2e409` | CoDel qdisc core anchor | open | v3.5 |
+| SO_REUSEPORT infrastructure | origin | `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a` | `soreuseport: infrastructure` | open | v3.9 |
+| nftables core | origin | `96518518cc417bb0a8c80b9fb736202e28acdf96` | `netfilter: add nftables` | open | v3.13 |
+| nftables set API | integration | `20a69341f2d00cd042e81c82289fba8a13c05a25` | set-API anchor; not core origin | open | v3.13 |
+| bridge VLAN filtering | origin | `243a2e63f5f47763b802e9dee8dbf1611a1c1322` | bridge VLAN filtering infrastructure | open | v3.9 |
+| MPLS routing / AF_MPLS | origin | `0189197f441602acdca3f97750d392a895b778fd` | MPLS label-based routing / AF_MPLS | open | v4.1 |
+| Flower classifier | origin | `77b9900ef53ae047e36a37d13a2aa33bb2d60641` | initial `cls_flower` classifier | open | v4.2 |
+| VRF device | origin | `193125dbd8eb292d88feb201f030889b488b0a02` | VRF device / routing-domain separation | open | v4.3 |
+| TC ct action | integration | `b57dc7c13ea90e09ae15f821d2583fa0231b4935` | conntrack state/metadata as TC action | open | v5.3 |
+| devlink | origin | `bfcd3a46617209454cfc0947ab093e37fd1e84ef` | `Introduce devlink infrastructure` | v4.6-rc1 | v4.6 |
+| BBR | origin | `0f8782ea14974ce992618b55f0c041ef43ed0b78` | initial BBR mainline anchor | open | v4.9 |
+| phylink | origin | `9525ae83959b60c6061fe2f2caabdc8f69a48bc6` | `phylink: add phylink infrastructure` | open | v4.14 |
+| netdevsim | origin | `83c9e13aa39aed5cf9a2f8dd69770b7c35ba1281` | hardware-independent offload test device | v4.16-rc1 | v4.16 |
+| SK_MSG | enablement | `4f738adba30a7cfc006f605707e7aee847ffefa0` | socket-message verdict / `BPF_PROG_TYPE_SK_MSG` | open | v4.17 |
+| TCP MSG_ZEROCOPY | enablement | `f214f915e7db99091f1312c48b30928c1e0c90b7` | `tcp: enable MSG_ZEROCOPY` | open | v4.14 |
+| page_pool origin | origin | `ff7d6b27f894f1469dc51ccb828b7363ccd9799f` | page_pool core origin anchor | open | v4.18 |
+| page_pool/XDP integration | integration | `60bbf7eeef10dc647430646d7fe5e3d8d132dbec` | mlx5 page_pool/XDP integration | open | v4.18 |
+| ethtool Generic Netlink | origin | `2b4a8990b7df55875745a80a609a1ceaaf51f322` | `ethtool: introduce ethtool netlink interface` | open | v5.6 |
+| SK_LOOKUP | origin | `e9ddbb7707ff5891616240026062b8c1e29864ca` | dedicated SK_LOOKUP program type / attach point | open | v5.9 |
+| auxiliary bus | origin | `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` | `Add auxiliary bus support` | v5.11-rc1 | v5.11 |
+| IPv6 BIG TCP / GRO | enablement | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | allow `gro_max_size` > 65536 | open | v5.19 |
+| IPv6 BIG TCP / GSO | enablement | `7c4e983c4f3cf94fcd879730c6caa877e0768a4d` | allow `gso_max_size` > 65536 | open | v5.19 |
+| XFRM packet offload | enablement | `d14f28b8c1de668bab863bf5892a49c824cb110d` | add packet offload flag | open | v6.2 |
+| netkit | origin | `35dfaad7188cdc043fde31709c796f5a692ba2bd` | netkit core anchor | open | v6.7 |
+| Rust PHY abstractions | integration | `f20fd5449ada3872dcd67aca397f0e27ca2e8ad6` | Rust core abstractions for network PHY drivers | v6.8-rc1 | v6.8 |
+| netdev-genl queue object | integration | `bc877956272f0521fef107838555817112a450dc` | YAML spec for queue object | v6.8-rc1 | v6.8 |
+| MPTCP subflow / accepted ADD_ADDR limits | enablement | `c8646664fbf1c0beb0990cef391cb52d3c909e78` | limits expanded to 64 | open | v7.2 |
+| MPTCP endpoint limit | enablement | `e845e6397d78bf6b842cfa8b5818ca8189f7e22e` | endpoint limit expanded to 255 | open | v7.2 |
+| net-next 7.3 merge | merge | `91ec2035134982b98fab0609a9fd8480e8217dc1` | merge tag `net-next-7.3` | mainline snapshot | pending v7.3 |
 
 Net DIM / `lib/dim` は algorithm の driver-local origin と common-library generalization の exact boundary を本版で再確認できていないため、この exact inventory には追加せず Open provenance items に残す。
 
@@ -1437,7 +1478,18 @@ subsystem pull / Linus mainline
 released tag
 ```
 
+
+## Unpromoted milestone candidate set — r25 review
+
+添付の `exclusions.md` は canonical table の「漏れ一覧」ではなく、**次の再監査候補集**として扱う。r25 では reviewer が指摘した routing / TC / offload の空白を埋めるため、bridge VLAN filtering (3.9)、MPLS routing (4.1)、Flower (4.2)、VRF (4.3)、TC `ct` action (5.3) の5件だけを Part VI / VII へ昇格した。
+
+その他の TUN/TAP multiqueue、TLP/RACK、ETF、CBS、GTP-U、SRv6、preferred busy polling、XDP RX/TX metadata、DualPI2、`netdev_work` 等は重要な機能だが、現行の採用基準では「本文の長期 lineage を代表する canonical point」とする追加理由を個別に監査してから昇格する。**未掲載 = 重要でない**ではない。
+
 # Changelog / Errata（非正規）
+- **r25:** routing / TC / offload の短い lineage を追加し、bridge VLAN filtering (3.9)、MPLS routing (4.1)、Flower (4.2)、VRF (4.3)、TC `ct` action (5.3) を canonical milestone / exact-anchor inventory に追加。
+- **r25:** switchdev 図を bridge/FIB/VLAN の switchdev path と TC の `ndo_setup_tc` / flow-block path の並行経路へ修正。
+- **r25:** Part VII の `First containing tag` を `First containing rc tag` と `First final release` に分離し、未監査 rc containment は `open` のまま維持。Part VI に canonical verification bundle を追加。
+- **r25:** synthesis で explicit-contract thesis と transport/protocol、processing-unit/batching、implementation-scalability、routing/forwarding の並行進化を同格に明記。
 - **r24:** RTNL の progression を `⇒` から `→` に変更。一つの feature の direct extension ではなく、global RTNL dependency を縮小する複数の locking/refactoring techniques の lineage として扱う。BIG TCP など direct extension が明確な系列の `⇒` は維持。
 
 - **r23:** WireGuard 5.6 を `SECURITY / VIRTUAL / OVERLAY` とし、`evidence grade` の残語を `Evidence class` へ修正。netmem / memory providers の Part VI 未収載が意図的な open provenance であることを明記。
