@@ -1185,11 +1185,11 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 6.8     | Rust phylib / Asix reference PHY                      | DRIVER FRAMEWORK                 | —                    | anchor: Part VII     |
 | 6.8     | queue/NAPI netdev-genl visibility                     | DRIVER FRAMEWORK / OBSERVABILITY | —                    | generation     |
 | 6.11    | virtio-net AF_XDP RX zero-copy                        | MEMORY                           | VIRTUAL / OVERLAY    | release            |
-| 6.12    | Device Memory TCP RX                                  | MEMORY                           | —                    | series         |
-| 6.13    | per-netns RTNL infrastructure milestone               | CONTROL PLANE                    | —                    | series         |
-| 6.15    | io_uring ZCRX                                         | MEMORY                           | —                    | series + release     |
+| 6.12    | Device Memory TCP RX                                  | MEMORY                           | —                    | anchor: Part VII |
+| 6.13    | per-netns RTNL infrastructure milestone               | CONTROL PLANE                    | —                    | anchor: Part VII |
+| 6.15    | io_uring ZCRX                                         | MEMORY                           | —                    | anchor: Part VII |
 | 6.15    | further RTNL breakup                                  | CONTROL PLANE                    | —                    | series + release     |
-| 6.16    | Device Memory TCP TX                                  | MEMORY                           | —                    | series + release     |
+| 6.16    | Device Memory TCP TX                                  | MEMORY                           | —                    | anchor: Part VII |
 | 6.16    | BPF qdisc                                             | PROGRAMMABILITY                  | —                    | series + release     |
 | 6.18    | AccECN core                                           | —                                | TRANSPORT            | generation     |
 | 6.18    | UDP RX evolution                                      | PERFORMANCE                      | —                    | generation     |
@@ -1200,7 +1200,7 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 7.0     | IPv6 BIG TCP without synthetic HBH jumbo header       | PERFORMANCE                      | —                    | release            |
 | 7.0     | AccECN enablement                                     | —                                | TRANSPORT            | release            |
 | 7.0     | large RX buffers for memory providers / io_uring ZCRX | MEMORY                           | —                    | release            |
-| 7.1     | RX HW queue leasing                                   | MEMORY / DRIVER FRAMEWORK        | —                    | release            |
+| 7.1     | RX HW queue leasing                                   | MEMORY / DRIVER FRAMEWORK        | —                    | anchor: Part VII |
 | 7.1     | dedicated qdisc-drop tracepoint                       | OBSERVABILITY                    | —                    | release            |
 | 7.3-rc  | BIG TCP over VXLAN/GENEVE                             | PERFORMANCE                      | VIRTUAL / OVERLAY    | mainline; final pending       |
 | 7.3-rc  | RTNL-less FIB-rule updates                            | CONTROL PLANE                    | —                    | mainline; final pending       |
@@ -1232,7 +1232,14 @@ Part VI は「いつ」を正規化し、Part VII はその attribution を再�
 
 ## Exact mainline anchor inventory
 
-ここに示すのは feature series の全 commit ではなく、再監査可能な代表 anchor である。`Anchor type` は `origin / integration / enablement / merge` の役割を示す。本文の台帳では **representative SHA と first final release** に絞る。first-containing rc tag の機械監査は読者向け chronology の理解に必須ではないため、作業ログへ分離する。
+ここに示すのは feature series の全 commit ではなく、再監査可能な代表 anchor である。`Anchor type` は次の意味で使う。
+
+- `origin` — object / mechanism の最初の mainline anchor
+- `enablement` — feature を実際に利用可能にした代表 commit
+- `integration` — subsystem 間を接続した代表 commit
+- `merge` — multi-commit series / generation を Linus mainline に統合した canonical merge
+
+巨大な series を恣意的な1 patchで代表させるより、pull/merge message が feature generation を明示する場合は `merge` を優先する。特に per-netns RTNL のような複数 release にまたがる migration では、`merge` は「完成 commit」ではなく **その generation の開始/統合点**を意味する。本文の台帳では representative SHA と first final release に絞り、first-containing rc tag の機械監査は作業ログへ分離する。
 
 | Item | Anchor type | Exact mainline anchor | Subject / role | First final release |
 |---|---|---|---|---|
@@ -1259,11 +1266,30 @@ Part VI は「いつ」を正規化し、Part VII はその attribution を再�
 | auxiliary bus | origin | `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` | `Add auxiliary bus support` | v5.11 |
 | IPv6 BIG TCP / GRO | enablement | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | allow `gro_max_size` > 65536 | v5.19 |
 | IPv6 BIG TCP / GSO | enablement | `7c4e983c4f3cf94fcd879730c6caa877e0768a4d` | allow `gso_max_size` > 65536 | v5.19 |
+| Device Memory TCP RX | merge | `9410645520e9b820069761f3450ef6661418e279` | merge tag `net-next-6.12`; Device Memory TCP RX generation | v6.12 |
+| per-netns RTNL start | merge | `fcc79e1714e8c2b8e216dc3149812edd37884eef` | merge tag `net-next-6.13`; initial per-netns RTNL conversion wave, explicitly in-progress | v6.13 |
+| io_uring ZCRX | merge | `71f0dd5a3293d75d26d405ffbaedfdda4836af32` | merge branch `io_uring-zero-copy-rx`; queue-bound userspace-page RX / memory-provider integration | v6.15 |
+| Device Memory TCP TX | merge | `1b98f357dadd6ea613a435fbaef1a5dd7b35fd21` | merge tag `net-next-6.16`; Device Memory TCP transmit path | v6.16 |
 | XFRM packet offload | enablement | `d14f28b8c1de668bab863bf5892a49c824cb110d` | add packet offload flag | v6.2 |
 | netkit | origin | `35dfaad7188cdc043fde31709c796f5a692ba2bd` | netkit core anchor | v6.7 |
 | Rust PHY abstractions | integration | `f20fd5449ada3872dcd67aca397f0e27ca2e8ad6` | Rust core abstractions for network PHY drivers | v6.8 |
 | netdev-genl queue object | integration | `bc877956272f0521fef107838555817112a450dc` | YAML spec for queue object | v6.8 |
+| RX HW queue leasing / queue-create | enablement | `7789c6bb76acf21539c2c74b0cc869bb57de99e6` | `net: Add queue-create operation`; virtual RX queue may lease a physical RX queue | v7.1 |
+| RX HW queue leasing generation | merge | `91a4855d6c03e770e42f17c798a36a3c46e63de2` | merge tag `net-next-7.1`; pull message explicitly lists HW queue leasing | v7.1 |
 | net-next 7.3 merge | merge | `91ec2035134982b98fab0609a9fd8480e8217dc1` | merge tag `net-next-7.3` | 7.3 final pending |
+
+### Era 4 exact-anchor audit
+
+Era 4 の中心4項目については、release row と exact anchor を次のように対応させる。
+
+| Milestone | Canonical anchor | Anchor interpretation |
+|---|---|---|
+| Device Memory TCP RX (6.12) | `9410645520e9b820069761f3450ef6661418e279` | `net-next-6.12` mainline merge。pull message が Device Memory TCP RX を明示するため generation-level canonical anchor とする |
+| per-netns RTNL start (6.13) | `fcc79e1714e8c2b8e216dc3149812edd37884eef` | `net-next-6.13` mainline merge。「very large, in-progress effort」の開始waveであり完成点とはしない |
+| io_uring ZCRX (6.15) | `71f0dd5a3293d75d26d405ffbaedfdda4836af32` | `io_uring-zero-copy-rx` branch merge。netdev側の queue/memory-provider integration をまとめる |
+| RX HW queue leasing (7.1) | `7789c6bb76acf21539c2c74b0cc869bb57de99e6` + `91a4855d6c03e770e42f17c798a36a3c46e63de2` | 前者を queue-create/lease API の enablement anchor、後者を `net-next-7.1` generation merge とする |
+
+queue leasing は単一 commit で完成した機能ではないため二段 anchor とする。`7789c6bb...` は virtual queue が physical queue を lease する generic `queue-create` API を導入し、`91a4855d...` は Linus mainline の `net-next-7.1` merge message で HW queue leasing generation 全体を明示する。TX queue leasing はこの時点では対象外である。
 
 Net DIM / `lib/dim` は algorithm の driver-local origin と common-library generalization の exact boundary を本版で再確認できていないため、この exact inventory には追加しない。Part VI では `generation` status として扱う。
 
