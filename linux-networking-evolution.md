@@ -729,100 +729,64 @@ UDP は GRO/GSO、tunnel/encapsulation、high packet-rate RX、receive-buffer sc
 
 前章では networking mechanism を end-to-end の lineage として追った。Part IV では視点を変え、個々の driver の責務のうち何が共通 networking-core framework へ移されたかを見る。
 
-# Part IV — Network Device Driver Framework の進化
+# Part IV — Network Device Driver Framework
 
-本章では networking core と driver の間の contract に焦点を当てる。`page_pool`、AF_XDP、Device Memory TCP、io_uring は Part III にも登場するが、ここでは feature 全体の歴史ではなく、**driver から見た queue / memory ownership** の役割を扱う。
+Part III が packet path / control path の長期 lineage を追ったのに対し、Part IV は **driver-local な実装知識がどのように共通 framework / object / API へ引き上げられたか**を見る。ここで重要なのは、個々の driver の高速化ではなく、NIC が持つ queue、link、switch、health、memory、interrupt moderation などの能力を networking core から共通に扱えるようにしたことである。
 
-## Driver-framework projection
-
-Part VI で DRIVER FRAMEWORK を主軸または副軸に持つ milestone を architecture story の観点から投影する。 release attribution / Ref / status はここでは再定義しない。
-
-| Release     | Driver-framework milestone                  | Architectural effect                                                |
-|-------------|---------------------------------------------|---------------------------------------------------------------------|
-| 3.3         | DQL/BQL                                     | common TX queue accounting / backpressure                           |
-| 3.19        | switchdev origin                            | kernel forwarding objects と switch-ASIC offload の接続             |
-| 4.6         | devlink                                     | device/ASIC-wide resource/control object                            |
-| 4.14        | phylink                                     | common MAC/PHY/PCS/SFP state machine                                |
-| 4.16 / 5.3  | Net DIM → `lib/dim`                         | adaptive interrupt moderation の common library 化                  |
-| 4.16        | netdevsim                                   | physical hardware なしで common offload API を test                 |
-| 5.1         | devlink health                              | common health reporting/recovery                                    |
-| 5.6         | ethtool Generic Netlink                     | structured/extensible driver management ABI                         |
-| 5.11        | auxiliary bus                               | complex device subfunction の独立 binding                           |
-| 5.12 / 6.19 | threaded NAPI → kthread busy-poll extension | NAPI execution model の明示化/拡張                                  |
-| 6.2         | XFRM packet offload                         | packet-level IPsec offload contract                                 |
-| 6.8         | Rust phylib                                 | safe driver abstraction の networking-side representative milestone |
-| 6.8         | queue/NAPI netdev-genl visibility           | queue/NAPI identity を generic object として公開                    |
-| 7.1         | RX HW queue leasing                         | physical queue assignment を explicit contract 化                   |
-
-page_pool / memory providers は MEMORY 軸を主とするため、この projection table ではなく Part III `Packet memory` と本章後半の memory-contract 説明で扱う。
-
-### 長期的な architecture の変化
+この流れは一つの framework が他を置き換えた歴史ではない。
 
 ``` text
-driver-private mechanisms
-        ↓
-common queue/backpressure · link · offload · device-control contracts
-        ↓
-structured/testable userspace-visible APIs
-        ↓
-queue / NAPI / page-pool objects
-        ↓
-queue-bound memory providers
-
-parallel language-safety track:
-C driver APIs ⇒ Rust-safe abstractions ⇒ Rust PHY / driver-core expansion
+driver-local convention
+   │
+   ├─ queue accounting ───────→ DQL/BQL
+   ├─ link topology ──────────→ phylink
+   ├─ switch datapath ────────→ switchdev
+   ├─ device control/health ──→ devlink
+   ├─ interrupt moderation ───→ DIM
+   ├─ packet memory ──────────→ page_pool → netmem / providers
+   └─ queue/NAPI identity ────→ netdev-genl
 ```
 
-後半の変化は特に重要である。modern netdev では、従来 driver 内部の不透明な実装詳細だったものを、ID と関係性を持つ generic object として公開する方向が強まっている。
+これらは別々の subsystem だが、共通する方向は **「driver 内部にしか見えなかった resource/state を kernel 共通の contract として表現する」**ことである。
 
-本章では個々の NIC driver を網羅的には列挙しない。Linux network driver に要求される実装を変化させ、driver ごとに重複していた仕組みを再利用可能な kernel framework へ移した common infrastructure を追う。
+## Queue accounting — DQL/BQL
 
-## Linux 3.0 時点の出発点
+DQL/BQL は driver ring の大きさそのものを標準化する framework ではない。driver/NIC に渡した bytes と completion された bytes を accounting し、software queue が device に過剰な backlog を押し込むのを抑える仕組みである。
 
-Linux 3.0 の時点で NAPI と multiqueue networking はすでに確立していた。RPS/RFS は 2.6.35、XPS は 2.6.38 で導入済みであり、v3.x の driver model はすでに次の要素を中心としていた。
+Part III の queueing 節では BQL を latency / pacing の一部として扱った。driver-framework の観点では、より重要なのは **各 driver が経験則で決めていた outstanding work を共通 accounting model にしたこと**である。
 
 ``` text
-RX/TX descriptor rings
-IRQ / MSI-X
-NAPI poll contexts
-multiple RX/TX queues
-RSS in hardware
-RPS/RFS/XPS in the stack
-ethtool + net_device_ops
+qdisc
+  │
+  ▼
+driver queue
+  │   enqueue bytes
+  ├──────────────→ DQL/BQL accounting
+  │                    ▲
+  ▼                    │ completed bytes
+NIC ring ───────────────┘
 ```
 
-したがって v3.x における重要な変化は NAPI の発明ではなく、driver と共通 networking-core algorithm の協調が強まったことである。
+したがって BQL の contract form は ownership ではなく **accounting / backpressure** である。
 
-## Linux 3.3 — DQL/BQL: queue control が共通 core へ移る
+## switchdev — kernel forwarding object と switch ASIC
 
-DQL/BQL は、この変化を示す初期の代表例である。
+switchdev は Linux bridge/FDB/VLAN などの kernel forwarding state を switch ASIC に同期するための framework として発展した。目的は「hardware switch を特別な別世界として管理する」ことではなく、Linux networking object を canonical control state として維持しながら forwarding execution を hardware に配置できるようにすることである。
 
 ``` text
-old:
-  each driver/hardware queue can accumulate excessive TX backlog
-
-DQL/BQL:
-  common dynamic queue-limit algorithm
-  + driver reports queued/completed bytes
-  + core dynamically controls outstanding data
+Linux bridge / FDB / VLAN / FIB objects
+                  │
+                  ▼
+        switchdev notifications
+                  │
+                  ▼
+             switch driver
+                  │
+                  ▼
+                 ASIC
 ```
 
-
-LWN series: https://lwn.net/Articles/469651/ https://lwn.net/Articles/469652/
-
-Driver Framework の観点では、performance policy が個々の driver から再利用可能な net core infrastructure へ移り始めたことに意味がある。
-
-## Offload / device-object contracts — hardware が Linux networking の first-class object になる
-
-### switchdev — Linux 3.19 で始まり 4.x で拡大
-
-The initial switchdev infrastructure belongs to the Linux 3.19 generation. The 4.x era is where the model expands into the broader hardware-offload architecture discussed below.
-
-switchdev は switch ASIC forwarding を proprietary SDK だけが制御する孤立した仕組みではなく、Linux driver model の一部として扱えるようにする。
-
-LWN: https://lwn.net/Articles/675826/ https://lwn.net/Articles/676096/
-
-The model represents physical switch ports as normal netdevices and lets bridge, VLAN, routing and related kernel objects drive hardware offload. TC offload は同じ hardware forwarding target と交差し得るが、driver callback path は switchdev notification path と同一ではない。
+ただし TC hardware offload はこの直列 path の一部ではない。TC classifier/action の offload は `ndo_setup_tc` や flow-block callback など別の kernel API path を通り、driver/hardware 側で switchdev 系の forwarding object と交差し得る。
 
 ``` text
 bridge / FIB / VLAN objects                 TC classifier / actions
@@ -838,336 +802,155 @@ switchdev notifications / objects          ndo_setup_tc / flow-block callbacks
                            hardware
 ```
 
-これは driver の責務における大きな変化であり、driver は Linux networking semantics を hardware 上へ実装する役割を担うようになる。図の左右は **並行する control/offload entry path** であり、TC が一律に switchdev model を経由することを意味しない。
+この区別は Part III の Routing / TC / offload 節で説明した control-path separation を、driver API 側から見たものである。
 
-### devlink — device 全体を扱う control plane
+## devlink — device-wide control object
 
-devlink series (v3): https://lwn.net/Articles/677967/
-
-devlink fills a gap left by `net_device`: many settings belong to the whole ASIC/device, not one network interface.
-
-Examples include:
+devlink は port/netdev 単位だけでは表しにくい **device-wide resource / parameter / port / health state** を扱う object として導入された。特に switch ASIC や SmartNIC のように、一つの device が複数 port、representor、resource、firmware state を持つ場合、netdev だけでは device 全体の control plane を表現しにくい。
 
 ``` text
-device resources
-port splitting
-shared buffers
-eswitch mode
-device parameters
-firmware / health
+PCI / physical device
+        │
+        ▼
+     devlink
+   ├─ ports
+   ├─ resources
+   ├─ parameters
+   ├─ regions
+   └─ health reporters
+        │
+        ├─ netdev / representor
+        └─ driver / firmware / ASIC
 ```
 
-Linux 5.1 later adds devlink health reporting/recovery as a generic mechanism.
+devlink health はこの object model を observability/recovery に広げた。driver-specific debug command の集合ではなく、reporter、diagnose、dump、recover という共通 interface を通して failure state を扱う点に意味がある。
 
-This establishes a useful split:
+devlink は datapath 自体を提供しない。switchdev/TC offload が「どこで forwarding を実行するか」を扱うのに対し、devlink はその device の **resource / configuration / health lifecycle** を扱う。
 
-``` text
-net_device / ethtool
-  interface-facing behavior
+## phylink — link topology と MAC/PHY/PCS coordination
 
-devlink
-  device / ASIC / resource / health behavior
-```
-
-### phylink と SFP
-
-phylink/SFP の初期 RFC は design provenance として扱い、mainline anchor と release containment は Part VII / Part VI に委ねる。
-
-The 2015 phylink/SFP RFC addresses a recurring driver problem: MAC, PHY, PCS/SerDes and hot-pluggable SFP combinations could not be modeled cleanly by simple PHY attachment.
-
-RFC: https://lwn.net/Articles/667055/
-
-Conceptually:
+phylink は MAC driver が PHY、fixed-link、SFP、PCS などの link topology を個別に扱う重複を減らす framework である。4.14 世代に導入され、link negotiation / mode change / carrier state に関する共通 orchestration を networking core 側へ引き上げた。
 
 ``` text
 MAC driver
+    │
+  phylink
+ ┌──┼──────────────┐
+ ▼  ▼              ▼
+PHY PCS        fixed-link / SFP
+```
+
+重要なのは「PHY APIを置き換えた」ことではない。MAC と link-side component の関係を framework が仲介し、driver が topology ごとの state machine を重複実装する必要を減らしたことである。
+
+Rust PHY abstraction もこの lineage 上に置ける。Rust networking support の初期段階では、high-performance NIC driver 全体を書き換えるより、PHY abstraction のような比較的明確な interface boundary から型安全な binding/abstraction を作る方向が先行した。
+
+## DIM — interrupt moderation policy の共通化
+
+Dynamic Interrupt Moderation (DIM) は packet/byte/event rate を観測し、interrupt coalescing parameter を workload に応じて調整する仕組みである。複数 driver が似た adaptive moderation logic を独自実装する代わりに、測定と profile selection を共通 library/framework に寄せた。
+
+``` text
+packet / byte / event samples
+          │
+          ▼
+        DIM
+          │
+   profile decision
+          │
+          ▼
+driver coalescing parameters
+```
+
+これは datapath ownership の contract ではなく、**measurement → policy decision → driver setting** を再利用可能にした framework 化の例である。
+
+## page_pool — packet-memory lifecycle の共通化
+
+page_pool の詳細な発展史は Part III「Packet memory」で扱う。ここでは driver framework としての意味だけに絞る。
+
+従来、RX driver は page allocation、DMA mapping、recycling、fragment handling を driver ごとに組み合わせていた。page_pool は RX packet memory の allocation/recycling lifecycle と DMA-aware handling を共通化し、XDPを含む高速RX pathから利用できる framework を提供した。
+
+``` text
+RX queue
    │
- phylink
-   ├── PHY
-   ├── PCS / SerDes
-   └── SFP module
-```
-
-This progressively removes link-mode state-machine duplication from Ethernet MAC drivers.
-
-### VF representor と SmartNIC/DPU control
-
-Representors extend the switchdev idea to SR-IOV embedded switches and later SmartNIC/DPU architectures.
-
-LWN: https://lwn.net/Articles/692942/
-
-A representor is both a control-plane representation of a VF/SF and a netdevice endpoint through which the normal Linux stack can control the virtual switch.
-
-This is the foundation for the now-familiar:
-
-``` text
-PF / uplink
-   │
-embedded switch
- ├─ VF representor
- ├─ VF representor
- └─ SF / other representors
-       ↓
-bridge / TC / OVS / routing
-       ↓
-hardware offload
-```
-
-### XDP が driver fast path を変える
-
-Linux 4.8 introduces first-generation XDP. From the driver’s point of view the important change is that the RX path gains a programmable hook before skb allocation / normal stack processing.
-
-Kernel Recipes 2018 explicitly describes XDP as a programmable layer running in device driver context: https://archives.kernel-recipes.org/document/xdp-a-new-programmable-network-layer/
-
-This creates new common driver responsibilities:
-
-``` text
-construct xdp_buff
-run XDP program
-handle PASS / DROP / TX / REDIRECT
-support ndo_xdp_xmit
-manage RX memory so buffers can move between RX/XDP/TX
-```
-
-The last point is one of the pressures that increased the value of a common RX-memory recycling infrastructure such as page_pool; page_pool was not created solely for XDP.
-
-### USENIX research に見る XDP / SmartNIC offload
-
-OSDI 2020 の **hXDP** は、Linux XDP/eBPF の program model、map、helper semantics を FPGA NIC 上へ持ち込み、unmodified eBPF program を NIC 側で実行する研究である。これは upstream XDP hardware-offload の release provenance ではないが、XDP が **Linux の programmable-datapath semantics を hardware execution target へ投影できる abstraction** として研究されたことを示す。USENIX ATC 2022 の program-warping work はこの方向をさらに最適化した。
-
-NSDI 2023 の **IO-TCP** は TCP stack の control plane を CPU 側に保持しつつ、disk I/O と TCP packet-transfer data plane を SmartNIC へ offload する split-stack design を示した。upstream feature そのものではないが、「canonical semantics/control は host に保持し、data movement / fast path を device へ移す」という driver/offload architecture の比較材料になる。
-
-### DIM — interrupt moderation の共通 library 化
-
-
-Netdev 0x12 (2018) presented DIM as a driver-independent Dynamic Interrupt Moderation library.
-
-https://www.netdevconf.info/0x12/
-
-Rather than every driver inventing adaptive interrupt/coalescing algorithms:
-
-``` text
-driver samples events/bytes/packets
-        ↓
-common DIM algorithm
-        ↓
-profile decision
-        ↓
-driver programs hardware moderation
-```
-
-This is another example of extracting policy from drivers into common netdev infrastructure.
-
-### page_pool — RX memory management の共通 infrastructure 化
-
-The page_pool work was motivated by drivers independently reinventing high-speed DMA page recycling. A 2016 RFC explicitly described it as a generic API for streaming-DMA page pools, and the refurbished implementation appears in the 2018 XDP-era work.
-
-Key late series: https://lists.openwall.net/netdev/2018/03/31/91
-
-Modern page_pool provides a common allocation/recycling/DMA model for skb and XDP buffers.
-
-``` text
-before:
- driver-specific RX allocator
- driver-specific recycling
- driver-specific DMA lifetime tricks
-
-after:
-        page_pool
-       /         \
-     skb       xdp_frame
-       \         /
-     common recycling
-```
-
-Its importance grows well beyond the original XDP motivation. By Netdev 0x19, page_pool is described as the standard RX datapath memory-management mechanism, and newer zero-copy features require drivers to integrate with it.
-
-## Operational driver infrastructure — management API・health・共通 library
-
-### devlink health
-
-Linux 5.1 adds generic devlink health reporting and recovery.
-
-Netdev 0x13 describes the goals as:
-
-``` text
-real-time alerting
-driver debug information
-self-healing / recovery
-vendor-support data collection
-```
-
-Conference provenance は Appendix に集約する。
-
-This changes hardware error handling from driver-specific logs/private tools toward a common operational model.
-
-### ethtool ioctl → Generic Netlink
-
-The ethtool netlink work addresses limitations of the old ioctl ABI: extensibility, races, error reporting and lack of notifications.
-
-Series: https://lwn.net/Articles/808028/ https://lwn.net/Articles/810618/
-
-Architecturally this is not just a userspace-tool rewrite. It creates a structured, extensible management API between userspace, networking core and drivers.
-
-### netdevsim と selftest-driven driver API design
-
-`netdevsim` becomes an important test vehicle for driver-facing APIs. Current netdev maintainer documentation explicitly encourages new driver configuration APIs to have netdevsim/selftest coverage, while also requiring a real driver use case.
-
-This changes the development model:
-
-``` text
-new driver API
-   ↓
-generic implementation
-   ↓
-netdevsim model + selftests
-   ↓
-real hardware driver
-```
-
-Driver frameworks are increasingly expected to be testable without the physical NIC.
-
-### auxiliary bus — 1つの PCI device と複数 subsystem driver
-
-Merged for Linux 5.11, the auxiliary bus addresses complex devices exposing Ethernet, RDMA, vDPA and related functions from shared hardware.
-
-Instead of ad-hoc cross-driver glue:
-
-``` text
-              PCI function
-                   │
-              parent/core
-             /      |      \
-        netdev     RDMA    vDPA
-       auxiliary drivers / devices
-```
-
-This becomes increasingly important for SmartNIC/IPU/DPU architectures.
-
-## Explicit queue / memory contracts — queue・NAPI・memory provider の object 化
-
-### page_pool の可観測化
-
-2023 page_pool netlink introspection associates pools with netdevices and NAPI IDs and exports allocation/recycling/memory information.
-
-LWN: https://lwn.net/Articles/948718/
-
-This is an important architectural transition:
-
-``` text
-page_pool as hidden driver implementation detail
-                 ↓
-page_pool as identifiable / observable netdev resource
-```
-
-### queue / NAPI object の generic netdev API 化
-
-Netdev 0x17 discusses exposing queues and NAPI instances through `netdev-genl`.
-
-https://netdevconf.info/0x17/sessions/talk/netlink-apis-to-exposeconfigure-netdev-objects.html
-
-The proposed/ongoing model makes properties such as these explicit:
-
-``` text
-queue
- ├─ NAPI instance
- ├─ stats
- ├─ memory model
- └─ XDP / zero-copy capabilities
-
-NAPI
- ├─ NAPI ID
- ├─ device
- ├─ IRQ
- └─ thread / CPU relationship
-```
-
-This is a conceptual shift from “the driver owns opaque rings” toward explicit queue / NAPI / memory objects with stable identities and API-defined properties.
-
-ただし **可視化・設定・割り当て・ownership は同義ではない**。API ごとに許される操作は異なり、 ある object を userspace から列挙・参照できても、その lifetime や ownership を userspace が自由に 変更できるとは限らない。netdev-genl の read/configuration API、memory-provider registration、 queue-leasing のような assignment mechanism は、それぞれ capability と permission boundary を個別に読む必要がある。
-
-This connects conceptually to Device Memory TCP, io_uring ZCRX and queue-leasing work elsewhere in this document, but does not imply that one generic API grants all of those control operations.
-
-### page_pool → netmem → memory providers
-
-driver-framework view of the memory lineage is:
-
-``` text
-driver-private RX recycling
-        ↓
+   ▼
 page_pool
-        ↓
-page_pool as common driver contract
-        ↓
-netmem abstraction
-        ↓
-memory providers
-        ↓
-host pages / userspace memory / device memory
+   ├─ allocate
+   ├─ DMA-aware lifecycle
+   └─ recycle
+        │
+        ▼
+      driver
 ```
 
-Kernel Recipes 2024 の公開 abstract が直接述べるのは、kernel network stack を利用し、vanilla TCP と互換性のある zero-copy receive の設計である。NIC / firmware / driver support、page_pool、netmem、queue configuration という具体的な実装依存関係は abstract 自体ではなく、同 conference の live blog と後続 upstream implementation から確認する。
+後年の netmem / memory providers / Device Memory TCP は page_pool の単純な後継ではない。しかし page_pool が **packet memory lifetime を driver-private convention から共通 objectへ移した**ことが、system RAM以外のmemory providerを扱うための重要な前提になった。
 
-つまり modern high-speed network driver は、単に `struct page` を allocate するだけではなく、次第に **memory-provider-aware** であることを求められている。
+ここではPart IIIと同じrelease chronologyを繰り返さず、driver-frameworkとしての役割だけを保持する。
 
-### XFRM device / IPsec packet offload
+## auxiliary bus — device 内部機能の分割
 
-XFRM device offload is another common driver-framework contract. The important 6.2 generation extends the model from crypto acceleration to packet offload, where the NIC can own SA/policy processing as well as encryption/decryption.
+auxiliary bus は、一つのphysical device/PCI functionに含まれる複数の機能を、親driverと補助driverの間で分離して扱うための共通 infrastructure である。networking専用ではないが、SmartNIC/RDMA/network driverのように一つのdeviceが複数subsystemへ機能を公開する構成で重要になった。
+
+これは devlink のような userspace-visible control object とは役割が異なる。auxiliary bus は **driver composition / binding boundary** を提供する。
+
+## threaded NAPI — execution context の選択肢
+
+NAPI は通常 softirq context でpollされるが、threaded NAPI はpoll処理をkernel threadで実行できる選択肢を追加した。これはXDPやAF_XDPのような新しいpacket pathではなく、既存NAPI processingの **execution context / scheduling placement** を変える仕組みである。
+
+real-time性、CPU scheduling、isolationの要件によってsoftirqとthreaded executionを選択できる点が重要であり、「一つの最適なNAPI execution model」へ統一する変更ではない。
+
+## ethtool netlink と YNL — driver control API の構造化
+
+従来のethtool ioctl interfaceは長年利用されてきたが、機能追加、dump、notification、extensible attributeという面ではNetlinkの方が扱いやすい。ethtool netlinkはlink modes、coalescing、channelsなどのdevice configurationをstructured Netlink APIへ移す方向を示した。
+
+さらにYNLはNetlink familyのschemaをmachine-readableに記述し、policy/documentation/userspace helper生成へ接続する。ethtool netlinkとYNLは同じfeatureではないが、
 
 ``` text
-XFRM core
-   ↓ state + policy synchronization
-xfrmdev_ops
-   ↓
-NIC driver
-   ↓
-IPsec hardware pipeline
+ad-hoc ioctl / hand-written Netlink
+              ↓
+structured Netlink objects
+              ↓
+machine-readable schema / generated tooling
 ```
 
-This is the same architectural pattern seen in switchdev and TC offload: the kernel keeps the canonical networking semantics while the driver maps those semantics onto hardware.
+というcontrol APIの長期的な方向を示す。
 
-## Rust — common driver contracts を safe abstraction として表現する parallel track
+## netdev-genl — queue / NAPI identity を control-plane object へ
 
-Rust は networking architecture の主 lineage ではなく、common C driver contracts が明確になるほど、 その ownership / lifetime / state-machine boundary を型安全な abstraction として表現できる、という **parallel language-safety track** として扱う。
-
-Linux 6.1 の Rust-for-Linux 導入は kernel-wide context であり、networking の canonical milestone ではない。本書での networking milestone は、6.8 の Rust PHY abstraction / Asix reference PHY を代表点とする。release attribution と exact anchor は Part VI / VII にのみ置く。
+netdev generic Netlink familyでは、NAPI instanceやRX/TX queueのidentityをuserspaceから列挙・参照できる方向が進んだ。これは単なるobservability enhancementではない。AF_XDP、io_uring ZCRX、memory providers、queue leasingのように **特定queueへresourceをbindingするAPI** が増えると、queueそのものを安定して指し示すcontrol-plane identityが必要になるためである。
 
 ``` text
-common C driver contracts
-  phylib · NAPI · devlink · page_pool · DMA / device lifecycle
-                         ⇒
-             explicit lifetime / state boundaries
-                         ⇒
-                safe Rust abstractions
+physical netdev
+   ├─ NAPI object
+   ├─ RX queue object
+   └─ TX queue object
+          │
+          ├─ statistics / introspection
+          └─ later queue-bound APIs
 ```
 
-重要なのは C implementation を Rust に置換したことではなく、driver framework が持つ lifetime、ownership、state transition、resource cleanup の contract を `unsafe` boundary の内側へ 閉じ込め、safe code から利用できる API として表現できることである。
+ここでqueue identityはOBSERVABILITYとCONTROL PLANEの接点になる。
 
-real NIC driver には PHY だけでなく PCI/platform probing、DMA、MMIO、IRQ、device removal など kernel-wide driver-core abstraction も必要である。したがって Rust networking の成熟は networking subsystem 単独では完結しない。ただし conference/review の詳細年表は本文の主題ではない。Appendix には architecture を補助する代表例だけを置く。
+## Driver framework の synthesis
 
+15年間を通して見ると、driver framework の変化は次のように要約できる。
 
-### Netdev
+| 以前 driver 内に埋もれていたもの | 共通化した代表 framework | 主な contract |
+|---|---|---|
+| outstanding TX work | DQL/BQL | accounting / backpressure |
+| switch forwarding state | switchdev | object / notification |
+| device-wide resource / health | devlink | object / API / lifecycle |
+| MAC–PHY/PCS topology | phylink | API / state coordination |
+| interrupt moderation logic | DIM | measurement / policy |
+| RX packet-memory recycling | page_pool | lifetime / object |
+| multi-function driver binding | auxiliary bus | composition / lifetime |
+| NAPI execution placement | threaded NAPI | execution choice |
+| NIC configuration | ethtool netlink | structured API |
+| queue / NAPI identity | netdev-genl | object / assignment |
 
-Netdev is the strongest conference source for driver-framework implementation:
+この表は各frameworkが同じ問題を解くという意味ではない。共通するのは、**driver-privateだったstate/resource/algorithm boundaryをkernel共通のcontractへ引き上げ、複数driver・複数hardware・複数execution modelから再利用可能にしたこと**である。
 
-``` text
-2018  DIM, switchdev/NOS, offload and driver API work
-2019  devlink health
-2023  Rust networking tutorial
-      queue/NAPI netdev-genl objects
-2024  Driver and H/W APIs workshop
-      memory pools / queues / devlink / fwctl
-2025  page_pool leak diagnostics
-2026  dedicated Device Driver Workshop
-```
+Part IIIのMEMORY/PROGRAMMABILITY/CONTROL PLANEが「datapath側で何が共存できるようになったか」を説明するのに対し、Part IVはその共存を支える **driver-facing contract surface** がどう増えたかを説明する。
 
-### Kernel Recipes
-
-Kernel Recipes は zero-copy networking と Rust/C driver abstraction の architecture context を補う。 代表的な講演 provenance は Appendix に置く。網羅的な Rust networking conference history は本書の対象外とする。
-
-## Part IV から Part V へ — common contracts から operability へ
-
-fast path、memory ownership、offload は、operator/developer が kernel の動作を理解できて初めて運用可能になる。Part V では、それと並行して進化した visibility、tracing、explainability を追う。
+------------------------------------------------------------------------
 
 # Part V — Observability / Explainability
 
