@@ -533,6 +533,18 @@ Flower classifier (4.2) → TC match/action → ndo_setup_tc / flow-block callba
 bridge / FIB / VLAN objects → switchdev notifications / objects → switch driver / hardware
 ```
 
+この lineage で r25 から canonical table に昇格した5件は、40桁 mainline anchor を Part VII に保持する。再監査時の起点は次の通り。
+
+| Milestone | First final release | Representative mainline anchor |
+|---|---:|---|
+| bridge VLAN filtering | 3.9 | `243a2e63f5f47763b802e9dee8dbf1611a1c1322` |
+| MPLS routing / AF_MPLS | 4.1 | `0189197f441602acdca3f97750d392a895b778fd` |
+| Flower classifier | 4.2 | `77b9900ef53ae047e36a37d13a2aa33bb2d60641` |
+| VRF device | 4.3 | `193125dbd8eb292d88feb201f030889b488b0a02` |
+| TC `ct` action | 5.3 | `b57dc7c13ea90e09ae15f821d2583fa0231b4935` |
+
+ここで重要なのは、**switchdev と TC offload を一本の経路として扱わない**ことである。bridge/FDB/VLAN/FIB の object/notification path と、TC classifier/action の `ndo_setup_tc` / flow-block callback path は driver/hardware で合流し得るが、kernel API としては並行する経路である。
+
 ここで2本の offload path を区別する。**bridge/FIB/VLAN の switchdev path** は kernel forwarding objects を switch ASIC へ同期する。一方、**TC offload path** は classifier/action semantics を `ndo_setup_tc`、flow block callbacks、representor 等を介して driver/hardware へ写像する。両者は同じ hardware offload architecture の一部として交差するが、`TC → switchdev → ASIC` という単一の直列 pipeline ではない。
 
 この短い lineage を Part VI の canonical milestone に昇格するのは、後続の routing / TC / offload story を変えた代表点に限定する。添付の未掲載候補のうち TLP/RACK、TUN/TAP multiqueue、ETF、preferred busy polling、XDP metadata、DualPI2 なども重要だが、この版では既存6軸の長期 lineage を変える代表点としては追加せず、候補集として保持する。
@@ -1192,7 +1204,9 @@ Evidence class は次の語彙だけを用いる。
 
 ### Canonical verification bundle
 
-主要 milestone を再検証するときは、**(a) milestone role = origin / integration / enablement / merge、(b) representative 40-digit mainline SHA、(c) first-containing rc tag、(d) first final release** を別フィールドとして扱う。`vX.Y-rc1` と `vX.Y` は同義ではない。Part VI の Release は **first final release** を表し、Part VII の `First containing rc tag` は commit containment を追うための補助情報である。rc tag を未監査の項目は `open` のままにし、final release から逆算して埋めない。
+主要 milestone を再検証するときは、**(a) milestone role = origin / integration / enablement / merge、(b) representative 40-digit mainline SHA、(c) first-containing rc tag、(d) first final release** を別フィールドとして扱う。`vX.Y-rc1` と `vX.Y` は同義ではない。Part VI の Release は **first final release** を表し、Part VII の `First containing rc tag` は commit containment を追うための補助情報である。
+
+`First containing rc tag` は、**git ancestry (`git merge-base --is-ancestor <sha> <tag>`) あるいは同等の一次資料で containment を確認した場合だけ記入する**。`vX.Y` に含まれるという事実から `vX.Y-rc1` を逆算しない。したがって `open` は「根拠が弱い」ではなく、**rc-tag containment の監査をまだ完了していない**ことだけを意味する。
 
 ## Canonical milestone table
 
@@ -1486,6 +1500,7 @@ released tag
 その他の TUN/TAP multiqueue、TLP/RACK、ETF、CBS、GTP-U、SRv6、preferred busy polling、XDP RX/TX metadata、DualPI2、`netdev_work` 等は重要な機能だが、現行の採用基準では「本文の長期 lineage を代表する canonical point」とする追加理由を個別に監査してから昇格する。**未掲載 = 重要でない**ではない。
 
 # Changelog / Errata（非正規）
+- **r26:** canonical verification procedure を強化。`First containing rc tag` は git ancestry または同等の一次資料で containment を確認した場合だけ記入することを明文化。routing / TC / offload の5件について final release + 40桁 anchor の再監査表を本文に追加し、switchdev object path と TC `ndo_setup_tc` / flow-block path が並行経路であることを明示。一次資料への verification entry points も追加。
 - **r25:** routing / TC / offload の短い lineage を追加し、bridge VLAN filtering (3.9)、MPLS routing (4.1)、Flower (4.2)、VRF (4.3)、TC `ct` action (5.3) を canonical milestone / exact-anchor inventory に追加。
 - **r25:** switchdev 図を bridge/FIB/VLAN の switchdev path と TC の `ndo_setup_tc` / flow-block path の並行経路へ修正。
 - **r25:** Part VII の `First containing tag` を `First containing rc tag` と `First final release` に分離し、未監査 rc containment は `open` のまま維持。Part VI に canonical verification bundle を追加。
