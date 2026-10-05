@@ -1,39 +1,37 @@
-release,milestones,grade,evidence
+release,milestones,evidence_class,evidence
 3.0,namespace / setns() era foundation,B,release-generation
-3.3,DQL/BQL; team; net_prio; TCP memcg,A,release; exact DQL anchor
+3.3,DQL/BQL; net_prio; TCP memcg,A,release; exact DQL anchor
 3.5,CoDel / fq_codel,A,release + exact anchors
 3.6,TSQ; TFO client; IPv4 route-cache removal,A,release + exact anchors
-3.7,VXLAN; TFO server; IPv6 NAT,A,release verified
+3.7,VXLAN; TFO server,A,release verified
 3.9,TCP/UDP SO_REUSEPORT; conntrack labels; VM sockets,A,release; SO_REUSEPORT infrastructure anchor
 3.11,SO_BUSY_POLL / low-latency busy polling,A,Linux man-pages explicitly says since 3.11
 3.12,sch_fq; sk_pacing_rate-driven pacing; TSO autosizing generation,A,qdisc-based pacing; TCP-internal fallback later
 3.13,nftables,A,release + verified core anchor 96518518cc41
-3.14,TCP autocorking,B,release-generation
 3.15,internal BPF ISA rework toward eBPF/native-JIT-friendly format,A,final series + release-generation
-3.18,bpf() syscall/maps/verifier generation; DCTCP; Geneve/FOU,A,release + exact anchors
+3.18,bpf() syscall/maps/verifier generation; DCTCP; Geneve,A,release + exact anchors
 3.19,ipvlan; switchdev origin; SO_ATTACH_BPF,A,release-generation
 4.1,cls_bpf / act_bpf eBPF support; kprobe BPF,B,early TC/tracing eBPF milestone
-4.3,VRF; LWT; OVS conntrack,A,series + release
-4.6,devlink,B,release origin; exact origin set pending
+4.6,devlink,B,release origin; exact anchor bfcd3a46617209454cfc0947ab093e37fd1e84ef
 4.7,TC BPF direct packet access,A,later TC fast-path programmability milestone
 4.8,XDP,A,initial series + release
 4.9,BBR,A,release + exact anchor
-4.10,cgroup BPF; BPF LWT; IPv6 Segment Routing,A,series + release
+4.10,cgroup BPF; BPF LWT,A,series + release
 4.13,SOCK_OPS; kTLS TX; TCP-internal pacing/fallback generation,A,release
 4.14,phylink; SOCKMAP; TCP MSG_ZEROCOPY; XDP devmap,A,release; exact phylink/TCP-ZC anchors; devmap documented since 4.14
 4.15,XDP cpumap,A,kernel docs explicitly document cpumap since 4.15
-4.16,netdevsim; Net DIM generation; nftables software flowtable,A,flowtable documented since 4.16; DIM exact SHA pending
+4.16,netdevsim; Net DIM generation; nftables software flowtable,A,flowtable documented since 4.16; netdevsim exact anchor 83c9e13aa39aed5cf9a2f8dd69770b7c35ba1281; DIM exact SHA pending
 4.17,BPF_PROG_TYPE_SK_MSG; sockmap sendmsg/sendfile,B,final-series generation
 4.18,AF_XDP; TCP_ZEROCOPY_RECEIVE; refurbished page_pool/XDP memory return; cgroup UDP sendmsg hooks,A,series + release
 4.19,SO_TXTIME; CAKE,A,release + exact anchors
 4.20,TCP EDT pacing; BPF flow dissector; taprio; rtnetlink strict checking,A,release
 5.0,UDP GRO; UDP MSG_ZEROCOPY,A,release
-5.1,devlink health; BPF spinlocks/DCE; SO_BINDTOIFINDEX; Y2038 timestamps; io_uring substrate; mac80211 airtime accounting/scheduling to TXQs,A,release; airtime commit contained in v5.1-rc1
+5.1,devlink health; SO_BINDTOIFINDEX; Y2038 timestamps; io_uring substrate; mac80211 airtime accounting/scheduling to TXQs,A,release; airtime commit contained in v5.1-rc1
 5.3,nexthop objects; DIM generalized into common lib/dim,A,release; nexthop exact core anchor
 5.5,mac80211 Airtime Queue Limits (AQL),B,release-generation
 5.6,MPTCP; WireGuard; BPF struct_ops/TCP CC; ethtool Generic Netlink,A,release; exact ethtool anchor
 5.9,BPF_PROG_TYPE_SK_LOOKUP,A,exact anchor e9ddbb7707ff5891616240026062b8c1e29864ca
-5.11,auxiliary bus,B,release + final-series/tag evidence; feature-origin SHA pending
+5.11,auxiliary bus,B,release + final-series/tag evidence; auxiliary bus exact anchor 7de3697e9cbd4bd3d62bafa249d57990e1b8f294
 5.12,threaded NAPI,A,release
 5.15,IPv6 IOAM core; MCTP; bridge per-VLAN multicast,A,release
 5.17,kfree_skb_reason / structured drop-reason foundation,A,release
@@ -45,7 +43,7 @@ release,milestones,grade,evidence
 6.3,IPv4 BIG TCP,A,release; exact commit set
 6.6,AF_XDP multi-buffer; TCX / bpf_mprog multi-program attachment,A,release; TCX/bpf_mprog present in v6.6 sources
 6.7,netkit; initial TCP-AO,A,release
-6.8,Rust phylib + Rust Asix reference PHY; queue/NAPI netdev-genl visibility,B,release/final-series + docs
+6.8,Rust phylib + Rust Asix reference PHY; queue/NAPI netdev-genl visibility,B,release/final-series + docs; Rust phylib exact anchor f20fd5449ada3872dcd67aca397f0e27ca2e8ad6; queue object anchor bc877956272f0521fef107838555817112a450dc
 6.11,virtio-net AF_XDP RX zero-copy,A,release + exact anchors
 6.12,Device Memory TCP RX,B,final series verified; implementation SHA list not reproduced
 6.13,per-netns RTNL infrastructure/migration milestone,B,"milestone, not completion"
@@ -53,6 +51,6 @@ release,milestones,grade,evidence
 6.16,Device Memory TCP TX; BPF qdisc; DCCP removal,A,final series verified; key BPF-qdisc anchors retained
 6.18,AccECN core; UDP RX evolution; DIBS separate shared-memory lineage,B,release-generation
 7.0,cake_mq / multi-queue-aware sch_cake; IPv6 BIG TCP without synthetic HBH jumbo header,A,net-next-7.0 / v7.0 release generation
-7.1,RX HW queue leasing,A,revised RX implementation contained in v7.1-rc1; initial merge/revert never reached v7.0 release; TX unmerged
+7.1,RX HW queue leasing,A,revised RX implementation contained in v7.1-rc1 / net-next-7.1; initial merge 77b9c4a438fc66e2ab004c411056b3fb71a54f2c reverted by 8766d61a1d33cb5f15bfdd6ce9832bbe1fc649c2 before v7.0 release; TX unmerged
 7.2,MPTCP PM limits: subflows 8→64; accepted ADD_ADDR 8→64; endpoints 8→255,A,three limit-expansion commits contained in v7.2-rc1; endpoint max 255 because ID 0 is reserved
-7.3-rc / mainline,BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE,A-rc,net-next-7.3 merged 2026-08-20; final 7.3 pending
+7.3-rc / mainline,BIG TCP over VXLAN/GENEVE; RTNL-less FIB-rule updates; devmem buffers > PAGE_SIZE,A-rc,net-next-7.3 merged 2026-08-20 (merge 91ec2035134982b98fab0609a9fd8480e8217dc1); final 7.3 pending
