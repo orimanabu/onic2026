@@ -47,10 +47,10 @@ DRIVER FRAMEWORK  switchdev / devlink / phylink / DIM / common driver contracts
 
 ### 本書で固定する語彙
 
-- **上位 thesis:** explicit resource / control contracts
+- **中心命題:** 複数の execution / memory-ownership model の共存
+- **それを可能にした mechanism:** explicit resource / control contracts
 - **contract の具体形:** object / accounting / API / assignment / lifetime / synchronization
 - **重要な subtheme:** ownership（特に queue / packet memory）
-- **帰結:** reusable / programmable / observable な resource control
 
 `ownership` はこの流れの重要な一部だが、すべてを ownership だけで説明しない。たとえば BQL は 主に byte accounting / backpressure、per-netns RTNL は synchronization scope の問題である。 一方 page_pool / AF_XDP / memory providers / queue leasing では、buffer や queue を誰が管理・割り当てるかという ownership が中心問題になる。
 
@@ -501,7 +501,7 @@ nftables は 3.13 で mainline に入り、従来の `{ip,ip6,arp,eb}tables` が
 
 ### ingress / bridge — Netfilter policy の適用点を広げる
 
-4.2 世代では `prerouting` より前の ingress hook が入り、nftables を L3 forwarding/firewall だけでなく ingress packet classification に使えるようになった。これは TC を置き換えたという意味ではなく、**Netfilter policy をより早い datapath point に配置できるようにした**という意味である。
+4.2 世代では `prerouting` より前の ingress hook が入り、nftables を L3 forwarding/firewall だけでなく ingress packet classification に使えるようになった。5.16 では netdev family に egress hook も加わり、policy placement は送信側にも広がった。これは TC を置き換えたという意味ではなく、**Netfilter policy をより早い datapath point に配置できるようにした**という意味である。
 
 bridge filtering でも同様に、nftables は ebtables の単純な syntax replacement ではなかった。従来の bridge/netfilter integration は L2 と L3 hook の境界、VLAN header representation、stateful filtering で複雑さを抱えていた。Netdev 1.1 の bridge filtering work は、nft bridge family に conntrack と NFQUEUE を統合する方向を示している。ここでも変化は「新しい firewall command」ではなく、**L2/L3 をまたぐ policy/state integration の整理**である。
 
@@ -531,6 +531,12 @@ Netfilter hook
 
 したがって conntrack の長期的な課題は lookup performance だけではない。flow lifetime / GC、per-netns scalability、state synchronization、offload された flow と software state の整合性も architecture issue になる。TC `ct` が 5.3 世代で conntrack metadata を TC classifier/action pipeline から利用可能にしたことも、conntrack が firewall 専用 subsystem ではなく **shared flow-state object** へ広がった例として読める。
 
+#### scope / lifetime と外部 consumer
+
+conntrack の内部でも、単なる lookup 高速化ではなく **state の scope と lifetime** が継続して整理された。4.7 世代では conntrack hash table の持ち方が全 netns 共有へ寄せられる一方、entry accounting は netns 単位に残った。4.9 世代では GC worker による timeout entry の回収が導入された。これは per-netns RTNL のように「すべてを namespace-local にする」話ではなく、**共有した方がよい resource と namespace ごとに隔離すべき accounting/control を分ける**例である。
+
+さらに conntrack は外部 consumer から直接利用される方向にも進んだ。5.18 世代では XDP / TC BPF program から conntrack entry を lookup する kfunc、6.0 世代では allocate / insert 側の kfunc が加わった。したがって `nftables ∥ TC ct ∥ BPF` は別々の state machine を持つのではなく、必要に応じて Netfilter conntrack を共有する。
+
 ### flowtable — policy と fast path を分離する
 
 4.16 の Netfilter flowtable は、この lineage の中で特に重要である。最初の packet は classic IP forwarding / conntrack / nftables policy を通り、policy が選択した established flow を flowtable に登録する。その後の flowtable hit は `neigh_xmit()` へ進み、ingress より後ろの classic forwarding hooks を bypass する。flowtable entry は NAT information も保持する。
@@ -549,13 +555,15 @@ ingress ──→ flowtable lookup ─────────────→ cl
 
 ここで重要なのは **fast path が policy engine を捨てたのではない**ことである。どの flow を fast path に入れるかは nftables policy が決め、FIN/RST、fragment、MTU exception などは classic path に戻る。これは本書の「置換ではなく共存」という thesis の非常に分かりやすい例である。
 
-その後 flowtable は software fast path だけでなく hardware offload にも拡張された。hardware mode では flow を `flow_rule` として driver/hardware datapath に写像し、software `[OFFLOAD]` と hardware `[HW_OFFLOAD]` は区別される。また VLAN、PPPoE、bridge VLAN filtering、DSA など topology handling も後から拡張されており、fast path は単純な5-tuple cacheから、Linux forwarding topology と接続する infrastructure へ発展した。
+5.5 世代では flowtable が software fast path だけでなく hardware offload にも拡張された。hardware mode では flow を `flow_rule` として driver/hardware datapath に写像する。hardware への投入は workqueue 経由で非同期に行われるため、offload 完了までの packet は software path を通り得る。software `[OFFLOAD]` と hardware `[HW_OFFLOAD]` は区別される。また VLAN、PPPoE、bridge VLAN filtering、DSA など topology handling も後から拡張されており、fast path は単純な5-tuple cacheから、Linux forwarding topology と接続する infrastructure へ発展した。
 
 この点は前節の TC offload と似ているが同一ではない。**TC flower/`ndo_setup_tc` path と Netfilter flowtable hardware-offload path は別の policy/control path** であり、driver/hardware 側で共通の flow-offload representation や callback infrastructure と接続する場合がある。
 
-### BPF / XDP との関係 — replacement ではなく接続点が増える
+### BPF / XDP との関係 — replacement ではなく相互乗り入れ
 
-BPF/XDP と nftables も新旧置換ではない。XDP は非常に早い packet-processing point と programmable execution model を提供する一方、nftables/conntrack は stateful policy、NAT、transactional ruleset、flow lifecycle を提供する。近年は XDP/BPF から Netfilter flowtable を lookup する kfunc のように、両者を接続する方向も現れている。
+BPF/XDP と nftables も新旧置換ではない。iptables-compatible ruleset を BPF へ変換する構想だった bpfilter は 4.18 で骨格が入り、最終的には 6.8 で削除された。一方で upstream で実際に定着したのは、既存 Netfilter infrastructure との**相互乗り入れ**である。
+
+XDP は非常に早い packet-processing point と programmable execution model を提供する一方、nftables/conntrack は stateful policy、NAT、transactional ruleset、flow lifecycle を提供する。5.18/6.0 世代の conntrack kfunc に加え、6.4 の `BPF_PROG_TYPE_NETFILTER` は BPF program を Netfilter hook 自体へ `bpf_link` で attach できるようにした。さらに近年は XDP/BPF から Netfilter flowtable を lookup する kfunc のように、fast-path infrastructure そのものを接続する方向も現れている。
 
 したがってこの lineage は、
 
@@ -1173,28 +1181,56 @@ Retis と pwru は上記primitiveを利用する代表例だが、本書ではke
 
 # Synthesis — thesis への回帰と未完の仕事
 
-15年間を通じて一貫して観察できるのは、単なる packet/s の増加ではない。 driver-private / implicit / global だった state と convention の一部が、 **object / accounting / API / assignment / lifetime / synchronization** という kernel 共通 contract として明示されてきたことである。
+Part I の中心命題は2段からなる。Linux networking は従来の system-RAM + `skb` path を置き換えたのではなく、複数の execution / memory-ownership model を**共存**させる architecture へ拡張した。そして、その共存を可能にした主要な mechanism が **explicit resource / control contracts** である。
 
-同時に、従来の system-RAM + `skb` path は消えていない。XDP/AF_XDP、offload、 Device Memory TCP、io_uring zero-copy などはそれを全面置換するのではなく、 用途と hardware capability に応じて **複数の execution / memory-ownership model を共存** させる方向へ Linux networking を拡張した。
+Part II–V を通過すると、この2段のつながりを具体的に言える。新しい path は既存 path の隣に独立して追加されたのではない。driver-private / implicit / global だった state が共通 contract として明示された箇所を**接続点**として、そこに追加された。
 
-ただし、この15年間を contract 化だけで要約しない。**transport/protocol** では TFO・DCTCP・BBR・MPTCP・PLB・AccECN が接続確立、輻輳制御、multipath、feedback semantics を更新し、**processing-unit / batching** では GRO/GSO と BIG TCP が1回の処理で扱う単位を拡大した。さらに routing / forwarding では bridge VLAN filtering、MPLS、VRF、Flower、TC conntrack が software forwarding semantics と hardware offload の接点を広げた。これらは explicit-contract lineage と並行して Linux networking の operational range を拡張した、同格の変化である。
+## Contract が共存を可能にした接続点
 
-この変化には未完の領域もある。TX-side queue leasing は RX-side と同じ意味で完成しておらず、 per-netns RTNL は global RTNL を一括置換したものではない。Rust networking も現時点では PHY/core abstraction を中心とする段階で、一般的な high-performance NIC driver ecosystem が Rust に移行したことを意味しない。これらは「次の release の機能」ではなく、 **explicit contracts の適用範囲が今後どこまで広がるか**という継続課題である。
+| 明示化された対象 | Contract の lineage | その接続点で共存できるようになったもの |
+|---|---|---|
+| queue occupancy | DQL/BQL → TSQ / `sch_fq` / pacing | socket・qdisc・driver が backlog を別々の層で制御する multi-layer control |
+| execution point | `bpf()` / maps / verifier → XDP・TC・cgroup・socket hooks → `struct_ops` / TCX / BPF qdisc | built-in stack と verified program が同じ packet・socket・algorithm を扱う |
+| packet memory | page_pool → netmem → memory providers | system-RAM page、userspace-owned buffer、device memory が同じ RX architecture に接続される |
+| queue identity | AF_XDP queue / UMEM binding → netdev-genl queue/NAPI objects → RX HW queue leasing | NIC queue を kernel stack、AF_XDP、io_uring ZCRX、device-memory path、virtual device が用途に応じて使い分ける |
+| forwarding / device state | switchdev・devlink → representor / TC offload → XFRM packet offload | kernel が canonical semantics/control state を保持しながら software path と hardware path を選べる |
+| control-plane state | nexthop objects → YNL → per-netns RTNL | reusable object / machine-readable API / narrower synchronization scope の下で configuration を並行化する |
+
+表中の `→` は図の記法どおり lineage continuation であり、直接依存を意味しない。また各行は「一つの contract が後続機能を直接生んだ」という因果を主張するものではなく、**共存を可能にした architecture 上の接続点**を要約している。
+
+この6行は Part I の6軸と一対一には対応しない。6軸は「何が変わったか」の分類であり、この表は「何が明示されたから、何が共存できたか」という読み方である。OBSERVABILITY は独立した行ではなく、typed drop reason、queue/NAPI identity、page_pool introspection などを通じ、これらの接続点で実際に何が起きているかを検証する evidence layer として全行にかかる。
+
+## Contract に還元しない並行系列
+
+15年間の変化のすべてが上の表に収まるわけではない。**transport / protocol** では TFO・DCTCP・BBR・MPTCP・PLB・AccECN が接続確立、輻輳制御、multipath、feedback semantics を更新した。**processing unit** では GRO/GSO と BIG TCP が1回の処理で扱う単位を拡大した。**implementation scalability** では `dev_queue_xmit()` の llist 化のように、contract を変えずに実装を速くする変更が続いた。**routing / forwarding** では bridge VLAN filtering、MPLS、VRF、Flower、TC `ct` action が software forwarding semantics と hardware offload の接点を広げた。
+
+これらは thesis の例外ではなく、別の説明を要する並行系列である。本書の thesis は、どの系列を説明しているかを限定した上で成り立つ。
 
 ## 6軸への回帰
 
 - **PERFORMANCE:** queueing は driver-local tuning から accounting / pacing / multi-layer scheduling へ進み、同時に BIG TCP や scalable TX のような contract 外の高速化も進んだ。
 - **PROGRAMMABILITY:** BPF/XDP は単一 fast path から socket / protocol / qdisc / virtual-device へ広がり、再利用可能な infrastructure になった。
 - **MEMORY:** page_pool から netmem / memory providers / device memory へ、allocation・lifetime・assignment が明示的になった。
-- **CONTROL PLANE:** reusable objects、YNL schema、per-netns/fine-grained locking により embedded/global state の範囲が縮小した。
-- **OBSERVABILITY:** typed reason / identity / tracing は、複雑化した programmable/offloaded/zero-copy path を operationally explainable にする evidence layer になった。
+- **CONTROL PLANE:** reusable objects、transactional policy、YNL schema、per-netns / fine-grained locking により embedded / global state の範囲が縮小した。
+- **OBSERVABILITY:** typed reason / identity / tracing は、複雑化した programmable / offloaded / zero-copy path を operationally explainable にする evidence layer になった。
 - **DRIVER FRAMEWORK:** BQL、switchdev、devlink、phylink、DIM、page_pool、netdev-genl は driver-local convention を common contract へ引き上げた。
 
-したがって本書の thesis は未来予測ではなく、既存 milestone を横断した説明モデルである。 次の Part VI では、この story からいったん離れ、各 milestone の release attribution を 1行1項目で正規化する。
+## 未完の仕事 — contract がまだ届いていない箇所
 
-## 未完の仕事 — architecture story が次に要求するもの
+未完点は「次に入る機能」の一覧ではなく、**explicit contracts の適用範囲がまだ届いていない箇所**として読む。
 
-現在の未完点は「機能をさらに列挙すること」より、**異種 memory / queue placement の一般化、global synchronization の縮小、hardware/software execution placement の共通化、そしてそれらを説明できる observability** にある。ここは将来の release で評価が変わり得るため、確定史ではなく本書の open questions として扱う。
+- **TX 側の queue assignment** — RX HW queue leasing は 7.1 に入ったが、TX queue leasing は未 merge である。assignment contract は RX 側に偏っている。
+- **global synchronization の縮小** — per-netns RTNL は global RTNL の一括置換ではなく、複数 release にわたる migration である。7.3-rc / mainline の RTNL-less FIB-rule 更新と per-netns netdev unregistration は、その途中経過にあたる。
+- **異種 memory の一般化** — netmem と memory providers は本書の story の中心にあるが、canonical boundary は確定していない（Part VI の boundary-open register）。driver 側も memory-provider-aware であることを次第に求められている段階である。
+- **execution placement の共通化** — switchdev path と TC offload path は並行経路のままであり、XDP も native / generic / offload で実行位置と必要な driver support が異なる。software と hardware のどちらで実行するかを扱う単一の contract はない。
+- **observability の coverage** — drop reason はすべての drop path に付くわけではなく、cross-layer の packet journey は今も tool 側の推論に依存する。
+- **Rust** — networking 側は PHY / core abstraction が中心で、一般的な high-performance NIC driver が Rust へ移行した段階ではない。
+
+これらは将来の release で評価が変わり得るため、確定史ではなく本書の open questions として扱う。
+
+したがって本書の thesis は未来予測ではなく、既存 milestone を横断した説明モデルである。次の Part VI では、この story からいったん離れ、各 milestone の release attribution を1行1項目で正規化する。
+
+------------------------------------------------------------------------
 
 # Part VI — Canonical release chronology
 
@@ -1294,6 +1330,7 @@ Part VI は監査工程そのものではなく、読者が milestone の根拠�
 | 5.1     | mac80211 airtime accounting/scheduling | PERFORMANCE      | —                    | release            |
 | 5.3     | nexthop objects                        | CONTROL PLANE    | —                    | release            |
 | 5.3     | TC ct action                            | PROGRAMMABILITY  | —                    | anchor: Part VII     |
+| 5.5     | nftables flowtable hardware offload          | PERFORMANCE / DRIVER FRAMEWORK | —          | release            |
 | 5.3     | DIM generalized into lib/dim           | DRIVER FRAMEWORK | —                    | generation     |
 | 5.5     | mac80211 AQL                           | PERFORMANCE      | —                    | release            |
 | 5.6     | MPTCP                                  | —                | TRANSPORT            | release            |
@@ -1318,6 +1355,7 @@ Part VI は監査工程そのものではなく、読者が milestone の根拠�
 | 6.2     | XFRM/IPsec packet offload                             | DRIVER FRAMEWORK                 | SECURITY             | anchor: Part VII     |
 | 6.3     | YNL / YAML Netlink tooling                            | CONTROL PLANE                    | —                    | release            |
 | 6.3     | IPv4 BIG TCP                                          | PERFORMANCE                      | —                    | release            |
+| 6.4     | BPF netfilter programs (`BPF_PROG_TYPE_NETFILTER`) | PROGRAMMABILITY | —             | release            |
 | 6.6     | AF_XDP multi-buffer                                   | MEMORY / PROGRAMMABILITY         | —                    | release            |
 | 6.6     | TCX / bpf_mprog                                       | PROGRAMMABILITY                  | —                    | release            |
 | 6.7     | netkit                                                | PROGRAMMABILITY                  | VIRTUAL / OVERLAY    | anchor: Part VII     |
