@@ -677,6 +677,85 @@ UDP は GRO/GSO、tunnel/encapsulation、high packet-rate RX、receive-buffer sc
 
 前章では networking mechanism を end-to-end の lineage として追った。Part IV では視点を変え、個々の driver の責務のうち何が共通 networking-core framework へ移されたかを見る。
 
+
+## SECURITY / kTLS / XFRM / WireGuard — security semantics と execution placement の分離
+
+SECURITY は第7の architecture axis ではなく、TRANSPORT や VIRTUAL / OVERLAY と同じ **cross-cutting lineage** として扱う。ここで追う共通テーマは「暗号方式の変遷」そのものではなく、**security state / policy を kernel が保持し、その semantics を変えずに software・accelerator・NIC のどこで実行するかを明示的な contract で選べるようになったこと**である。
+
+```text
+security semantics / state
+        │
+        ├─ TLS record state on TCP socket
+        │      ├─ kTLS TX (4.13)
+        │      ├─ kTLS RX (4.17)
+        │      └─ TLS device offload (4.18 generation)
+        │
+        ├─ XFRM SA / policy
+        │      ├─ IPsec crypto offload
+        │      └─ packet offload (6.2)
+        │
+        └─ WireGuard peer / key / allowed-IP state (5.6)
+               └─ integrated L3 secure netdevice
+```
+
+### kTLS — userspace handshake と kernel record datapath を分離する
+
+kTLS の origin は4.13の `tls: kernel TLS support` (`3c4d7559159bfe1e3b94df3a657b2cda3a34e218`) である。TLS handshake と certificate/key-exchange policy を userspace に残し、handshake 完了後の symmetric crypto state を `setsockopt()` でTCP socketへ渡して、TLS record datapathをkernelへ移す。現在のkernel documentationもkTLSをTLS record subprotocolの実装として説明し、handshakeは別のsubprotocolとして区別している。
+
+4.17では `tls: RX path for ktls` (`c46234ebb4d1eee5e09819f49169e51cfc6eb909`) により `TLS_RX`、`recvmsg`、`splice_read`、pollとrecord framing/decryptionが加わり、TXだけだったrecord datapathが双方向になった。
+
+その次の転換は「kernelでcryptoする」から「kernelがsecurity semantics/stateを保持したまま、crypto executionをdeviceへ配置できる」ことである。`net/tls: Add generic NIC offload infrastructure` (`e8f69799810c32dd40c6724d829eccc70baad07f`) はTXのgeneric NIC offload contractを導入し、`tls: Add rx inline crypto offload` (`4799ac81e52a72a6404827bf2738337bb581a174`) がRX側を完成させた。kernel docsが示す `TLS_SW` と `TLS_HW` は別プロトコルではなく、同じkTLS socket/APIに対する **execution placement** の違いである。
+
+したがってkTLSのlineageは、
+
+```text
+userspace TLS record processing
+        ↓
+kernel-visible TLS record state
+        ↓
+software kTLS TX/RX
+        ↓
+same TLS semantics + NIC execution
+```
+
+と読むのが本書の中心命題に最もよく対応する。
+
+### XFRM/IPsec — SA/policy を canonical state として software / hardware execution を選ぶ
+
+XFRMでは kernel が Security Association (SA) と policy を保持する。device offloadでもこのcontrol-plane semanticsを捨てるのではなく、`xfrmdev_ops` とnetdev capabilityを介してdriver/NICへ実行を委譲する。
+
+ここでは **crypto offload** と **packet offload** を区別する。crypto offloadではNICがencrypt/decryptを担当する一方、packet constructionやXFRM processingの多くはkernel側に残る。6.2世代のpacket offloadではSAだけでなくpolicyもkernelとNICで同期し、NICがencrypt/decryptに加えてencapsulationとpolicy executionまで担当できる。代表anchorはPart VIIの `d14f28b8c1de668bab863bf5892a49c824cb110d` である。
+
+```text
+XFRM SA / policy = kernel canonical state
+        ├─ software IPsec
+        ├─ crypto offload
+        │     └─ crypto execution → NIC
+        └─ packet offload (6.2)
+              └─ SA + policy execution → NIC
+```
+
+これはRouting/TC/offload節で見た「kernel object/policyをcanonical stateとしてhardwareへ写像する」設計と同型だが、XFRMではsecurity state、rekey/lifetime、policy synchronizationがcontractの中心になる。
+
+### WireGuard — offload frameworkではなく、secure tunnelを通常のnetdeviceとして統合する
+
+WireGuard 5.6 (`e7096c131e5161fa3b8e52a650d7719d2857adfd`) はkTLS/XFRMとは異なる方向である。WireGuardはL3 secure tunnelをkernelのnetwork device driverとして実装し、RTNL、generic Netlink、UDP tunnel API、GRO/GSO、NAPIなど既存networking infrastructureへ統合した。
+
+したがってWireGuardを「XFRMの次世代版」や「kTLSと同じoffload lineage」とは扱わない。security semanticsを持つ実装がnetwork stackの通常のobject/APIへ統合された例として、**SECURITY / VIRTUAL / OVERLAY** の交差点に置く。
+
+### SECURITY lineage の architecture takeaway
+
+3つの仕組みはprotocolもobject modelも異なるが、Linux networking全体の進化という観点では共通点がある。
+
+| Mechanism | Kernel-visible canonical state | Execution placement | 本書での意味 |
+|---|---|---|---|
+| kTLS | TCP socketに紐付くTLS record / crypto state | software crypto / NIC TLS offload | protocol semantics とcrypto executionの分離 |
+| XFRM/IPsec | SA + policy | software / crypto offload / packet offload | policy/state とhardware executionの分離 |
+| WireGuard | peer / key / allowed-IP + netdevice | kernel implementation | secure tunnelを通常のnetwork object/APIへ統合 |
+
+**Takeaway:** securityの進化も「専用fast pathへの置換」ではなく、**security semantics / stateをkernel-visibleなcontractとして保持し、そのexecution placementやnetwork integrationを明示する方向**として読むことができる。このためSECURITYを第7軸に増やす必要はなく、CONTROL PLANE・DRIVER FRAMEWORK・TRANSPORT・VIRTUAL / OVERLAYを横断するlineageとして扱う方が整合的である。
+
+
 # Part IV — Network Device Driver Framework
 
 Part III が packet path / control path の長期 lineage を追ったのに対し、Part IV は **driver-local な実装知識がどのように共通 framework / object / API へ引き上げられたか**を見る。ここで重要なのは、個々の driver の高速化ではなく、NIC が持つ queue、link、switch、health、memory、interrupt moderation などの能力を networking core から共通に扱えるようにしたことである。
@@ -1114,6 +1193,7 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 4.10    | BPF LWT                              | PROGRAMMABILITY          | —                    |source index / series|
 | 4.13    | SOCK_OPS                             | PROGRAMMABILITY          | TRANSPORT            |source index|
 | 4.13    | kTLS TX                              | —                        | SECURITY / TRANSPORT |source index|
+| 4.13    | kTLS TX / kernel TLS record datapath                    | PERFORMANCE / CONTROL PLANE      | SECURITY / TRANSPORT | anchor: Part VII |
 | 4.14    | phylink                              | DRIVER FRAMEWORK         | —                    | anchor: Part VII     |
 | 4.14    | SOCKMAP                              | PROGRAMMABILITY          | —                    |source index|
 | 4.14    | XDP devmap                           | PROGRAMMABILITY          | —                    |source index|
@@ -1125,10 +1205,12 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 4.16    | Net DIM initial generation                   | DRIVER FRAMEWORK         | —                    |source index / series|
 | 4.16    | nftables software flowtable          | PERFORMANCE              | —                    |source index|
 | 4.17    | BPF_PROG_TYPE_SK_MSG                 | PROGRAMMABILITY          | —                    | anchor: Part VII     |
+| 4.17    | kTLS RX                                                 | PERFORMANCE / CONTROL PLANE      | SECURITY / TRANSPORT | anchor: Part VII |
 | 4.18    | AF_XDP                               | MEMORY / PROGRAMMABILITY | —                    |source index / series|
 | 4.18    | page_pool origin / XDP memory return | MEMORY                   | —                    | anchor: Part VII     |
 | 4.18    | TCP_ZEROCOPY_RECEIVE                 | PERFORMANCE              | —                    |source index|
 | 4.18    | BTF origin / typed BPF metadata                           | PROGRAMMABILITY / OBSERVABILITY | —                    | anchor: Part VII |
+| 4.18    | generic TLS device offload (TX/RX generation)            | DRIVER FRAMEWORK / PERFORMANCE   | SECURITY / TRANSPORT | anchor: Part VII |
 | 4.19    | SO_TXTIME                            | PERFORMANCE              | —                    |source index|
 | 4.19    | CAKE                                 | PERFORMANCE              | —                    |source index|
 | 4.20    | TCP EDT                              | PERFORMANCE              | —                    |source index|
@@ -1153,6 +1235,7 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 5.6     | WireGuard                              | —                | SECURITY / VIRTUAL / OVERLAY |source index|
 | 5.6     | BPF struct_ops / TCP CC                | PROGRAMMABILITY  | TRANSPORT            |source index|
 | 5.6     | ethtool Generic Netlink                | DRIVER FRAMEWORK | —                    | anchor: Part VII     |
+| 5.6     | WireGuard mainline secure L3 netdevice                    | DRIVER FRAMEWORK / CONTROL PLANE | SECURITY / VIRTUAL / OVERLAY | anchor: Part VII |
 | 5.9     | BPF_PROG_TYPE_SK_LOOKUP                | PROGRAMMABILITY  | —                    | anchor: Part VII     |
 | 5.11    | auxiliary bus                          | DRIVER FRAMEWORK | —                    | anchor: Part VII     |
 | 5.12    | threaded NAPI                          | DRIVER FRAMEWORK | —                    |source index|
@@ -1226,7 +1309,6 @@ Part VI の古い milestone は recent feature と同じ密度で exact SHA を�
 - **phylink / page_pool / SK_MSG / SK_LOOKUP / BIG TCP / XFRM packet offload** — exact mainline anchors are listed in Part VII.
 
 この source key は「古い release を増やして件数を均す」ためではない。Era 1–2 の foundation が、Era 4 の resource-placement features と同じ監査可能性で読めるようにするための入口である。
-
 # Part VII — 正規 provenance ledger
 
 **Evidence model:** Part VII の SHA は feature series の「代表 anchor」であり、anchor の存在だけで series 全体を証明しない。 各項目は **SHA identity / feature correspondence / release containment** を別々に監査する。
@@ -1269,6 +1351,12 @@ Part VI の古い milestone は recent feature と同じ密度で exact SHA を�
 | auxiliary bus | origin | `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` | `Add auxiliary bus support` | v5.11 |
 | IPv6 BIG TCP / GRO | enablement | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | allow `gro_max_size` > 65536 | v5.19 |
 | IPv6 BIG TCP / GSO | enablement | `7c4e983c4f3cf94fcd879730c6caa877e0768a4d` | allow `gso_max_size` > 65536 | v5.19 |
+| kTLS TX / kernel TLS | origin | `3c4d7559159bfe1e3b94df3a657b2cda3a34e218` | `tls: kernel TLS support`; TLS ULP + software TX record datapath | v4.13 |
+| kTLS RX | enablement | `c46234ebb4d1eee5e09819f49169e51cfc6eb909` | `tls: RX path for ktls`; `TLS_RX`, recvmsg/splice/poll | v4.17 |
+| TLS device offload TX | integration | `e8f69799810c32dd40c6724d829eccc70baad07f` | `net/tls: Add generic NIC offload infrastructure`; same kTLS API/state with NIC TX crypto | v4.18 |
+| TLS device offload RX | integration | `4799ac81e52a72a6404827bf2738337bb581a174` | `tls: Add rx inline crypto offload`; completes generic RX device-offload infrastructure | v4.18 |
+| WireGuard | origin | `e7096c131e5161fa3b8e52a650d7719d2857adfd` | `net: WireGuard secure network tunnel`; L3 secure tunnel as normal netdevice | v5.6 |
+| XFRM packet offload | integration | `d14f28b8c1de668bab863bf5892a49c824cb110d` | packet-level IPsec offload; policy/SA synchronization with NIC | v6.2 |
 | BTF origin | origin | `69b693f0aefa0ed521e8bd02260523b5ae446ad7` | `bpf: btf: Introduce BPF Type Format (BTF)`; typed metadata for BPF program/map | v4.18 |
 | Net DIM common-library integration | integration | `4f75da3666c0c572967729a2401ac650be5581b6` | `linux/dim: Move implementation to .c files`; driver-local/header logic becomes common `lib/dim` implementation | v5.3 |
 | vDPA bus | origin | `961e9c84077f6c8579d7a628cbe94a675cb67ae4` | `vDPA: introduce vDPA bus`; common virtio datapath / vendor-control abstraction | v5.7 |
