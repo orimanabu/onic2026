@@ -176,25 +176,23 @@ How explicitly can placement, lifetime and synchronization be controlled?
 
 # Part III — Long-term lineages
 
-Part III では release 順ではなく、同じ設計課題が長期間にどう変化したかを追う。 図の矢印は、明示しない限り「直接の親子関係」を意味しない。dependency / extension / parallel development / shared design problem を区別する。release attribution の正本は Part VI である。
+Part III では release 順ではなく、同じ設計課題が長期間にどう変化したかを追う。図の矢印は、明示しない限り直接の親子関係を意味せず、dependency / extension / parallel development / shared design problem を区別する。各 milestone の release は Part VI の chronology に対応する。
 
 ## Queueing / latency / pacing — multi-layer control evolution
 
-
-
-**Era 1 context:** SO_REUSEPORT（3.9）と SO_BUSY_POLL（3.11）は multicore server の receive placement / latency を改善した。一方、IPv4 route-cache removal（3.6）は CONTROL PLANE scalability の変更であり、queueing lineage そのものではないため Part III の routing 節で扱う。
-
-PERFORMANCE 軸の queueing lineage は、単に qdisc algorithm が増えた歴史ではない。 socket が作る burst、qdisc が保持する backlog、driver/NIC ring に積まれた outstanding bytes、 さらに multiqueue NIC での queue 選択を、それぞれ別レイヤーで制御できるようになった歴史である。
+PERFORMANCE 軸の queueing lineage は、単に qdisc algorithm が増えた歴史ではない。socket が作る burst、qdisc が保持する backlog、driver/NIC ring に積まれた outstanding bytes、さらに multiqueue NIC での queue 選択を、それぞれ別レイヤーで制御できるようになった歴史である。
 
 ``` text
-socket / transport:  TSQ · TCP pacing · BBR
-                          ∥
-qdisc / scheduler:   CoDel · fq_codel · sch_fq · EDT · CAKE / cake_mq
-                          ∥
-driver / NIC:        DQL/BQL · multiqueue scaling · dev_queue_xmit() llist
+socket / transport: TSQ · TCP pacing · BBR
+ ∥
+qdisc / scheduler: CoDel · fq_codel · sch_fq · EDT · CAKE / cake_mq
+ ∥
+driver / NIC: DQL/BQL · multiqueue scaling · dev_queue_xmit() llist
 ```
 
 DQL/BQL は driver が NIC へ渡した byte と完了した byte を accounting し、hardware queue に過剰な backlog を作らないための backpressure contract を与える。TSQ は同じ問題を TCP socket 側から制限し、 `sch_fq` と TCP pacing は「何個 queue に入れるか」だけでなく「いつ送るか」を扱う。
+
+Era 1 では SO_REUSEPORT（3.9）と SO_BUSY_POLL（3.11）も multicore server の receive placement / latency を改善した。これらは qdisc の派生ではないが、work placement と待ち時間を制御する同時期の server-side foundation である。IPv4 route-cache removal（3.6）は CONTROL PLANE scalability の変更なので Routing 節で扱う。
 
 CoDel/fq_codel と CAKE は qdisc 層で delay / fairness / shaping を扱う。EDT と `SO_TXTIME` は time-based transmission を明示し、taprio は time-aware scheduling を hardware/offload と接続する。 これらは同じ API の世代交代ではなく、queueing problem を複数層へ分解した結果である。
 
@@ -211,9 +209,9 @@ v5.0 ですでに GRO/GSO/TSO は成熟していたが、高速 NIC では per-p
 
 ``` text
 wire packets
-    ↓ GRO
+ ↓ GRO
 large skb
-    ↓ GSO/TSO
+ ↓ GSO/TSO
 wire packets
 ```
 
@@ -221,11 +219,11 @@ v5.19 BIG TCP は kernel internal GRO/GSO aggregate の 64KiB 制約を緩和し
 
 ``` text
 GRO/GSO
-  ↓
+ ↓
 IPv6 BIG TCP (5.19)
-  → IPv4 BIG TCP (6.3)
-  → IPv6 BIG TCP without synthetic HBH jumbo header (Linux 7.0)
-  → BIG TCP over VXLAN / GENEVE (7.3-rc / mainline)
+ → IPv4 BIG TCP (6.3)
+ → IPv6 BIG TCP without synthetic HBH jumbo header (Linux 7.0)
+ → BIG TCP over VXLAN / GENEVE (7.3-rc / mainline)
 ```
 
 PPPoE GRO/GSO のような encapsulation-specific aggregation も、同じ PERFORMANCE 軸で per-packet cost を減らすが、BIG TCP の派生機能ではない。
@@ -233,7 +231,7 @@ PPPoE GRO/GSO のような encapsulation-specific aggregation も、同じ PERFO
 BIG TCP は wire MTU を巨大化する機能ではなく、 **kernel 内部の packet-processing unit を大きくする機能**として理解する。利用可否と効果は protocol path、 GRO/GSO/offload capability、driver/NIC、tunnel implementation などに依存し、すべての device / path で 一律に大きな aggregate を利用できることを意味しない。
 
 
-**Takeaway:** aggregation は主に explicit resource contract の系列ではなく、GRO/GSO/BIG TCP により **1回の stack traversal で扱う processing unit を拡大する並行系列**である。
+**Takeaway:** aggregation は主に explicit resource contract の系列ではなく、GRO/GSO/BIG TCP により **\1 回の stack traversal で扱う processing unit を拡大する並行系列**である。
 
 ------------------------------------------------------------------------
 
@@ -243,14 +241,14 @@ BPF lineage の起点は XDP ではない。classic BPF は socket/filtering 文
 
 ``` text
 classic BPF packet filter
-        ↓
+ ↓
 internal eBPF ISA (3.15)
-        ↓
+ ↓
 bpf() / maps / verifier (3.18)
-        ├─ SO_ATTACH_BPF (3.19) / TC BPF (4.1...)
-        ├─ cgroup / LWT / XDP
-        ├─ SOCK_OPS (4.13) / SOCKMAP
-        └─ struct_ops / TCX / BPF qdisc
+ ├─ SO_ATTACH_BPF (3.19) / TC BPF (4.1...)
+ ├─ cgroup / LWT / XDP
+ ├─ SOCK_OPS (4.13) / SOCKMAP
+ └─ struct_ops / TCX / BPF qdisc
 ```
 
 このため「packet filter から stack extension へ」という節題は、programming language の置換ではなく、**verified execution contract と attachment model の一般化**を表す。
@@ -261,18 +259,18 @@ BPF の発展は一本道ではなく、attachment point と適用範囲が複�
 TC direct packet access、devmap/cpumap、SK_MSG、flow dissector、`struct_ops`、SK_LOOKUP、TCX は、 packet/datapath、socket/message、protocol algorithm、attachment/lifetime という異なる面を拡張した。 一本の attachment-point lineage としてではなく、verified programmability の適用範囲が広がったものとして読む。
 
 ``` text
-                     BPF core / verifier / maps
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        ▼                     ▼                     ▼
- packet / datapath        socket / lookup       protocol algorithms
- XDP, TC                  cgroup hooks,         struct_ops / TCP CC
-                         SK_LOOKUP
-        │                                           │
-        └──────────────┐                 ┌──────────┘
-                       ▼                 ▼
-                 virtual devices / queue control
-                 netkit · BPF qdisc · related hooks
+ BPF core / verifier / maps
+ │
+ ┌─────────────────────┼─────────────────────┐
+ ▼ ▼ ▼
+ packet / datapath socket / lookup protocol algorithms
+ XDP, TC cgroup hooks, struct_ops / TCP CC
+ SK_LOOKUP
+ │ │
+ └──────────────┐ ┌──────────┘
+ ▼ ▼
+ virtual devices / queue control
+ netkit · BPF qdisc · related hooks
 ```
 
 ここで下段は上段の単純な後継ではない。5.x～6.x にかけて **適用範囲と attachment point が 独立・並行して追加された**結果として、packet、socket、protocol algorithm、virtual device、 queue/datapath まで programmability の対象が広がった、と読む。
@@ -283,19 +281,19 @@ USENIX の研究を併せて読むと、Linux networking の programmability が
 
 ``` text
 mTCP (NSDI 2014): user-level TCP / kernel overhead avoidance
-        ↓
+ ↓
 XDP/eBPF: early in-kernel programmable hook
-        ↓
+ ↓
 Electrode (NSDI 2023) / DINT (NSDI 2024):
-  kernel の protection / isolation を維持し frequent path を eBPF 化
-        ↓
+ kernel の protection / isolation を維持し frequent path を eBPF 化
+ ↓
 eTran (NSDI 2025):
-  transport 自体を eBPF で extensible にする
+ transport 自体を eBPF で extensible にする
 ```
 
 mTCP は Linux kernel TCP processing の CPU cost に対して user-level TCP stack を採った。一方 Electrode と DINT は、kernel bypass の security / isolation / maintainability 上の trade-off を避けながら、XDP/eBPF により frequent path を kernel 内で処理する。eTran はさらに TCP/DCTCP や Homa のような transport design を eBPF ベースの extensible kernel transport として扱う。この研究史は、**kernel を単に迂回するのではなく、kernel の ownership / protection model を保ったまま fast path や protocol behavior を programmable にする**という方向を補強する。
 
-これらは upstream Linux release milestone ではないため Part VI には追加せず、architecture の動機を説明する research evidence として扱う。
+これらの研究は mainline milestone そのものではないが、kernel bypass と in-kernel programmability の設計上の trade-off を理解する補助線になる。
 
 
 **Takeaway:** extension point、program type、map、typed operations を API/object として明示した。
@@ -305,31 +303,23 @@ mTCP は Linux kernel TCP processing の CPU cost に対して user-level TCP st
 
 ## XDP / AF_XDP
 
-XDP は 4.8 世代に、driver RX の非常に早い位置で verified BPF program を実行する datapath として mainline に現れた。重要なのは単なる「高速drop」ではなく、その後 redirect target と memory ownership が段階的に増えたことである。4.14 の DEVMAP、4.15 の CPUMAP は redirect を device / remote CPU という明示的 target object に広げ、4.18 の AF_XDP は RX queue と UMEM/userspace buffer を結び付ける queue-bound datapath を追加した。
+XDP は 4.8 世代に、driver RX の非常に早い位置で verified BPF program を実行する datapath として mainline に現れた。重要なのは単なる「高速 \1」ではなく、その後 redirect target と memory ownership が段階的に増えたことである。4.14 の DEVMAP、4.15 の CPUMAP は redirect を device / remote CPU という明示的 target object に広げ、4.18 の AF_XDP は RX queue と UMEM/userspace buffer を結び付ける queue-bound datapath を追加した。
 
 ``` text
 XDP at driver RX (4.8)
-   ├─ redirect → DEVMAP (4.14)
-   ├─ redirect → CPUMAP (4.15)
-   └─ RX queue ↔ AF_XDP / UMEM (4.18)
+ ├─ redirect → DEVMAP (4.14)
+ ├─ redirect → CPUMAP (4.15)
+ ├─ packet memory → page_pool
+ └─ RX queue ↔ AF_XDP / UMEM (4.18)
+ ├─ zero-copy
+ ├─ multi-buffer (6.6)
+ └─ queue ownership / later netkit integration
 ```
 
 4.8–4.18 は、後年の queue leasing や memory-provider architecture につながる queue / redirect / buffer-binding の前史として重要である。
 
 
-v5.0 時点で XDP/AF_XDP は存在した。その後の本質は周辺 infrastructure の成熟。ここで XDP → AF_XDP → netkit / queue leasing を単純な派生関係とはみなさない。 XDP は native driver mode、generic/SKB mode、hardware offload で実行位置・性能特性・必要な driver support が異なり、 AF_XDP や queue leasing は queue ownership / zero-copy という共通課題から並行して発展した面を持つ。
-
-``` text
-XDP
-├─ redirect
-├─ page_pool
-├─ link/lifecycle
-└─ AF_XDP
-    ├─ zero-copy
-    ├─ multi-buffer (6.6)
-    ├─ virtio-net ZC
-    └─ queue ownership / netkit integration
-```
+その後は native/generic/hardware-offload mode、page_pool、multi-buffer、AF_XDP zero-copy など周辺 infrastructure が成熟した。XDP → AF_XDP → netkit / queue leasing を単純な派生関係とはみなさない。XDP は execution placement、AF_XDP や queue leasing は queue/buffer ownership という共通課題から並行して発展した面を持つ。
 
 v6.6 AF_XDP multi-buffer は:
 
@@ -369,8 +359,8 @@ NIC → allocate/map page → stack → unmap/free
 
 page_pool:
 NIC → recycled/mapped page → stack ─┐
-      ↑                             │
-      └──────── return/recycle ─────┘
+ ↑ │
+ └──────── return/recycle ─────┘
 ```
 
 page_pool は XDP 専用ではない。XDP と強く結び付いて普及したが、後の zero-copy RX、 memory-provider、device-memory path が driver ごとの独自 allocator に戻らずに済むための common infrastructure として読む。
@@ -381,25 +371,25 @@ system RAM の page だけを packet backing と仮定すると、device memory 
 
 ``` text
 network packet memory
-          ↓
-        netmem
-       /      \
-system RAM   non-page / device-backed memory
+ ↓
+ netmem
+ / \
+system RAM non-page / device-backed memory
 ```
 
 ここで重要なのは「RAM を device memory に置換した」ことではなく、従来 path を維持したまま 異なる backing memory を表現できる contract を追加したことである。
 
 ### memory providers / queue binding — memory lifetime と RX queue を接続する
 
-Device Memory TCP RX は6.12で先に mainline 化され、この時点では page_pool の `mp_priv` など devmem 用の専用経路を利用していた。6.15で `memory_provider_ops` / page_pool custom-provider hooks が導入され、devmem TCP と io_uring ZCRX が同じ **汎用 memory-provider contract** に接続できる形へ整理された。したがって `Device Memory TCP RX (6.12) → generic memory-provider hooks (6.15)` は、**consumer-specific path の先行 → provider API の一般化**という順序である。
+Device Memory TCP RX は6.1\1 で先に mainline 化され、この時点では page_pool の `mp_priv` など devmem 用の専用経路を利用していた。6.1\1 で `memory_provider_ops` / page_pool custom-provider hooks が導入され、devmem TCP と io_uring ZCRX が同じ **汎用 memory-provider contract** に接続できる形へ整理された。したがって `Device Memory TCP RX (6.12) → generic memory-provider hooks (6.15)` は、**consumer-specific path の先行 → provider API の一般化**という順序である。
 
 io_uring ZCRX や Device Memory TCP では、memory pool を用意するだけでは不十分である。 どの RX queue がどの memory provider を使うか、buffer がいつ application/device から返却されるか、 queue reconfiguration 中に lifetime をどう保つかを kernel/driver/userspace 間で合意する必要がある。
 
 ``` text
 RX queue
-   ↔ memory provider
-   ↔ page_pool / netmem-backed buffers
-   ↔ userspace or device consumer
+ ↔ memory provider
+ ↔ page_pool / netmem-backed buffers
+ ↔ userspace or device consumer
 ```
 
 このため Era 4 では MEMORY 軸が `lifetime` だけでなく `assignment` と強く結び付く。 netdev-genl queue objects、io_uring ZCRX、Device Memory TCP、RX HW queue leasing は 同一機能ではないが、**queue identity と memory ownership/lifetime を明示的に結び付ける** という architecture problem を共有する。
@@ -422,23 +412,23 @@ large RX buffers や `>PAGE_SIZE` devmem buffer の拡張は、この model が 
 
 ## io_uring networking
 
-6.0 の SEND_ZC / multishot receive と 6.15 の ZCRX を同じ lineage で扱い、TCP 節には重複記載しない。
+io_uring networking は、socket I/O を一回ごとの syscall から submission/completion と登録済み resource の model へ移し、network buffer の lifetime と queue binding を userspace-visible な contract として扱う方向へ進んだ。6.0 世代の SEND_ZC / multishot receive は TX copy avoidance と receive batching を進め、6.15 の ZCRX は RX queue と userspace-owned memory の直接的な結び付きを追加した。
 
 TCP `MSG_ZEROCOPY` は send-side copy avoidance の先行 milestone であり、後の io_uring `SEND_ZC` と 同一 API ではないが、userspace↔kernel の data movement cost を減らす PERFORMANCE lineage の 重要な前段として扱う。
 
 ``` text
 sendmsg / recvmsg
-      ↓
+ ↓
 zero-copy TX
-      ↓
+ ↓
 multishot / registered buffers
-      ↓
+ ↓
 zero-copy RX (6.15)
-      ↓
+ ↓
 memory-provider / device-memory integration
 ```
 
-目標は syscall reduction だけではなく、 NICからuserspaceまでの buffer ownership/lifetime の効率化にある。
+目標は syscall reduction だけではなく、 NI\1 から \\1 までの buffer ownership/lifetime の効率化にある。
 
 
 **Takeaway:** socket I/O を submission/completion と registered resources に分解し、ZCRX では queue と buffer/memory-provider の関係まで明示する方向へ進んだ。
@@ -451,34 +441,28 @@ routing / forwarding control は BPF だけでは説明できない。bridge VLA
 
 ``` text
 bridge VLAN filtering (3.9) ─┐
-MPLS routing (4.1)          ├─ Linux forwarding / routing semantics
-VRF device (4.3)            ┘
+MPLS routing (4.1) ├─ Linux forwarding / routing semantics
+VRF device (4.3) ┘
 
 Flower classifier (4.2) → TC match/action → ndo_setup_tc / flow-block callbacks → driver / hardware
-                                      ↘ TC ct action (5.3): conntrack state/metadata in TC
+ ↘ TC ct action (5.3): conntrack state/metadata in TC
 
 bridge / FIB / VLAN objects → switchdev notifications / objects → switch driver / hardware
 ```
 
 ここで重要なのは、**switchdev と TC offload を一本の経路として扱わない**ことである。bridge/FDB/VLAN/FIB の object/notification path と、TC classifier/action の `ndo_setup_tc` / flow-block callback path は driver/hardware で合流し得るが、kernel API としては並行する経路である。
 
-ここで2本の offload path を区別する。**bridge/FIB/VLAN の switchdev path** は kernel forwarding objects を switch ASIC へ同期する。一方、**TC offload path** は classifier/action semantics を `ndo_setup_tc`、flow block callbacks、representor 等を介して driver/hardware へ写像する。両者は同じ hardware offload architecture の一部として交差するが、`TC → switchdev → ASIC` という単一の直列 pipeline ではない。
-
-
-------------------------------------------------------------------------
-
-
 **Takeaway:** forwarding semantics を kernel の canonical state として保ちながら、bridge/FIB/TC policy を software または hardware execution へ写像できるようになった。switchdev と TC offload は同じ直列 API ではなく、別の control path が driver/hardware で交差する。
 
 ### XFRM packet offload — security state と forwarding placement
 
-6.2 の XFRM packet offload は、従来の crypto offload より広く packet-level IPsec processing をdeviceへ配置する仕組みである。kernel/XFRM が policy/state のcanonical control planeを保持しながら、executionをsoftwareまたはdeviceへ置ける点で switchdev/TC offload と共通する。security semantics は独立した cross-cutting domain であり、ここでは hardware execution placement との接点だけを扱う。
+6.2 の XFRM packet offload は、従来の crypto offload より広く packet-level IPsec processing を \\1 へ配置する仕組みである。kernel/XFRM が policy/state の \1 control plan\1 を保持しながら、executio\1 を \\1 または \\1 へ置ける点で switchdev/TC offload と共通する。security semantics は独立した cross-cutting domain であり、ここでは hardware execution placement との接点だけを扱う。
 
 ## Routing / Netlink / RTNL
 
-この lineage の早い転換点として、IPv4 route-cache removal（3.6）がある。per-destination shared cache に依存する routing model を外し、後年の nexthop object や locking-scope縮小とは別系統ながら、routing scalability を global/shared state の削減によって改善した。
+Routing/control-plane scalability では、共有状態の削減、再利用可能な routing object、machine-readable API、lock scope の縮小が並行して進んだ。IPv4 route-cache removal（3.6）は per-destination shared cache を外した早い転換点であり、nexthop object や per-netns RTNL の直接の祖先ではないが、global/shared state を減らすという同じ scalability pressure に応えた。
 
-6.19 の WireGuard YNL-described Netlink は、個別 security protocol の説明ではなく、machine-readable Netlink schema が実 subsystem へ広がる CONTROL PLANE の例としてここに置く。
+6.19 の WireGuard YNL-described Netlink は、machine-readable Netlink schema が個別 subsystem へ広がった例である。
 
 routing は nexthop object により:
 
@@ -520,7 +504,7 @@ global RTNL
 
 この `→` は direct extension を意味せず、global RTNL dependency を縮小する複数の locking / refactoring techniques が同じ設計方向に進んだことを示す。
 
-7.3向けnetworking pullでは `RTM_NEWRULE` / `RTM_DELRULE` のFIB rule変更が RTNL-lock-less化され、further RTNL-dependency reductionやlock-less GET準備と 同じ「global RTNL依存を減らす」流れとしてmainlineへ入った。
+7.\1 向け \1 pul\1 では `RTM_NEWRULE` / `RTM_DELRULE` の \1 rul\1 変更が RTNL-lock-les\1 化され、further RTNL-dependency reductio\1 や \1 GE\1 準備と 同じ「global RTN\1 依存を減らす」流れとして \\1 へ入った。
 
 さらに 7.3-rc / mainline では per-netns netdev unregistration infrastructure が入り、 per-netns RTNL の大きな blocker だった device unregistration path の分解も進んだ。 これは 6.13 以降の per-netns RTNL lineage の継続として扱う。
 
@@ -532,26 +516,26 @@ global RTNL
 
 ## netfilter / nftables / conntrack — rule engine から policy-selected fast path へ
 
-Netfilter の15年間を `iptables → nftables` という userspace command の置換として見ると本質を取りこぼす。変化の中心は、既存の hook / conntrack / NAT を残しながら、**ruleset representation、state、policy placement、fast-path eligibility、hardware placement を明示化したこと**にある。
+Netfilter の1\1 年間を `iptables → nftables` という userspace command の置換として見ると本質を取りこぼす。変化の中心は、既存の hook / conntrack / NAT を残しながら、**ruleset representation、state、policy placement、fast-path eligibility、hardware placement を明示化したこと**にある。
 
 ``` text
 iptables / ip6tables / ebtables / arptables
-        ↓
+ ↓
 nftables core (3.13)
-  ├─ expression / VM-based rules
-  ├─ Netlink control plane
-  ├─ sets / maps
-  └─ transactional ruleset updates
-        ├─ ingress hook / netdev family (4.2)
-        ├─ bridge-family + conntrack
-        └─ flowtable (4.16)
-              ├─ software fast path
-              └─ hardware offload (5.5)
+ ├─ expression / VM-based rules
+ ├─ Netlink control plane
+ ├─ sets / maps
+ └─ transactional ruleset updates
+ ├─ ingress hook / netdev family (4.2)
+ ├─ bridge-family + conntrack
+ └─ flowtable (4.16)
+ ├─ software fast path
+ └─ hardware offload (5.5)
 ```
 
 ### nftables — ruleset model の再設計
 
-nftables は3.13で mainline に入り、family ごとに重複していた xtables machinery を汎用 expression/VM と Netlink API に寄せた。重要なのは syntax ではなく、atomic/transactional update、sets/maps、monitoring/tracing を含む **ruleset object model** への移行である。4.2 の ingress hook、5.16 の netdev egress hookは、Netfilter policyを適用できる datapath point を広げた。
+nftables は3.1\1 で mainline に入り、family ごとに重複していた xtables machinery を汎用 expression/VM と Netlink API に寄せた。重要なのは syntax ではなく、atomic/transactional update、sets/maps、monitoring/tracing を含む **ruleset object model** への移行である。4.2 の ingress hook、5.16 の netdev egress hoo\1 は、Netfilter polic\1 を適用できる datapath point を広げた。
 
 ### conntrack — shared flow-state substrate
 
@@ -559,39 +543,39 @@ conntrack は nftables に置換されたものではない。flow direction/sta
 
 ``` text
 packet → Netfilter hook → conntrack
-                         ├─ state / direction
-                         ├─ NAT mapping
-                         ├─ mark / label
-                         └─ lifetime
-                              ├─ nftables
-                              ├─ TC ct
-                              ├─ BPF kfunc
-                              └─ flowtable
+ ├─ state / direction
+ ├─ NAT mapping
+ ├─ mark / label
+ └─ lifetime
+ ├─ nftables
+ ├─ TC ct
+ ├─ BPF kfunc
+ └─ flowtable
 ```
 
 4.7 世代では conntrack hash table の scope が全 netns 共有へ寄せられ、entry accounting は netns 単位に残った。4.9 世代では GC worker による timeout entry 回収が導入された。5.18/6.0 世代には BPF から conntrack entry を lookup / allocate / insert する kfunc も加わり、state は firewall 専用ではなく複数 execution model から利用される object になった。
 
 ### flowtable — policy と fast path の分離
 
-4.16 の flowtable では、最初の packet が classic forwarding / conntrack / nftables policy を通り、選択された established flow が fast path に登録される。hit時は後段の classic forwarding hooks を bypassして `neigh_xmit()` へ進み、miss、fragment、FIN/RST、MTU exception などは classic pathへ戻る。
+4.16 の flowtable では、最初の packet が classic forwarding / conntrack / nftables policy を通り、選択された established flow が fast path に登録される。hi\1 時は後段の classic forwarding hooks を bypas\1 して `neigh_xmit()` へ進み、miss、fragment、FIN/RST、MTU exception などは classic pat\1 へ戻る。
 
 ``` text
-                         miss / exception
+ miss / exception
 ingress → flowtable lookup ─────────→ classic forwarding
-              │                           │
-              │ hit                       │ policy / conntrack
-              ▼                           │
-        fast forwarding ←── flow add ─────┘
-              │
-              ▼
-          neigh_xmit()
+ │ │
+ │ hit │ policy / conntrack
+ ▼ │
+ fast forwarding ←── flow add ─────┘
+ │
+ ▼
+ neigh_xmit()
 ```
 
-5.5 世代では hardware offload に拡張され、flow は `flow_rule` として driver/hardware datapath に写像される。hardware投入は非同期なので、完了まで software path を通る packet もある。これは fast path が policy engine を置換したのではなく、**policy/state を共有しながら software slow path・software fast path・hardware path を共存させた**例である。
+5.5 世代では hardware offload に拡張され、flow は `flow_rule` として driver/hardware datapath に写像される。hardwar\1 投入は非同期なので、完了まで software path を通る packet もある。これは fast path が policy engine を置換したのではなく、**policy/state を共有しながら software slow path・software fast path・hardware path を共存させた**例である。
 
 ### BPF / XDP との関係
 
-BPF/XDP も nftables の置換ではない。bpfilter は iptables-compatible ruleset を BPF へ変換する構想として4.18に骨格が入ったが6.8で削除された。一方、定着したのは conntrack kfunc、6.4 の `BPF_PROG_TYPE_NETFILTER`、flowtable lookup kfunc のように既存 Netfilter infrastructure と相互乗り入れする方向である。
+BPF/XDP も nftables の置換ではない。bpfilter は iptables-compatible ruleset を BPF へ変換する構想として4.1\1 に骨格が入ったが6.\1 で削除された。一方、定着したのは conntrack kfunc、6.4 の `BPF_PROG_TYPE_NETFILTER`、flowtable lookup kfunc のように既存 Netfilter infrastructure と相互乗り入れする方向である。
 
 **Takeaway:** Netfilter では policy representation、transactional update、shared flow state、fast-path eligibility、software/hardware execution placement が明示化された。これは CONTROL PLANE から「explicit contracts が複数 execution model の共存を可能にする」ことを示す代表例である。
 
@@ -599,14 +583,14 @@ BPF/XDP も nftables の置換ではない。bpfilter は iptables-compatible ru
 
 ## Virtual networking — datapath と queue assignment の並行進化
 
-この lineage の前史は v5.0 よりかなり早い。network namespace と `setns()` は network stack instance を process/container 単位に切り替える isolation/control primitive を与え、VXLAN（3.7）は L3 underlay 上に L2 overlay を構成する一般的な tunnel device を、ipvlan（3.19）は veth/macvlanとは異なる lightweight virtual interface model を追加した。これらは後年の netkit、vDPA、queue leasing の直接の祖先ではないが、**一つの physical network device / host stack の上に複数の virtual networking model を共存させる foundation**である。
+この lineage の前史は v5.0 よりかなり早い。network namespace と `setns()` は network stack instance を process/container 単位に切り替える isolation/control primitive を与え、VXLAN（3.7）は L3 underlay 上に L2 overlay を構成する一般的な tunnel device を、ipvlan（3.19）は veth/macvla\1 とは異なる lightweight virtual interface model を追加した。これらは後年の netkit、vDPA、queue leasing の直接の祖先ではないが、**一つの physical network device / host stack の上に複数の virtual networking model を共存させる foundation**である。
 
 ``` text
 network namespace / setns
-        ├─ veth / bridge
-        ├─ VXLAN overlay (3.7)
-        └─ ipvlan (3.19)
-              ↓
+ ├─ veth / bridge
+ ├─ VXLAN overlay (3.7)
+ └─ ipvlan (3.19)
+ ↓
 later: virtio/vhost/vDPA, SR-IOV, netkit, queue assignment
 ```
 
@@ -623,15 +607,15 @@ guest virtio-net → QEMU/vhost/TAP → bridge/OVS → NIC
 
 ``` text
 VM datapath:
-  virtio-net ∥ vhost ∥ vDPA ∥ SR-IOV/VFIO
-                    ↔
-              AF_XDP zero-copy
+ virtio-net ∥ vhost ∥ vDPA ∥ SR-IOV/VFIO
+ ↔
+ AF_XDP zero-copy
 
 container datapath:
-  veth ∥ netkit / BPF-native path
+ veth ∥ netkit / BPF-native path
 
 queue / zero-copy assignment:
-  AF_XDP / io_uring ↔ RX HW queue leasing
+ AF_XDP / io_uring ↔ RX HW queue leasing
 ```
 
 netkit は veth の単純な後継ではなく、RX HW queue leasing も netkit から派生した機能ではない。queue lease は virtual-device queue と physical-device queue の対応を明示し、AF_XDP や memory-provider 型の queue-bound API を container/virtual-device 側から利用可能にする **assignment mechanism** として位置付ける。
@@ -649,20 +633,24 @@ v6.7 netkit、v6.11 virtio-net AF_XDP RX ZC、v7.1 RX HW queue leasing に共通
 
 ### Transport protocol evolution
 
-| Theme                         | Representative milestones  | この節で追う意味                           |
+| Theme | Representative milestones | この節で追う意味 |
 |-------------------------------|----------------------------|--------------------------------------------|
-| connection establishment      | TFO client / server        | handshake latency / early data             |
-| congestion control / feedback | DCTCP · BBR · PLB · AccECN | congestion signal と sender behavior       |
-| multipath                     | MPTCP                      | 複数 path / subflow の transport semantics |
-| authentication                | TCP-AO                     | TCP connection authentication              |
+| connection establishment | TFO client / server | handshake latency / early data |
+| congestion control / feedback | DCTCP · BBR · PLB · AccECN | congestion signal と sender behavior |
+| multipath | MPTCP | 複数 path / subflow の transport semantics |
+| authentication | TCP-AO | TCP connection authentication |
 
 これらも一本の派生系列ではない。
 
+TFO は handshake と application data の境界を変え、connection establishment latency を削減した。DCTCP は ECN marking を datacenter congestion feedback として積極的に利用し、BBR は loss を主信号とする従来型とは異なり bandwidth / RTT model に基づいて sending behavior を決める。PLB は ECMP 環境で persistent congestion を検出した flow の path を transport 側から再選択する。AccECN は CE feedback の情報量を増やし、より細かな congestion signal を transport に返す。
+
+MPTCP は一つの論理 connection の下に複数 subflow / address / path-manager state を持つ transport へ TCP semantics を拡張した。TCP-AO は connection authentication を現在の TCP option / key-management model に更新する。これらは packet-memory や BPF execution contract とは異なり、**transport が保持する connection / congestion / path / authentication semantics 自体**を変更する lineage である。
+
 ``` text
-connection establishment:       TFO
-congestion control / feedback:  DCTCP ∥ BBR ∥ PLB ∥ AccECN
-multipath:                       MPTCP
-authentication:                  TCP-AO
+connection establishment: TFO
+congestion control / feedback: DCTCP ∥ BBR ∥ PLB ∥ AccECN
+multipath: MPTCP
+authentication: TCP-AO
 ```
 
 MPTCP は initial upstream から multi-subflow、userspace path manager、Generic Netlink、BPF integration へ発展し、7.2 の PM limit expansion は operational scale を広げたが、BBR や BIG TCP の後継ではない。
@@ -681,7 +669,7 @@ UDP でも `MSG_ZEROCOPY` と GRO/GSO は copy cost と per-packet processing �
 UDP は GRO/GSO、tunnel/encapsulation、high packet-rate RX、receive-buffer scaling の 基盤として発展してきた。ここでは UDP 固有の protocol lineage と、PERFORMANCE / VIRTUAL-OVERLAY 側で扱う packet aggregation・tunnel acceleration を混同しない。
 
 
-**Takeaway:** transport は explicit-contract thesisだけでは説明しない。TFO、DCTCP、BBR、MPTCP、PLB、AccECN は主に connection / congestion / path / feedback semantics 自体を更新する並行系列である。
+**Takeaway:** transport は explicit-contract thesi\1 だけでは説明しない。TFO、DCTCP、BBR、MPTCP、PLB、AccECN は主に connection / congestion / path / feedback semantics 自体を更新する並行系列である。
 
 ------------------------------------------------------------------------
 
