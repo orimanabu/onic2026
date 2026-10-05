@@ -543,6 +543,18 @@ bridge / FIB / VLAN objects → switchdev notifications / objects → switch dri
 | VRF device | 4.3 | `193125dbd8eb292d88feb201f030889b488b0a02` |
 | TC `ct` action | 5.3 | `b57dc7c13ea90e09ae15f821d2583fa0231b4935` |
 
+#### r27 audit status — routing / TC / offload
+
+| Milestone | Exact SHA | First final release | Primary-source status | First-containing rc tag |
+|---|---|---:|---|---|
+| bridge VLAN filtering | `243a2e63f5f47763b802e9dee8dbf1611a1c1322` | 3.9 | origin commit text verified | `open` — ancestry not yet independently verified |
+| MPLS routing / AF_MPLS | `0189197f441602acdca3f97750d392a895b778fd` | 4.1 | AF_MPLS anchor and “since Linux 4.1” independently documented; kernel CVE metadata also identifies the same introducing commit/version | `open` — ancestry not yet independently verified |
+| Flower classifier | `77b9900ef53ae047e36a37d13a2aa33bb2d60641` | 4.2 | exact origin SHA corroborated by contemporary netdev discussion | `open` — ancestry not yet independently verified |
+| VRF device | `193125dbd8eb292d88feb201f030889b488b0a02` | 4.3 | exact anchor retained; kernel VRF documentation is the semantic reference | `open` — ancestry not yet independently verified |
+| TC `ct` action | `b57dc7c13ea90e09ae15f821d2583fa0231b4935` | 5.3 | exact commit text verified: conntrack state/mark/label become usable by TC classifiers | `open` — ancestry not yet independently verified |
+
+**監査上の注意:** この表では、検索結果や release-generation の情報だけから `vX.Y-rc1` を推定していない。`First-containing rc tag` は、対象 commit と rc tag の ancestry を git object graph で確認できるまでは `open` とする。これは「feature の first final release が未確定」という意味ではない。
+
 ここで重要なのは、**switchdev と TC offload を一本の経路として扱わない**ことである。bridge/FDB/VLAN/FIB の object/notification path と、TC classifier/action の `ndo_setup_tc` / flow-block callback path は driver/hardware で合流し得るが、kernel API としては並行する経路である。
 
 ここで2本の offload path を区別する。**bridge/FIB/VLAN の switchdev path** は kernel forwarding objects を switch ASIC へ同期する。一方、**TC offload path** は classifier/action semantics を `ndo_setup_tc`、flow block callbacks、representor 等を介して driver/hardware へ写像する。両者は同じ hardware offload architecture の一部として交差するが、`TC → switchdev → ASIC` という単一の直列 pipeline ではない。
@@ -1208,6 +1220,16 @@ Evidence class は次の語彙だけを用いる。
 
 `First containing rc tag` は、**git ancestry (`git merge-base --is-ancestor <sha> <tag>`) あるいは同等の一次資料で containment を確認した場合だけ記入する**。`vX.Y` に含まれるという事実から `vX.Y-rc1` を逆算しない。したがって `open` は「根拠が弱い」ではなく、**rc-tag containment の監査をまだ完了していない**ことだけを意味する。
 
+ローカルに Torvalds tree がある場合の再現可能な確認手順は次の通り。
+
+```bash
+git merge-base --is-ancestor <sha> vX.Y-rc1 && echo contained
+git merge-base --is-ancestor <sha> vX.Y-rc2 && echo contained
+git tag --contains <sha> --sort=version:refname | grep -E '^v[0-9]+\.[0-9]+(-rc[0-9]+)?$' | head
+```
+
+最初の2行は候補 tag に対する yes/no の ancestry test、3行目は containment tag の探索補助である。**日付順・commit message・final release の所属だけでは rc containment の代用にしない。**
+
 ## Canonical milestone table
 
 ### 3.0–3.18
@@ -1500,6 +1522,7 @@ released tag
 その他の TUN/TAP multiqueue、TLP/RACK、ETF、CBS、GTP-U、SRv6、preferred busy polling、XDP RX/TX metadata、DualPI2、`netdev_work` 等は重要な機能だが、現行の採用基準では「本文の長期 lineage を代表する canonical point」とする追加理由を個別に監査してから昇格する。**未掲載 = 重要でない**ではない。
 
 # Changelog / Errata（非正規）
+- **r27:** routing / TC / offload の5 milestone に primary-source audit status を追加。bridge VLAN filtering のorigin commit、AF_MPLS の4.1導入、Flower origin SHA、TC `ct` のconntrack metadata semantics を再確認。`First containing rc tag` は検索や日付から推定せず、git object graph の ancestry 確認が終わるまで `open` を維持。`git merge-base --is-ancestor` / `git tag --contains` による再現可能な監査手順を明記。
 - **r26:** canonical verification procedure を強化。`First containing rc tag` は git ancestry または同等の一次資料で containment を確認した場合だけ記入することを明文化。routing / TC / offload の5件について final release + 40桁 anchor の再監査表を本文に追加し、switchdev object path と TC `ndo_setup_tc` / flow-block path が並行経路であることを明示。一次資料への verification entry points も追加。
 - **r25:** routing / TC / offload の短い lineage を追加し、bridge VLAN filtering (3.9)、MPLS routing (4.1)、Flower (4.2)、VRF (4.3)、TC `ct` action (5.3) を canonical milestone / exact-anchor inventory に追加。
 - **r25:** switchdev 図を bridge/FIB/VLAN の switchdev path と TC の `ndo_setup_tc` / flow-block path の並行経路へ修正。
