@@ -7,7 +7,7 @@ title: Linux Networking Evolution
 > **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras, Parts III–V the lineages / driver-framework / observability story. Part VI is the only normative release chronology, Part VII the provenance ledger, and Appendix material is supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02  
-**構成改訂:** 2026-10-06（r47）
+**構成改訂:** 2026-10-06（r48）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
@@ -208,9 +208,11 @@ Part III では release 順ではなく、同じ設計課題が長期間にど�
 
 Part VI の年表からは以下の stable anchor へ戻れる。主要な入口は **Queueing / Aggregation / BPF / XDP / Packet memory / io_uring / Routing・TC / Netlink・RTNL / Netfilter / Virtual networking / Transport / Security / Observability** で、driver-framework側は Part IV の **DQL/BQL / switchdev / devlink / phylink / DIM / page_pool / netdevsim / auxiliary bus / threaded NAPI / ethtool netlink / netdev-genl** へ接続する。Markdown renderer固有の日本語heading slugに依存しないよう、本文には明示的なHTML anchorを置く。
 
-### Axis group: PERFORMANCE
+**PERFORMANCE** — queueing, aggregation, pacing, CPU/queue placement
 
 <a id="detail-queueing"></a>
+各トピックは原則として **位置づけ → story / lineage → mechanism → Takeaway** の順に読む。driver-specific mechanism は Part IV、観測 primitive / tool case study は Part V に置き、Part III では重複して再説明しない。
+
 ## Queueing / latency / pacing — multi-layer control evolution
 
 PERFORMANCE 軸の queueing lineage は、単に qdisc algorithm が増えた歴史ではない。socket が作る burst、qdisc が保持する backlog、driver/NIC ring に積まれた outstanding bytes、さらに multiqueue NIC での queue 選択を、それぞれ別レイヤーで制御できるようになった歴史である。
@@ -235,15 +237,6 @@ Wi-Fi/mac80211 では airtime accounting/scheduling と AQL が、byte queue だ
 
 **Takeaway:** queue occupancy と completion を accounting/API として明示し、各 layer が backpressure と scheduling を独立に制御できるようになった。
 
-
-
-### Queueing の mechanism をもう一段下げて見る
-
-DQL/BQL は「queue length を固定値で小さくする」仕組みではない。driver が hardware queue へ渡した byte 数を `dql_queued()`、完了した byte 数を `dql_completed()` 相当の accounting で追跡し、device が starvation しない範囲まで software 側の outstanding data limit を適応させる。したがって目的は throughput を犠牲にして queue を短くすることではなく、**NIC が必要とする最小限の backlog を学習して、driver 内部に隠れていた queueing delay を露出・制御すること**にある。BQL の設計背景は LWN の original series（https://lwn.net/Articles/469652/）を参照。
-
-`SO_REUSEPORT` は同一 local address/port に複数 socket を bind できるようにし、TCP server では listener を worker ごとに分けて accept-side contention と load distribution を改善する。後には reuseport group に BPF program を付けて socket selection 自体を programmable にできる。`SO_BUSY_POLL` は socket が最後に受信した対応 NIC/NAPI context を手掛かりに、blocking receive や poll/select が短時間 busy-poll して interrupt/scheduler latency を避ける。その代償は CPU utilization と power である。API semantics は `socket(7)`（https://man7.org/linux/man-pages/man7/socket.7.html）を参照。
-
-`sch_fq` pacing は queueing discipline が単に packet を並べるだけでなく、flow ごとの pacing time を使って送信時刻を制御する転換点である。TCP の pacing rate と qdisc の scheduler が接続されることで、burst を NIC queue に押し込むのではなく、host 内で送信間隔を整える。後の BBR などの congestion-control model が pacing を積極的に利用できる土台になった。
 
 
 ### CoDel — queue length ではなく sojourn time を制御する
@@ -326,7 +319,7 @@ GSO は送信側で大きな `skb` を transport/network stack に通し、NIC �
 BIG TCP はこの内部 processing unit を従来の約64 KiB境界よりさらに大きくする。IPv6では Hop-by-Hop option、IPv4では適切な GSO/GRO metadata を使い、巨大な packet をそのまま wire に出すのではなく、host 内での per-packet overhead を減らす。したがって BIG TCP は jumbo frame の別名ではない。Netdev 0x15 の “BIG TCP” session は、この狙いを high-speed host networking の観点から説明している（https://netdevconf.info/0x15/accepted-sessions.html）。
 
 
-### Axis group: PROGRAMMABILITY
+**PROGRAMMABILITY** — BPF hooks, object model, XDP/AF_XDP
 
 <a id="detail-bpf"></a>
 ## BPF — packet filter から stack extension へ
@@ -478,7 +471,7 @@ XDP metadata / RX hintsはhardware timestamp、RSS hash、VLAN等、packet bytes
 
 <a id="detail-devmem-large"></a>
 
-### Axis group: MEMORY
+**MEMORY** — page-backed RX から provider / device memory へ
 
 <a id="detail-packet-memory"></a>
 ## Packet memory — page_pool → netmem → memory providers / device memory
@@ -604,7 +597,7 @@ io_uring の networking は単に `sendmsg()` / `recvmsg()` を別syscallへ置�
 
 zero-copyにはpage pinning、completion notification、small-packetではcopyの方が安い場合がある等のtrade-offがあり、単純に常時有効化するoptimizationではない。kernel documentation: https://docs.kernel.org/networking/msg_zerocopy.html
 
-### Axis group: CONTROL PLANE
+**CONTROL PLANE** — forwarding objects, TC/offload, Netlink/RTNL
 
 <a id="detail-routing-tc-offload"></a>
 ## Routing / TC / offload — forwarding semantics と hardware mapping の並行進化
@@ -826,7 +819,7 @@ Linux 3.0の`setns()`は、`/proc/PID/ns/*`のmagic linkをopenして得たfile 
 
 named netnsもこの性質を利用しており、`/var/run/netns/NAME`をopenしたFDはnamespaceを参照し続け、そのFDを`setns()`へ渡せる。container/network toolingにとって、network namespace lifecycleとprocess lifecycleを切り離す基礎になった。man-pages: https://man7.org/linux/man-pages/man2/setns.2.html , https://man7.org/linux/man-pages/man8/ip-netns.8.html
 
-### Cross-cutting domains
+**CROSS-CUTTING DOMAINS** — virtual/overlay, transport, security
 
 <a id="detail-virtual"></a>
 ## Virtual networking — datapath と queue assignment の並行進化
@@ -883,6 +876,7 @@ network namespace は network device、routing table、firewall state、socket n
 netkitはこの系列をBPF-first container datapathとして再設計し、peer側device内部にBPF execution pointを持たせる。LPC 2023資料はveth/ipvlan/netkitを、device legs、routing、BPF programming placement、per-CPU backlog overheadの観点で比較している（https://lpc.events/event/17/contributions/1581/attachments/1292/2602/lpc_netkit_devs.pdf）。後のqueue leasingではvirtual deviceがphysical NIC queueのresource boundaryとも接続される。
 
 
+<a id="detail-congestion-signals"></a>
 <a id="detail-transport"></a>
 ## TCP / UDP / transport
 
@@ -961,15 +955,6 @@ MPTCP connection / data sequence space
 
 kernel documentation: https://docs.kernel.org/networking/mptcp.html
 
-<a id="detail-congestion-signals"></a>
-### PLB と AccECN — congestion signal の意味を豊かにする
-
-Protective Load Balancing (PLB) はECMP環境で、単一flowがpersistent congestionのあるpathへhashされた場合にflow label/hash等を変更して別pathを選び直す。通常のTCP congestion controlが「そのpath上でsending rateをどう変えるか」を扱うのに対し、PLBは **どのECMP pathを使うか** までtransport reactionの対象にする点が異なる。
-
-Accurate ECN (AccECN) はclassic ECNのECE/CWRによる粗いfeedbackより多くのcongestion-marking情報をsenderへ返す。DCTCPのようなECN-sensitive algorithmやdatacenter congestion controlでは、単なる「congestionがあった/なかった」より、markingの程度を把握できることが重要になる。したがってDCTCP → PLB → AccECNは一直線の機能継承ではないが、**loss以外のnetwork signalをtransport decisionへ取り込む粒度が上がった**という並行した流れとして読める。
-
-
-<a id="detail-tcp-modern"></a>
 ### TCP のその他の重要な変化 — repair / small queues / pacing / auth
 
 `TCP_REPAIR` はcheckpoint/restore用途でsocket stateやsequence/window情報をuserspaceから保存・復元できるようにし、live connectionをprocess/container lifecycleと切り離す。TCP Small Queues (TSQ) は1 socketがqdisc/device queueへ過剰なbytesを押し込むのを抑え、BQLがdriver/hardware queueを制御するのに対してsocket側のbufferingを制限する。
@@ -1114,13 +1099,6 @@ NIC ring ───────────────┘
 したがって BQL の contract form は ownership ではなく **accounting / backpressure** である。
 
 
-### DQL/BQL の driver contract
-
-BQLをdriverから見ると、TX ring descriptor数そのものではなく **byte accounting** を共通DQL layerへ報告することがcontractになる。enqueue時にqueued bytes、TX completion時にcompleted bytesを報告し、`netdev_tx_sent_queue()` / `netdev_tx_completed_queue()` 系helperを通してstack側queue stop/wake判断と結び付く。これによりdriver固有の「何descriptorまで溜めるか」という静的tuningから、deviceの実際のdrain behaviorを観測するadaptive limitへ移る。
-
-BQLはqdiscの代替ではない。qdiscはsoftware scheduling/pacing/AQM、BQLはその下にあるdriver/hardware queueへのoutstanding bytesを抑える。したがって fq_codel や sch_fq と組み合わせると、上位のqueueing policyがNIC内部の長いhidden queueに隠されにくくなる。
-
-<a id="detail-switchdev"></a>
 ## switchdev — kernel forwarding object と switch ASIC
 
 switchdev は Linux bridge/FDB/VLAN などの kernel forwarding state を switch ASIC に同期するための framework として発展した。目的は「hardware switch を特別な別世界として管理する」ことではなく、Linux networking object を canonical control state として維持しながら forwarding execution を hardware に配置できるようにすることである。
@@ -1270,13 +1248,12 @@ page_pool
 ここではPart IIIと同じrelease chronologyを繰り返さず、driver-frameworkとしての役割だけを保持する。
 
 
-### page_pool の fast path と lifetime
+### Mechanism
 
-page_poolはper-NAPI/RX-queueに近い配置でcache/recycle pathを持ち、allocation時のDMA mappingを再利用できる。driverはpacket bufferをstackへ渡した後も、適切なreturn pathでpage_poolへ返せる。fragment supportにより1 pageを複数RX bufferへ分ける利用も可能で、大きなbase-page systemでのmemory efficiencyにも効く。
+page_pool は通常 RX queue / NAPI に近い単位で配置され、RX buffer の allocation / recycle と DMA mapping reuse をまとめる。packet が stack や redirect 先へ渡された後も buffer が in-flight になり得るため、pool detach と最終 release は別イベントである。fragment support、page-pool introspection、custom memory provider はこの lifetime model の上に積み上がる。
 
-重要なのはallocation速度だけでなく、**DMA ownership transition と delayed return を共通化すること**である。LPC 2025のMANA talkは64 KiB base pageで1 packet/1 pageが大きな浪費になる問題に対し、page_pool fragmentsとpre-DMA-mapped poolをRX queueごとに使う具体例を示す（https://lpc.events/event/19/contributions/2276/）。kernel docs: https://docs.kernel.org/networking/page_pool.html
+このため page_pool の本質は「高速allocator」だけではなく、**RX packet memory の ownership / recycling / DMA lifetime を driver 共通 contract にしたこと**にある。
 
-<a id="detail-netdevsim"></a>
 ## netdevsim — framework API を hardware なしで検証する
 
 netdevsim（4.16）は実NICを模倣するための一般的な emulator というより、networking core / driver API を **hardware independent にselftestできる test device** として重要である。devlink resource、FIB offload、rate object など、driver-facing contract が増えるほど「特定vendor hardwareなしにAPI semanticsを検証できること」がframework evolutionの一部になる。
@@ -1318,6 +1295,7 @@ Kernel netdev specification: https://docs.kernel.org/7.1/netlink/specs/netdev.ht
 
 後のbusy-poll関連拡張ではapplication側pollingとNAPI schedulingの関係もさらに明示化される。したがってNAPIの進化は interrupt mitigation → polling budget → execution placement → userspace-driven busy polling という複数段階で読む必要がある。
 
+<a id="detail-ethtool-genl"></a>
 <a id="detail-ethtool-netlink"></a>
 ## ethtool netlink と YNL — driver control API の構造化
 
@@ -1343,6 +1321,12 @@ machine-readable schema / generated tooling
 YNLはさらにGeneric Netlink family specificationをYAMLで記述し、userspace codeやdocumentationを生成する。重要なのはserialization形式より、**API schemaをmachine-readable source of truthにする**ことである。これによりattribute policy、operation、multicast groupをcode/doc/test間で共有できる。
 
 <a id="detail-netdev-genl"></a>
+### Mechanism
+
+Generic Netlink family `ethtool` は link modes、features、rings、channels、coalescing、pause、EEE、FEC、module、stats 等を nested attributes で表す。GET / SET / ACT、dump、notification、extended ACK、bitset representation を利用でき、固定 ioctl structure を増設し続ける方式より schema evolution と machine-readable tooling に向く。
+
+移行は ioctl を一度に廃止する方式ではなく、機能単位で Netlink command を追加する形で進んだ。後の YNL はこの structured API を YAML schema から扱う方向をさらに明確にした。
+
 ## netdev-genl — queue / NAPI identity を control-plane object へ
 
 netdev generic Netlink familyでは、NAPI instanceやRX/TX queueのidentityをuserspaceから列挙・参照できる方向が進んだ。これは単なるobservability enhancementではない。AF_XDP、io_uring ZCRX、memory providers、queue leasingのように **特定queueへresourceをbindingするAPI** が増えると、queueそのものを安定して指し示すcontrol-plane identityが必要になるためである。
@@ -1376,15 +1360,6 @@ netdev Generic Netlink familyは、従来driver内部の実装詳細だったNAP
 Rust PHY supportはnetwork driver全体をRustへ置き換えるものではなく、PHY abstractionという比較的明確なdriver contractからRust binding/implementationを導入した例である。本書では言語移行そのものより、既存C subsystem APIのownership/lifetime ruleをRust type systemへどう写像するかというDRIVER FRAMEWORKの変化として位置付ける。
 
 
-<a id="detail-ethtool-genl"></a>
-### ethtool Generic Netlink — ioctl command set から extensible object API へ
-
-ethtool NetlinkはGeneric Netlink family `ethtool`を使い、link modes、features、rings、channels、coalescing、pause、EEE、FEC、module、stats等をnested attributesとして扱う。`GET` / `SET` / `ACT`とnotificationを持ち、extended ACK、dump、compact/verbose bitsetを利用できるため、固定ioctl structureを拡張し続ける方式よりschema evolutionに向く。
-
-現在のkernel documentationにはioctl→Netlink command mappingもあり、すべてを一度に置換したのではなく機能単位で移行したことが分かる。これはYNLへの流れと合わせ、**device control APIをstructured / discoverable / machine-readableにする**CONTROL PLANE/DRIVER FRAMEWORKの変化である。kernel docs: https://docs.kernel.org/networking/ethtool-netlink.html
-
-
-<a id="detail-threaded-busypoll"></a>
 ### Threaded NAPI busy-poll — NAPIごとのdedicated polling execution
 
 threaded NAPIはsoftirqではなくkernel threadでNAPI pollを実行する選択肢を導入した。後のthreaded busy-poll拡張は、そのthreadをcontinuous pollingさせ、RX/TX descriptorを低jitterで回収する用途を追加する。NetlinkからNAPI単位でthreaded/busy-pollを選択し、userspaceがthread PIDを取得してaffinity、priority、scheduler policyを設定できる設計である。
