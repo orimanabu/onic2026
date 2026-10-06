@@ -7,7 +7,7 @@ title: Linux Networking Evolution
 > **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras, Parts III–V the lineages / driver-framework / observability story. Part VI is the only normative release chronology, Part VII the provenance ledger, and Appendix material is supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02  
-**構成改訂:** 2026-10-06（r44）
+**構成改訂:** 2026-10-06（r45）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
@@ -218,6 +218,14 @@ DQL/BQL は「queue length を固定値で小さくする」仕組みではな�
 `sch_fq` pacing は queueing discipline が単に packet を並べるだけでなく、flow ごとの pacing time を使って送信時刻を制御する転換点である。TCP の pacing rate と qdisc の scheduler が接続されることで、burst を NIC queue に押し込むのではなく、host 内で送信間隔を整える。後の BBR などの congestion-control model が pacing を積極的に利用できる土台になった。
 
 <a id="detail-aggregation"></a>
+
+<a id="detail-aqm-pacing"></a>
+### AQM / pacing / deterministic scheduling — fq_codel, PIE, CAKE, ETF/TAPRIO
+
+`fq_codel` はflow queueingとCoDel AQMを組み合わせ、elephant flowが短いflowのlatencyを押し上げるhead-of-line effectを分離しつつ、persistent queue delayをCoDelで抑える。PIEはqueue delayを推定し、drop probabilityをfeedback制御する別系統のAQMである。CAKEは家庭/edge routerで必要になるfair queueing、AQM、diffserv handling、shaping、ACK filtering等を統合する方向を取った。
+
+一方、ETF (`sch_etf`) / `SO_TXTIME` と TAPRIO は「平均的なqueue delayを減らす」AQMとは目的が違う。ETFはpacketごとのdesired transmit timeをtimestampとしてqueueへ渡し、TAPRIOはIEEE 802.1Qbv型のgate control scheduleでtraffic classの送信windowを時間軸上に定義する。つまりqueue managementは **backlog制御 → flow fairness/AQM → pacing → explicit transmission-time scheduling** まで広がった。
+
 ## Packet aggregation — GRO/GSO → BIG TCP
 
 v5.0 ですでに GRO/GSO/TSO は成熟していたが、高速 NIC では per-packet metadata processing が支配的になる。
@@ -258,6 +266,14 @@ GSO は送信側で大きな `skb` を transport/network stack に通し、NIC �
 BIG TCP はこの内部 processing unit を従来の約64 KiB境界よりさらに大きくする。IPv6では Hop-by-Hop option、IPv4では適切な GSO/GRO metadata を使い、巨大な packet をそのまま wire に出すのではなく、host 内での per-packet overhead を減らす。したがって BIG TCP は jumbo frame の別名ではない。Netdev 0x15 の “BIG TCP” session は、この狙いを high-speed host networking の観点から説明している（https://netdevconf.info/0x15/accepted-sessions.html）。
 
 <a id="detail-bpf"></a>
+
+<a id="detail-rps-rfs"></a>
+### RPS / RFS / XPS — hardware queue の外側で CPU placement を制御する
+
+RPS (Receive Packet Steering) はNICがRSS queueを十分持たない場合でも、softwareでflow hashから処理CPUを選び、receive processingを別CPUへenqueueする。RFS (Receive Flow Steering) はさらにapplicationが実際にそのflowを処理しているCPUを考慮し、cache localityを改善する。XPSは送信側でCPUまたはRX queueとTX queueのmappingを持ち、TX lock contentionやcache migrationを減らす。
+
+これらはqueueそのものをuserspaceへleaseする後年の仕組みとは異なり、**packet processingをどのCPU/queueへ配置するかというsoftware steering** の初期段階である。kernel scaling documentation: https://docs.kernel.org/networking/scaling.html
+
 ## BPF — packet filter から stack extension へ
 
 BPF lineage の起点は XDP ではない。classic BPF は socket/filtering 文脈の小さな packet-filter VM だったが、3.15 世代の internal eBPF ISA rework と 3.18 の `bpf()` syscall / maps / verifier により、**userspace が verified program と persistent map object を kernel にロードする共通 execution model**へ変わった。3.19 の `SO_ATTACH_BPF` は socket filtering を新しい eBPF program model へ接続し、その後 TC、cgroup/LWT、socket hooks、XDP、`struct_ops`、TCX、qdisc へ attachment point が広がった。
@@ -382,6 +398,14 @@ AF_XDP は XSK socket と userspace UMEM、RX/TX/FILL/COMPLETION rings を組み
 この「kernel bypassではなくkernel-managed resourceを userspace datapath に貸す」という考え方は後の queue leasing に続く。LPC 2025 の zero-copy/KubeVirt talk は physical NIC hardware queue を netkit 等へ lease し、AF_XDP、io_uring ZCRX、Device Memory TCP を共通の queue-placement problem として扱っている（https://lpc.events/event/19/contributions/2275/）。
 
 <a id="detail-packet-memory"></a>
+
+<a id="detail-xdp-extensions"></a>
+### XDP の拡張 — multi-buffer / metadata / hints
+
+初期XDPは1 packet = 1 contiguous RX bufferという前提が強く、jumbo frameやscatter-gather RXとの相性が制約になった。XDP multi-bufferはfragmentを伴うpacket representationを導入し、driver/XDP program/redirect pathがnon-linear packetを扱えるようにする。これはXDPを特定MTU・特定driver layoutのfast pathから、より一般的なRX representationへ広げる変更である。
+
+XDP metadata / RX hintsはhardware timestamp、RSS hash、VLAN等、packet bytesの外側にあるNIC metadataをBPF programへ渡す。packet dataとmetadataのlifetime/layoutを別contractとして扱うため、AF_XDPやhardware-aware processingとの接続点になる。
+
 ## Packet memory — page_pool → netmem → memory providers / device memory
 
 packet memory の変化は「zero-copy が増えた」という一語では足りない。重要なのは、 **allocation / recycling / lifetime / DMA mapping / queue binding を誰が管理するか**が driver-private な慣習から common contract へ移ってきたことである。
@@ -490,6 +514,14 @@ io_uring の networking は単に `sendmsg()` / `recvmsg()` を別syscallへ置�
 `SEND_ZC` は送信時の userspace→kernel data copy を避ける方向だが、zero-copy completion は「send operationが完了した」ことと「userspace bufferを再利用してよい」ことを区別する必要がある。ZCRXではさらにRX queue/page_pool/memory providerとregistered userspace memoryを接続するため、network queue ownership と buffer lifetime が io_uring object model の外部条件になる。このため本書では io_uring を syscall batching の話だけでなく、**registered resource + asynchronous completion + queue/memory placement** の系列として扱う。
 
 <a id="detail-routing-tc-offload"></a>
+
+<a id="detail-socket-zerocopy"></a>
+### MSG_ZEROCOPY — socket API のcopy avoidance
+
+`MSG_ZEROCOPY` はsend pathでuserspace payloadをkernel bufferへcopyする代わりに、userspace pagesをnetworking TX pathへpin/referenceして利用する。send syscallのreturnはbuffer再利用可能を意味しないため、zero-copy completionはsocket error queue経由で別途通知される。この **operation completion と memory lifetime completion の分離** は、後のio_uring `SEND_ZC`にも共通する。
+
+zero-copyにはpage pinning、completion notification、small-packetではcopyの方が安い場合がある等のtrade-offがあり、単純に常時有効化するoptimizationではない。kernel documentation: https://docs.kernel.org/networking/msg_zerocopy.html
+
 ## Routing / TC / offload — forwarding semantics と hardware mapping の並行進化
 
 routing / forwarding control は BPF だけでは説明できない。bridge VLAN filtering、MPLS、VRF は Linux 内部の forwarding domain / lookup semantics を明示し、Flower と TC `ct` action は packet field と conntrack state を TC pipeline の match/action model に持ち込んだ。これらは後の hardware offload と接続するが、すべてが switchdev を経由するわけではない。
@@ -677,6 +709,14 @@ conntrack は5-tupleだけのcacheではなく、original/reply direction、stat
 flowtable は最初のpacketでpolicy/route/neighbour resolutionを行った結果からfast-path entryを作り、subsequent packetをclassic forwarding pathの一部を省略して送る。ただしFIN/RST、fragment、MTU exception等はclassic pathへ戻す。hardware offloadでも同じflow semanticsをdriver/NICへ配置する。詳細なpacket pathとexceptionはkernel docs（https://docs.kernel.org/networking/nf_flowtable.html）を参照。
 
 <a id="detail-virtual"></a>
+
+<a id="detail-tunnel-offloads"></a>
+### Tunnel / segmentation offload — overlay と NIC capability の接続
+
+VXLAN/GENEVE等のoverlayではinner packetをencapsulateするため、従来のTSO/GSO checksum assumptionsをそのまま使えない。UDP tunnel segmentation、checksum offload、tunnel GSO/GROはinner/outer header境界をmetadataとして保持し、NICまたはsoftware segmentationがencapsulation後のwire packetを正しく生成できるようにする。
+
+この系列によりoverlay導入が必ずper-packet software encapsulation costを意味しなくなった。後のTC tunnel offloadやswitchdev/e-switch offloadでは、tunnel key/action自体をhardware flow ruleへ写像する段階へ進む。
+
 ## Virtual networking — datapath と queue assignment の並行進化
 
 この lineage の前史は v5.0 よりかなり早い。network namespace と `setns()` は network stack instance を process/container 単位に切り替える isolation/control primitive を与え、VXLAN（3.7）は L3 underlay 上に L2 overlay を構成する一般的な tunnel device を、ipvlan（3.19）は veth/macvlan とは異なる lightweight virtual interface model を追加した。これらは後年の netkit、vDPA、queue leasing の直接の祖先ではないが、**一つの physical network device / host stack の上に複数の virtual networking model を共存させる foundation**である。
@@ -731,6 +771,14 @@ network namespace は network device、routing table、firewall state、socket n
 netkitはこの系列をBPF-first container datapathとして再設計し、peer側device内部にBPF execution pointを持たせる。LPC 2023資料はveth/ipvlan/netkitを、device legs、routing、BPF programming placement、per-CPU backlog overheadの観点で比較している（https://lpc.events/event/17/contributions/1581/attachments/1292/2602/lpc_netkit_devs.pdf）。後のqueue leasingではvirtual deviceがphysical NIC queueのresource boundaryとも接続される。
 
 <a id="detail-transport"></a>
+
+<a id="detail-seg6-ioam"></a>
+### Segment Routing / IOAM — packet header に path intent と telemetry を持たせる
+
+SRv6はIPv6 Segment Routing Header (SRH) にsegment listを持ち、endpoint behaviorを通じてpacket path/service functionを指定する。Linuxではroute/seg6 local actionとしてcontrol planeへ統合され、encap/inline/local behaviorをrouting objectとして扱う。
+
+IOAMはpacketが通過するnode/pathのtelemetryをpacket自身へ記録する仕組みで、単なるhost-local tracingとは異なる。Observability axisで扱うBPF/BTF/drop reasonが「kernel内部を外から観測」するのに対し、IOAMは **network path上でtelemetry stateをpacketへ運ぶ**。両者は観測対象とplacementが異なる。
+
 ## TCP / UDP / transport
 
 この節は **transport protocol 自体の semantics / feedback / path management** に絞る。 TCP 上で使われるという理由だけで、memory、aggregation、programmability の milestone を ここへ再収容しない。
@@ -816,6 +864,14 @@ Protective Load Balancing (PLB) はECMP環境で、単一flowがpersistent conge
 Accurate ECN (AccECN) はclassic ECNのECE/CWRによる粗いfeedbackより多くのcongestion-marking情報をsenderへ返す。DCTCPのようなECN-sensitive algorithmやdatacenter congestion controlでは、単なる「congestionがあった/なかった」より、markingの程度を把握できることが重要になる。したがってDCTCP → PLB → AccECNは一直線の機能継承ではないが、**loss以外のnetwork signalをtransport decisionへ取り込む粒度が上がった**という並行した流れとして読める。
 
 <a id="detail-security"></a>
+
+<a id="detail-tcp-modern"></a>
+### TCP のその他の重要な変化 — repair / small queues / pacing / auth
+
+`TCP_REPAIR` はcheckpoint/restore用途でsocket stateやsequence/window情報をuserspaceから保存・復元できるようにし、live connectionをprocess/container lifecycleと切り離す。TCP Small Queues (TSQ) は1 socketがqdisc/device queueへ過剰なbytesを押し込むのを抑え、BQLがdriver/hardware queueを制御するのに対してsocket側のbufferingを制限する。
+
+TCP pacingは`sch_fq`とtransport rate informationを接続し、後のBBR等がburstではなくrate-controlled transmissionを利用する基盤になった。TCP-AOはMD5 signatureの後継としてconnection authentication/key managementを拡張し、routing protocol等のlong-lived TCP sessionをsecurity domainへ接続する。
+
 ## SECURITY / kTLS / XFRM / WireGuard — security semantics と execution placement の分離
 
 SECURITY は第7の architecture axis ではなく、TRANSPORT や VIRTUAL / OVERLAY と同じ **cross-cutting lineage** として扱う。ここで追う共通テーマは「暗号方式の変遷」そのものではなく、**security state / policy を kernel が保持し、その semantics を変えずに software・accelerator・NIC のどこで実行するかを明示的な contract で選べるようになったこと**である。
@@ -902,6 +958,14 @@ TCP-AO は transport authentication semantics 自体の更新なので Part III�
 
 
 <a id="detail-observability"></a>
+
+<a id="detail-time-timestamp"></a>
+### Timestamping / time-aware networking — packet と clock domain を結び付ける
+
+Linux timestamping APIはsoftware timestampだけでなくNIC hardware timestampをsocket ancillary data/error queueへ返し、PTP/measurement applicationがpacket eventをclock domainへ対応付けられるようにする。PHC (PTP Hardware Clock) とcross timestampingはsystem clockとdevice clockの関係を明示する。
+
+これはRetis/pwruのpacket provenanceとは別系統だが、observabilityに「どこを通ったか」だけでなく **いつ発生したかをhardware timeまで含めて意味付けするcontract** を与える。man-pages: https://man7.org/linux/man-pages/man7/socket.7.html
+
 ## Observability — counter から packet provenance / typed introspection へ
 
 network observabilityの進化は「counterが増えた」だけではない。従来の`/proc/net/*`、`ip -s`、ethtool stats、SNMP counterは「どこかで何件起きたか」を集約して示すのに強い一方、特定packetがkernel内のどのfunction/objectを通り、なぜdropされたかを復元するには情報が足りない。tracepoint、BPF、BTF、drop reasonが組み合わさることで、観測対象は **aggregate counter → event → typed kernel object → packet provenance** へ広がった。
@@ -1268,6 +1332,14 @@ netdev Generic Netlink familyは、従来driver内部の実装詳細だったNAP
 
 これはobservabilityだけではない。AF_XDP、Device Memory TCP、io_uring ZCRX、queue leasingのように「どのqueueがどのmemory/execution domainに属するか」をcontrol planeから指定・検証するため、**queue identity自体がresource contract**になる。version別specを比較すると、6.8/6.9頃のpage-pool introspectionから、6.16以降のio_uring provider情報、7.1のqueue/resource拡張へobject modelが育っていることを追える（https://www.kernel.org/doc/html/）。
 
+
+<a id="detail-driver-modern"></a>
+### Modern driver contracts — XDP features / queue objects / Rust PHY
+
+近年のdriver frameworkでは「このdriverがXDPを実装しているか」というbinaryな判定から、redirect、ndo_xmit、zero-copy等のfeature capabilityをmachine-readableに公開する方向へ進んだ。netdev-genlのqueue/NAPI/page_pool objectと組み合わせると、control planeは **capability + resource identity + assignment** を別々に問い合わせられる。
+
+Rust PHY supportはnetwork driver全体をRustへ置き換えるものではなく、PHY abstractionという比較的明確なdriver contractからRust binding/implementationを導入した例である。本書では言語移行そのものより、既存C subsystem APIのownership/lifetime ruleをRust type systemへどう写像するかというDRIVER FRAMEWORKの変化として位置付ける。
+
 ## Source-audit policy
 
 Part IV の `Canonical source` は、同じ種類の証拠を無理に全行へ割り当てない。**API / object semantics の現在形**は kernel documentation、**mainline に入った境界**は Part VII の exact anchor、**merge/release attribution** は release coverage または merge source を使う。conference material は設計意図や背景の補助資料として使うが、mainline boundary の正本にはしない。
@@ -1510,7 +1582,7 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 4.14 | phylink | DRIVER FRAMEWORK | — | anchor: Part VII | [phylink](#detail-phylink) |
 | 4.14 | SOCKMAP | PROGRAMMABILITY | — | release | [BPF](#detail-bpf) |
 | 4.14 | XDP devmap | PROGRAMMABILITY | — | release | [XDP / AF_XDP](#detail-xdp-afxdp) |
-| 4.14 | TCP MSG_ZEROCOPY | PERFORMANCE | — | anchor: Part VII | — |
+| 4.14 | TCP MSG_ZEROCOPY | PERFORMANCE | — | anchor: Part VII | [socket zero-copy](#detail-socket-zerocopy) |
 | 4.14 | DEVMAP | PROGRAMMABILITY | — | release | [XDP / AF_XDP](#detail-xdp-afxdp) |
 | 4.15 | XDP cpumap | PROGRAMMABILITY | — | release | [XDP / AF_XDP](#detail-xdp-afxdp) |
 | 4.15 | CPUMAP | PROGRAMMABILITY | — | release | [XDP / AF_XDP](#detail-xdp-afxdp) |
@@ -1572,7 +1644,7 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 6.6 | TCX / bpf_mprog | PROGRAMMABILITY | — | release | [TC / offload](#detail-routing-tc-offload) |
 | 6.7 | netkit | PROGRAMMABILITY | VIRTUAL / OVERLAY | anchor: Part VII | [virtual networking](#detail-virtual) |
 | 6.7 | TCP-AO | — | SECURITY / TRANSPORT | release | [transport](#detail-transport) |
-| 6.8 | Rust phylib / Asix reference PHY | DRIVER FRAMEWORK | — | anchor: Part VII | — |
+| 6.8 | Rust phylib / Asix reference PHY | DRIVER FRAMEWORK | — | anchor: Part VII | [modern driver contracts](#detail-driver-modern) |
 | 6.8 | queue/NAPI netdev-genl visibility | DRIVER FRAMEWORK / OBSERVABILITY | — | series + release | [netdev-genl / queue](#detail-netdev-genl) |
 | 6.8 | page_pool identity / Netlink introspection | OBSERVABILITY / MEMORY | — | anchor: Part VII | [packet memory](#detail-packet-memory) |
 | 6.11 | virtio-net AF_XDP RX zero-copy | MEMORY | VIRTUAL / OVERLAY | release | [XDP / AF_XDP](#detail-xdp-afxdp) |
@@ -1604,6 +1676,13 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 
 Part VI は「いつ」を正規化し、Part VII はその attribution を再監査できる exact anchor を保持する。
 
+
+
+## Part VI coverage audit
+
+`Architecture detail` 列をcoverage testとして利用し、Part VIに存在するがPart III/IVに説明先がなかったmilestoneを再分類した。今回、RPS/RFS/XPS、AQM/time-aware qdisc、socket zero-copy、XDP multi-buffer/metadata、tunnel offload、SRv6/IOAM、TCP_REPAIR/TSQ等、timestamping、modern driver contractの受け皿を追加した。
+
+`—` が残る行は、(1) 同一系列の細かなrelease updateで独立説明を増やす価値が低いもの、(2) exact semantics/sourceの再監査をしてから本文へ昇格すべきもの、のどちらかとして扱う。したがって今後は `—` の件数をゼロにすること自体を目的にせず、architecture上の説明価値とsource qualityを昇格条件にする。
 
 # Part VII — 正規 provenance ledger
 
