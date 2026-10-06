@@ -7,11 +7,11 @@ title: Linux Networking Evolution
 > **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras, Parts III–V the lineages / driver-framework / observability story. Part VI is the only normative release chronology, Part VII the provenance ledger, and Appendix material is supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02  
-**構成改訂:** 2026-10-04（r24）
+**構成改訂:** 2026-10-06（r40）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
-**対象範囲:** wired / host networking を中心に扱う。RDMA、Wi-Fi 全般、QUIC や security protocol の網羅的な歴史は対象外とし、mac80211 は queue management （airtime / AQL）の観点から選択的に扱う。
+**対象範囲:** wired / host networking を中心に扱う。RDMA、Wi-Fi 全般、QUIC や security protocol の網羅的な歴史は対象外とする。一方、SECURITY は kTLS / XFRM / WireGuard / TCP-AO のように networking architecture と交差する範囲を cross-cutting lineage として扱う。mac80211 は queue management（airtime / AQL）の観点から選択的に扱う。
 
 ## この文書の読み方
 
@@ -105,7 +105,7 @@ DRIVER FRAMEWORK  switchdev / devlink / phylink / DIM / common driver contracts
 | OBSERVABILITY     | opaque outcome → typed reason / identity / correlation                                     | contract を検証する evidence layer   | Part V                                                        |
 | DRIVER FRAMEWORK  | driver-local convention → reusable kernel framework / device-wide object                   | object / API / accounting / lifetime | Part IV                                                       |
 
-**Cross-cutting domain:** TRANSPORT は Part III「TCP / UDP / transport」、 VIRTUAL / OVERLAY は Part III「Virtual networking」、SECURITY は本書の主対象ではなく、 kTLS / WireGuard / TCP-AO / XFRM offload のように他の lineage と交差する場合だけ補助ラベルとして扱う。
+**Cross-cutting domain:** TRANSPORT は Part III「TCP / UDP / transport」、VIRTUAL / OVERLAY は Part III「Virtual networking」、SECURITY は Part III「SECURITY / kTLS / XFRM / WireGuard」で扱う。これらは7番目以降の architecture axis ではなく、複数の軸を横断する domain である。
 
 ### thesis を検証する代表例
 
@@ -131,7 +131,7 @@ DRIVER FRAMEWORK  switchdev / devlink / phylink / DIM / common driver contracts
 
 ### この thesis が説明しないもの
 
-`explicit resource / control contracts` は本書が観察する強い architecture tendency であり、 Linux networking の全変更を説明する万能則ではない。本書は15年間の変化を、少なくとも **(1) resource / control contract の明示化、(2) transport algorithm / protocol semantics の進化、(3) packet-processing unit / batching の拡大、(4) implementation scalability の改善**という並行する系列として読む。TFO / DCTCP / BBR / MPTCP / PLB / AccECN は (2)、GRO/GSO / BIG TCP は (3)、`dev_queue_xmit()` llist 化は (4) の代表例であり、(1) へ還元しない。中心 thesis はこれらを排除するのではなく、**どの系列を説明しているかを限定した上で、並行進化として同じ重みで扱う**。
+`explicit resource / control contracts` は本書が観察する強い architecture tendency であり、 Linux networking の全変更を説明する万能則ではない。本書は15年間の変化を、少なくとも **(1) resource / control contract の明示化、(2) transport algorithm / protocol semantics の進化、(3) packet-processing unit / batching の拡大、(4) implementation scalability の改善**という並行する系列として読む。TFO / DCTCP / BBR / MPTCP / PLB / AccECN は (2)、GRO/GSO / BIG TCP は (3)、`dev_queue_xmit()` llist 化は (4) の代表例であり、(1) へ還元しない。中心 thesis はこれらを排除するのではなく、**どの系列を説明しているかを限定した上で、並行進化として明示的に扱う**。
 
 Observability も7番目の contract form とはしない。typed identity、drop reason、tracepoint、 timestamp などは、resource/control contract と runtime behavior を理解・検証する **evidence layer** と位置付ける。
 
@@ -209,9 +209,9 @@ v5.0 ですでに GRO/GSO/TSO は成熟していたが、高速 NIC では per-p
 
 ``` text
 wire packets
- ↓ GRO
+    ↓ GRO
 large skb
- ↓ GSO/TSO
+    ↓ GSO/TSO
 wire packets
 ```
 
@@ -219,11 +219,11 @@ v5.19 BIG TCP は kernel internal GRO/GSO aggregate の 64KiB 制約を緩和し
 
 ``` text
 GRO/GSO
- ↓
+  ↓
 IPv6 BIG TCP (5.19)
- → IPv4 BIG TCP (6.3)
- → IPv6 BIG TCP without synthetic HBH jumbo header (Linux 7.0)
- → BIG TCP over VXLAN / GENEVE (7.3-rc / mainline)
+  → IPv4 BIG TCP (6.3)
+  → IPv6 BIG TCP without synthetic HBH jumbo header (Linux 7.0)
+  → BIG TCP over VXLAN / GENEVE (7.3-rc / mainline)
 ```
 
 PPPoE GRO/GSO のような encapsulation-specific aggregation も、同じ PERFORMANCE 軸で per-packet cost を減らすが、BIG TCP の派生機能ではない。
@@ -231,7 +231,7 @@ PPPoE GRO/GSO のような encapsulation-specific aggregation も、同じ PERFO
 BIG TCP は wire MTU を巨大化する機能ではなく、 **kernel 内部の packet-processing unit を大きくする機能**として理解する。利用可否と効果は protocol path、 GRO/GSO/offload capability、driver/NIC、tunnel implementation などに依存し、すべての device / path で 一律に大きな aggregate を利用できることを意味しない。
 
 
-**Takeaway:** aggregation は主に explicit resource contract の系列ではなく、GRO/GSO/BIG TCP により **\1 回の stack traversal で扱う processing unit を拡大する並行系列**である。
+**Takeaway:** aggregation は主に explicit resource contract の系列ではなく、GRO/GSO/BIG TCP により **1回の stack traversal で扱う processing unit を拡大する並行系列**である。
 
 ------------------------------------------------------------------------
 
@@ -241,14 +241,14 @@ BPF lineage の起点は XDP ではない。classic BPF は socket/filtering 文
 
 ``` text
 classic BPF packet filter
- ↓
+        ↓
 internal eBPF ISA (3.15)
- ↓
+        ↓
 bpf() / maps / verifier (3.18)
- ├─ SO_ATTACH_BPF (3.19) / TC BPF (4.1...)
- ├─ cgroup / LWT / XDP
- ├─ SOCK_OPS (4.13) / SOCKMAP
- └─ struct_ops / TCX / BPF qdisc
+        ├─ SO_ATTACH_BPF (3.19) / TC BPF (4.1...)
+        ├─ cgroup / LWT / XDP
+        ├─ SOCK_OPS (4.13) / SOCKMAP
+        └─ struct_ops / TCX / BPF qdisc
 ```
 
 このため「packet filter から stack extension へ」という節題は、programming language の置換ではなく、**verified execution contract と attachment model の一般化**を表す。
@@ -259,18 +259,18 @@ BPF の発展は一本道ではなく、attachment point と適用範囲が複�
 TC direct packet access、devmap/cpumap、SK_MSG、flow dissector、`struct_ops`、SK_LOOKUP、TCX は、 packet/datapath、socket/message、protocol algorithm、attachment/lifetime という異なる面を拡張した。 一本の attachment-point lineage としてではなく、verified programmability の適用範囲が広がったものとして読む。
 
 ``` text
- BPF core / verifier / maps
- │
- ┌─────────────────────┼─────────────────────┐
- ▼ ▼ ▼
- packet / datapath socket / lookup protocol algorithms
- XDP, TC cgroup hooks, struct_ops / TCP CC
- SK_LOOKUP
- │ │
- └──────────────┐ ┌──────────┘
- ▼ ▼
- virtual devices / queue control
- netkit · BPF qdisc · related hooks
+                     BPF core / verifier / maps
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+ packet / datapath        socket / lookup       protocol algorithms
+ XDP, TC                  cgroup hooks,         struct_ops / TCP CC
+                         SK_LOOKUP
+        │                                           │
+        └──────────────┐                 ┌──────────┘
+                       ▼                 ▼
+                 virtual devices / queue control
+                 netkit · BPF qdisc · related hooks
 ```
 
 ここで下段は上段の単純な後継ではない。5.x～6.x にかけて **適用範囲と attachment point が 独立・並行して追加された**結果として、packet、socket、protocol algorithm、virtual device、 queue/datapath まで programmability の対象が広がった、と読む。
@@ -281,14 +281,14 @@ USENIX の研究を併せて読むと、Linux networking の programmability が
 
 ``` text
 mTCP (NSDI 2014): user-level TCP / kernel overhead avoidance
- ↓
+        ↓
 XDP/eBPF: early in-kernel programmable hook
- ↓
+        ↓
 Electrode (NSDI 2023) / DINT (NSDI 2024):
- kernel の protection / isolation を維持し frequent path を eBPF 化
- ↓
+  kernel の protection / isolation を維持し frequent path を eBPF 化
+        ↓
 eTran (NSDI 2025):
- transport 自体を eBPF で extensible にする
+  transport 自体を eBPF で extensible にする
 ```
 
 mTCP は Linux kernel TCP processing の CPU cost に対して user-level TCP stack を採った。一方 Electrode と DINT は、kernel bypass の security / isolation / maintainability 上の trade-off を避けながら、XDP/eBPF により frequent path を kernel 内で処理する。eTran はさらに TCP/DCTCP や Homa のような transport design を eBPF ベースの extensible kernel transport として扱う。この研究史は、**kernel を単に迂回するのではなく、kernel の ownership / protection model を保ったまま fast path や protocol behavior を programmable にする**という方向を補強する。
@@ -303,17 +303,13 @@ mTCP は Linux kernel TCP processing の CPU cost に対して user-level TCP st
 
 ## XDP / AF_XDP
 
-XDP は 4.8 世代に、driver RX の非常に早い位置で verified BPF program を実行する datapath として mainline に現れた。重要なのは単なる「高速 \1」ではなく、その後 redirect target と memory ownership が段階的に増えたことである。4.14 の DEVMAP、4.15 の CPUMAP は redirect を device / remote CPU という明示的 target object に広げ、4.18 の AF_XDP は RX queue と UMEM/userspace buffer を結び付ける queue-bound datapath を追加した。
+XDP は 4.8 世代に、driver RX の非常に早い位置で verified BPF program を実行する datapath として mainline に現れた。重要なのは単なる「高速化」ではなく、その後 redirect target と memory ownership が段階的に増えたことである。4.14 の DEVMAP、4.15 の CPUMAP は redirect を device / remote CPU という明示的 target object に広げ、4.18 の AF_XDP は RX queue と UMEM/userspace buffer を結び付ける queue-bound datapath を追加した。
 
 ``` text
 XDP at driver RX (4.8)
- ├─ redirect → DEVMAP (4.14)
- ├─ redirect → CPUMAP (4.15)
- ├─ packet memory → page_pool
- └─ RX queue ↔ AF_XDP / UMEM (4.18)
- ├─ zero-copy
- ├─ multi-buffer (6.6)
- └─ queue ownership / later netkit integration
+   ├─ redirect → DEVMAP (4.14)
+   ├─ redirect → CPUMAP (4.15)
+   └─ RX queue ↔ AF_XDP / UMEM (4.18)
 ```
 
 4.8–4.18 は、後年の queue leasing や memory-provider architecture につながる queue / redirect / buffer-binding の前史として重要である。
@@ -359,8 +355,8 @@ NIC → allocate/map page → stack → unmap/free
 
 page_pool:
 NIC → recycled/mapped page → stack ─┐
- ↑ │
- └──────── return/recycle ─────┘
+      ↑                             │
+      └──────── return/recycle ─────┘
 ```
 
 page_pool は XDP 専用ではない。XDP と強く結び付いて普及したが、後の zero-copy RX、 memory-provider、device-memory path が driver ごとの独自 allocator に戻らずに済むための common infrastructure として読む。
@@ -371,25 +367,25 @@ system RAM の page だけを packet backing と仮定すると、device memory 
 
 ``` text
 network packet memory
- ↓
- netmem
- / \
-system RAM non-page / device-backed memory
+          ↓
+        netmem
+       /      \
+system RAM   non-page / device-backed memory
 ```
 
 ここで重要なのは「RAM を device memory に置換した」ことではなく、従来 path を維持したまま 異なる backing memory を表現できる contract を追加したことである。
 
 ### memory providers / queue binding — memory lifetime と RX queue を接続する
 
-Device Memory TCP RX は6.1\1 で先に mainline 化され、この時点では page_pool の `mp_priv` など devmem 用の専用経路を利用していた。6.1\1 で `memory_provider_ops` / page_pool custom-provider hooks が導入され、devmem TCP と io_uring ZCRX が同じ **汎用 memory-provider contract** に接続できる形へ整理された。したがって `Device Memory TCP RX (6.12) → generic memory-provider hooks (6.15)` は、**consumer-specific path の先行 → provider API の一般化**という順序である。
+Device Memory TCP RX は6.12で先に mainline 化され、この時点では page_pool の `mp_priv` など devmem 用の専用経路を利用していた。6.15で `memory_provider_ops` / page_pool custom-provider hooks が導入され、devmem TCP と io_uring ZCRX が同じ **汎用 memory-provider contract** に接続できる形へ整理された。したがって `Device Memory TCP RX (6.12) → generic memory-provider hooks (6.15)` は、**consumer-specific path の先行 → provider API の一般化**という順序である。
 
 io_uring ZCRX や Device Memory TCP では、memory pool を用意するだけでは不十分である。 どの RX queue がどの memory provider を使うか、buffer がいつ application/device から返却されるか、 queue reconfiguration 中に lifetime をどう保つかを kernel/driver/userspace 間で合意する必要がある。
 
 ``` text
 RX queue
- ↔ memory provider
- ↔ page_pool / netmem-backed buffers
- ↔ userspace or device consumer
+   ↔ memory provider
+   ↔ page_pool / netmem-backed buffers
+   ↔ userspace or device consumer
 ```
 
 このため Era 4 では MEMORY 軸が `lifetime` だけでなく `assignment` と強く結び付く。 netdev-genl queue objects、io_uring ZCRX、Device Memory TCP、RX HW queue leasing は 同一機能ではないが、**queue identity と memory ownership/lifetime を明示的に結び付ける** という architecture problem を共有する。
@@ -418,17 +414,17 @@ TCP `MSG_ZEROCOPY` は send-side copy avoidance の先行 milestone であり、
 
 ``` text
 sendmsg / recvmsg
- ↓
+      ↓
 zero-copy TX
- ↓
+      ↓
 multishot / registered buffers
- ↓
+      ↓
 zero-copy RX (6.15)
- ↓
+      ↓
 memory-provider / device-memory integration
 ```
 
-目標は syscall reduction だけではなく、 NI\1 から \\1 までの buffer ownership/lifetime の効率化にある。
+目標は syscall reduction だけではなく、 NIC から userspace までの buffer ownership/lifetime の効率化にある。
 
 
 **Takeaway:** socket I/O を submission/completion と registered resources に分解し、ZCRX では queue と buffer/memory-provider の関係まで明示する方向へ進んだ。
@@ -441,11 +437,11 @@ routing / forwarding control は BPF だけでは説明できない。bridge VLA
 
 ``` text
 bridge VLAN filtering (3.9) ─┐
-MPLS routing (4.1) ├─ Linux forwarding / routing semantics
-VRF device (4.3) ┘
+MPLS routing (4.1)          ├─ Linux forwarding / routing semantics
+VRF device (4.3)            ┘
 
 Flower classifier (4.2) → TC match/action → ndo_setup_tc / flow-block callbacks → driver / hardware
- ↘ TC ct action (5.3): conntrack state/metadata in TC
+                                      ↘ TC ct action (5.3): conntrack state/metadata in TC
 
 bridge / FIB / VLAN objects → switchdev notifications / objects → switch driver / hardware
 ```
@@ -456,7 +452,7 @@ bridge / FIB / VLAN objects → switchdev notifications / objects → switch dri
 
 ### XFRM packet offload — security state と forwarding placement
 
-6.2 の XFRM packet offload は、従来の crypto offload より広く packet-level IPsec processing を \\1 へ配置する仕組みである。kernel/XFRM が policy/state の \1 control plan\1 を保持しながら、executio\1 を \\1 または \\1 へ置ける点で switchdev/TC offload と共通する。security semantics は独立した cross-cutting domain であり、ここでは hardware execution placement との接点だけを扱う。
+6.2 の XFRM packet offload は、従来の crypto offload より広く packet-level IPsec processing を NIC へ配置する仕組みである。kernel/XFRM が policy/state の control plane を保持しながら、execution を software または NIC へ置ける点で switchdev/TC offload と共通する。security semantics は独立した cross-cutting domain であり、ここでは hardware execution placement との接点だけを扱う。
 
 ## Routing / Netlink / RTNL
 
@@ -504,7 +500,7 @@ global RTNL
 
 この `→` は direct extension を意味せず、global RTNL dependency を縮小する複数の locking / refactoring techniques が同じ設計方向に進んだことを示す。
 
-7.\1 向け \1 pul\1 では `RTM_NEWRULE` / `RTM_DELRULE` の \1 rul\1 変更が RTNL-lock-les\1 化され、further RTNL-dependency reductio\1 や \1 GE\1 準備と 同じ「global RTN\1 依存を減らす」流れとして \\1 へ入った。
+7.3 向け net-next pull では `RTM_NEWRULE` / `RTM_DELRULE` の FIB rule 変更が RTNL-lock-less 化され、further RTNL-dependency reduction や parallel GET 準備と 同じ「global RTNL 依存を減らす」流れとして mainline へ入った。
 
 さらに 7.3-rc / mainline では per-netns netdev unregistration infrastructure が入り、 per-netns RTNL の大きな blocker だった device unregistration path の分解も進んだ。 これは 6.13 以降の per-netns RTNL lineage の継続として扱う。
 
@@ -516,26 +512,26 @@ global RTNL
 
 ## netfilter / nftables / conntrack — rule engine から policy-selected fast path へ
 
-Netfilter の1\1 年間を `iptables → nftables` という userspace command の置換として見ると本質を取りこぼす。変化の中心は、既存の hook / conntrack / NAT を残しながら、**ruleset representation、state、policy placement、fast-path eligibility、hardware placement を明示化したこと**にある。
+Netfilter の15年間を `iptables → nftables` という userspace command の置換として見ると本質を取りこぼす。変化の中心は、既存の hook / conntrack / NAT を残しながら、**ruleset representation、state、policy placement、fast-path eligibility、hardware placement を明示化したこと**にある。
 
 ``` text
 iptables / ip6tables / ebtables / arptables
- ↓
+        ↓
 nftables core (3.13)
- ├─ expression / VM-based rules
- ├─ Netlink control plane
- ├─ sets / maps
- └─ transactional ruleset updates
- ├─ ingress hook / netdev family (4.2)
- ├─ bridge-family + conntrack
- └─ flowtable (4.16)
- ├─ software fast path
- └─ hardware offload (5.5)
+  ├─ expression / VM-based rules
+  ├─ Netlink control plane
+  ├─ sets / maps
+  └─ transactional ruleset updates
+        ├─ ingress hook / netdev family (4.2)
+        ├─ bridge-family + conntrack
+        └─ flowtable (4.16)
+              ├─ software fast path
+              └─ hardware offload (5.5)
 ```
 
 ### nftables — ruleset model の再設計
 
-nftables は3.1\1 で mainline に入り、family ごとに重複していた xtables machinery を汎用 expression/VM と Netlink API に寄せた。重要なのは syntax ではなく、atomic/transactional update、sets/maps、monitoring/tracing を含む **ruleset object model** への移行である。4.2 の ingress hook、5.16 の netdev egress hoo\1 は、Netfilter polic\1 を適用できる datapath point を広げた。
+nftables は3.13で mainline に入り、family ごとに重複していた xtables machinery を汎用 expression/VM と Netlink API に寄せた。重要なのは syntax ではなく、atomic/transactional update、sets/maps、monitoring/tracing を含む **ruleset object model** への移行である。4.2 の ingress hook、5.16 の netdev egress hook は、Netfilter policy を適用できる datapath point を広げた。
 
 ### conntrack — shared flow-state substrate
 
@@ -543,39 +539,39 @@ conntrack は nftables に置換されたものではない。flow direction/sta
 
 ``` text
 packet → Netfilter hook → conntrack
- ├─ state / direction
- ├─ NAT mapping
- ├─ mark / label
- └─ lifetime
- ├─ nftables
- ├─ TC ct
- ├─ BPF kfunc
- └─ flowtable
+                         ├─ state / direction
+                         ├─ NAT mapping
+                         ├─ mark / label
+                         └─ lifetime
+                              ├─ nftables
+                              ├─ TC ct
+                              ├─ BPF kfunc
+                              └─ flowtable
 ```
 
 4.7 世代では conntrack hash table の scope が全 netns 共有へ寄せられ、entry accounting は netns 単位に残った。4.9 世代では GC worker による timeout entry 回収が導入された。5.18/6.0 世代には BPF から conntrack entry を lookup / allocate / insert する kfunc も加わり、state は firewall 専用ではなく複数 execution model から利用される object になった。
 
 ### flowtable — policy と fast path の分離
 
-4.16 の flowtable では、最初の packet が classic forwarding / conntrack / nftables policy を通り、選択された established flow が fast path に登録される。hi\1 時は後段の classic forwarding hooks を bypas\1 して `neigh_xmit()` へ進み、miss、fragment、FIN/RST、MTU exception などは classic pat\1 へ戻る。
+4.16 の flowtable では、最初の packet が classic forwarding / conntrack / nftables policy を通り、選択された established flow が fast path に登録される。hit 時は後段の classic forwarding hooks を bypass して `neigh_xmit()` へ進み、miss、fragment、FIN/RST、MTU exception などは classic path へ戻る。
 
 ``` text
- miss / exception
+                         miss / exception
 ingress → flowtable lookup ─────────→ classic forwarding
- │ │
- │ hit │ policy / conntrack
- ▼ │
- fast forwarding ←── flow add ─────┘
- │
- ▼
- neigh_xmit()
+              │                           │
+              │ hit                       │ policy / conntrack
+              ▼                           │
+        fast forwarding ←── flow add ─────┘
+              │
+              ▼
+          neigh_xmit()
 ```
 
-5.5 世代では hardware offload に拡張され、flow は `flow_rule` として driver/hardware datapath に写像される。hardwar\1 投入は非同期なので、完了まで software path を通る packet もある。これは fast path が policy engine を置換したのではなく、**policy/state を共有しながら software slow path・software fast path・hardware path を共存させた**例である。
+5.5 世代では hardware offload に拡張され、flow は `flow_rule` として driver/hardware datapath に写像される。hardware 投入は非同期なので、完了まで software path を通る packet もある。これは fast path が policy engine を置換したのではなく、**policy/state を共有しながら software slow path・software fast path・hardware path を共存させた**例である。
 
 ### BPF / XDP との関係
 
-BPF/XDP も nftables の置換ではない。bpfilter は iptables-compatible ruleset を BPF へ変換する構想として4.1\1 に骨格が入ったが6.\1 で削除された。一方、定着したのは conntrack kfunc、6.4 の `BPF_PROG_TYPE_NETFILTER`、flowtable lookup kfunc のように既存 Netfilter infrastructure と相互乗り入れする方向である。
+BPF/XDP も nftables の置換ではない。bpfilter は iptables-compatible ruleset を BPF へ変換する構想として4.18に骨格が入ったが6.8で削除された。一方、定着したのは conntrack kfunc、6.4 の `BPF_PROG_TYPE_NETFILTER`、flowtable lookup kfunc のように既存 Netfilter infrastructure と相互乗り入れする方向である。
 
 **Takeaway:** Netfilter では policy representation、transactional update、shared flow state、fast-path eligibility、software/hardware execution placement が明示化された。これは CONTROL PLANE から「explicit contracts が複数 execution model の共存を可能にする」ことを示す代表例である。
 
@@ -583,14 +579,14 @@ BPF/XDP も nftables の置換ではない。bpfilter は iptables-compatible ru
 
 ## Virtual networking — datapath と queue assignment の並行進化
 
-この lineage の前史は v5.0 よりかなり早い。network namespace と `setns()` は network stack instance を process/container 単位に切り替える isolation/control primitive を与え、VXLAN（3.7）は L3 underlay 上に L2 overlay を構成する一般的な tunnel device を、ipvlan（3.19）は veth/macvla\1 とは異なる lightweight virtual interface model を追加した。これらは後年の netkit、vDPA、queue leasing の直接の祖先ではないが、**一つの physical network device / host stack の上に複数の virtual networking model を共存させる foundation**である。
+この lineage の前史は v5.0 よりかなり早い。network namespace と `setns()` は network stack instance を process/container 単位に切り替える isolation/control primitive を与え、VXLAN（3.7）は L3 underlay 上に L2 overlay を構成する一般的な tunnel device を、ipvlan（3.19）は veth/macvlan とは異なる lightweight virtual interface model を追加した。これらは後年の netkit、vDPA、queue leasing の直接の祖先ではないが、**一つの physical network device / host stack の上に複数の virtual networking model を共存させる foundation**である。
 
 ``` text
 network namespace / setns
- ├─ veth / bridge
- ├─ VXLAN overlay (3.7)
- └─ ipvlan (3.19)
- ↓
+        ├─ veth / bridge
+        ├─ VXLAN overlay (3.7)
+        └─ ipvlan (3.19)
+              ↓
 later: virtio/vhost/vDPA, SR-IOV, netkit, queue assignment
 ```
 
@@ -607,15 +603,15 @@ guest virtio-net → QEMU/vhost/TAP → bridge/OVS → NIC
 
 ``` text
 VM datapath:
- virtio-net ∥ vhost ∥ vDPA ∥ SR-IOV/VFIO
- ↔
- AF_XDP zero-copy
+  virtio-net ∥ vhost ∥ vDPA ∥ SR-IOV/VFIO
+                    ↔
+              AF_XDP zero-copy
 
 container datapath:
- veth ∥ netkit / BPF-native path
+  veth ∥ netkit / BPF-native path
 
 queue / zero-copy assignment:
- AF_XDP / io_uring ↔ RX HW queue leasing
+  AF_XDP / io_uring ↔ RX HW queue leasing
 ```
 
 netkit は veth の単純な後継ではなく、RX HW queue leasing も netkit から派生した機能ではない。queue lease は virtual-device queue と physical-device queue の対応を明示し、AF_XDP や memory-provider 型の queue-bound API を container/virtual-device 側から利用可能にする **assignment mechanism** として位置付ける。
@@ -669,26 +665,22 @@ UDP でも `MSG_ZEROCOPY` と GRO/GSO は copy cost と per-packet processing �
 UDP は GRO/GSO、tunnel/encapsulation、high packet-rate RX、receive-buffer scaling の 基盤として発展してきた。ここでは UDP 固有の protocol lineage と、PERFORMANCE / VIRTUAL-OVERLAY 側で扱う packet aggregation・tunnel acceleration を混同しない。
 
 
-**Takeaway:** transport は explicit-contract thesi\1 だけでは説明しない。TFO、DCTCP、BBR、MPTCP、PLB、AccECN は主に connection / congestion / path / feedback semantics 自体を更新する並行系列である。
+**Takeaway:** transport は explicit-contract thesis だけでは説明しない。TFO、DCTCP、BBR、MPTCP、PLB、AccECN は主に connection / congestion / path / feedback semantics 自体を更新する並行系列である。
 
 ------------------------------------------------------------------------
-
-## Part III から Part IV へ — feature lineage から driver contract へ
-
-前章では networking mechanism を end-to-end の lineage として追った。Part IV では視点を変え、個々の driver の責務のうち何が共通 networking-core framework へ移されたかを見る。
-
 
 ## SECURITY / kTLS / XFRM / WireGuard — security semantics と execution placement の分離
 
 SECURITY は第7の architecture axis ではなく、TRANSPORT や VIRTUAL / OVERLAY と同じ **cross-cutting lineage** として扱う。ここで追う共通テーマは「暗号方式の変遷」そのものではなく、**security state / policy を kernel が保持し、その semantics を変えずに software・accelerator・NIC のどこで実行するかを明示的な contract で選べるようになったこと**である。
 
-```text
+``` text
 security semantics / state
         │
         ├─ TLS record state on TCP socket
         │      ├─ kTLS TX (4.13)
         │      ├─ kTLS RX (4.17)
-        │      └─ TLS device offload (4.18 generation)
+        │      ├─ TLS device offload TX (4.18)
+        │      └─ TLS device offload RX (4.19)
         │
         ├─ XFRM SA / policy
         │      ├─ IPsec crypto offload
@@ -700,15 +692,15 @@ security semantics / state
 
 ### kTLS — userspace handshake と kernel record datapath を分離する
 
-kTLS の origin は4.13の `tls: kernel TLS support` (`3c4d7559159bfe1e3b94df3a657b2cda3a34e218`) である。TLS handshake と certificate/key-exchange policy を userspace に残し、handshake 完了後の symmetric crypto state を `setsockopt()` でTCP socketへ渡して、TLS record datapathをkernelへ移す。現在のkernel documentationもkTLSをTLS record subprotocolの実装として説明し、handshakeは別のsubprotocolとして区別している。
+kTLS の origin は4.13の `tls: kernel TLS support`（exact SHA は Part VII） である。TLS handshake と certificate/key-exchange policy を userspace に残し、handshake 完了後の symmetric crypto state を `setsockopt()` でTCP socketへ渡して、TLS record datapathをkernelへ移す。現在のkernel documentationもkTLSをTLS record subprotocolの実装として説明し、handshakeは別のsubprotocolとして区別している。
 
-4.17では `tls: RX path for ktls` (`c46234ebb4d1eee5e09819f49169e51cfc6eb909`) により `TLS_RX`、`recvmsg`、`splice_read`、pollとrecord framing/decryptionが加わり、TXだけだったrecord datapathが双方向になった。
+4.17では `tls: RX path for ktls`（exact SHA は Part VII） により `TLS_RX`、`recvmsg`、`splice_read`、pollとrecord framing/decryptionが加わり、TXだけだったrecord datapathが双方向になった。
 
-その次の転換は「kernelでcryptoする」から「kernelがsecurity semantics/stateを保持したまま、crypto executionをdeviceへ配置できる」ことである。`net/tls: Add generic NIC offload infrastructure` (`e8f69799810c32dd40c6724d829eccc70baad07f`) はTXのgeneric NIC offload contractを導入し、`tls: Add rx inline crypto offload` (`4799ac81e52a72a6404827bf2738337bb581a174`) がRX側を完成させた。kernel docsが示す `TLS_SW` と `TLS_HW` は別プロトコルではなく、同じkTLS socket/APIに対する **execution placement** の違いである。
+その次の転換は「kernelでcryptoする」から「kernelがsecurity semantics/stateを保持したまま、crypto executionをdeviceへ配置できる」ことである。`net/tls: Add generic NIC offload infrastructure`（exact SHA は Part VII） はTXのgeneric NIC offload contractを導入し、`tls: Add rx inline crypto offload`（exact SHA は Part VII） がRX側を完成させた。kernel docsが示す `TLS_SW` と `TLS_HW` は別プロトコルではなく、同じkTLS socket/APIに対する **execution placement** の違いである。
 
 したがってkTLSのlineageは、
 
-```text
+``` text
 userspace TLS record processing
         ↓
 kernel-visible TLS record state
@@ -724,9 +716,11 @@ same TLS semantics + NIC execution
 
 XFRMでは kernel が Security Association (SA) と policy を保持する。device offloadでもこのcontrol-plane semanticsを捨てるのではなく、`xfrmdev_ops` とnetdev capabilityを介してdriver/NICへ実行を委譲する。
 
-ここでは **crypto offload** と **packet offload** を区別する。crypto offloadではNICがencrypt/decryptを担当する一方、packet constructionやXFRM processingの多くはkernel側に残る。6.2世代のpacket offloadではSAだけでなくpolicyもkernelとNICで同期し、NICがencrypt/decryptに加えてencapsulationとpolicy executionまで担当できる。代表anchorはPart VIIの `d14f28b8c1de668bab863bf5892a49c824cb110d` である。
+XFRM device offload の origin は4.12の `xfrmdev_ops` / IPsec hardware-offloading API であり、まずSA/ESPの **crypto offload** を可能にした（exact SHA は Part VII）。
 
-```text
+ここでは **crypto offload** と **packet offload** を区別する。crypto offloadではNICがencrypt/decryptを担当する一方、packet constructionやXFRM processingの多くはkernel側に残る。6.2世代のpacket offloadではSAだけでなくpolicyもkernelとNICで同期し、NICがencrypt/decryptに加えてencapsulationとpolicy executionまで担当できる。代表 anchor は Part VII に記録する。
+
+``` text
 XFRM SA / policy = kernel canonical state
         ├─ software IPsec
         ├─ crypto offload
@@ -739,9 +733,13 @@ XFRM SA / policy = kernel canonical state
 
 ### WireGuard — offload frameworkではなく、secure tunnelを通常のnetdeviceとして統合する
 
-WireGuard 5.6 (`e7096c131e5161fa3b8e52a650d7719d2857adfd`) はkTLS/XFRMとは異なる方向である。WireGuardはL3 secure tunnelをkernelのnetwork device driverとして実装し、RTNL、generic Netlink、UDP tunnel API、GRO/GSO、NAPIなど既存networking infrastructureへ統合した。
+WireGuard 5.6（exact SHA は Part VII） はkTLS / XFRMとは異なる方向である。WireGuard はL3 secure tunnelをkernel のnetwork device driverとして実装し、RTNL、generic Netlink、UDP tunnel API、GRO/GSO、NAPIなど既存networking infrastructureへ統合した。
 
-したがってWireGuardを「XFRMの次世代版」や「kTLSと同じoffload lineage」とは扱わない。security semanticsを持つ実装がnetwork stackの通常のobject/APIへ統合された例として、**SECURITY / VIRTUAL / OVERLAY** の交差点に置く。
+したがってWireGuardを「XFRMの次世代版」や「kTLSと同じoffload lineage」とは扱わない。security semanticsを持つ実装がnetwork stack の通常のobject/APIへ統合された例として、**SECURITY / VIRTUAL / OVERLAY** の交差点に置く。
+
+### この lineage の範囲
+
+TCP-AO は transport authentication semantics 自体の更新なので Part III「TCP / UDP / transport」で扱う。WireGuard の YNL-described Netlink は secure-tunnel semantics の変更ではなく machine-readable control-plane API の展開なので Part III「Routing / Netlink / RTNL」で扱う。
 
 ### SECURITY lineage の architecture takeaway
 
@@ -753,7 +751,11 @@ WireGuard 5.6 (`e7096c131e5161fa3b8e52a650d7719d2857adfd`) はkTLS/XFRMとは異
 | XFRM/IPsec | SA + policy | software / crypto offload / packet offload | policy/state とhardware executionの分離 |
 | WireGuard | peer / key / allowed-IP + netdevice | kernel implementation | secure tunnelを通常のnetwork object/APIへ統合 |
 
-**Takeaway:** securityの進化も「専用fast pathへの置換」ではなく、**security semantics / stateをkernel-visibleなcontractとして保持し、そのexecution placementやnetwork integrationを明示する方向**として読むことができる。このためSECURITYを第7軸に増やす必要はなく、CONTROL PLANE・DRIVER FRAMEWORK・TRANSPORT・VIRTUAL / OVERLAYを横断するlineageとして扱う方が整合的である。
+**Takeaway:** securityの進化も「専用fast pathへの置換」ではなく、**security semantics / stateをkernel-visibleなcontractとして保持し、そのexecution placementやnetwork integrationを明示する方向**として読むことができる。この lineage は CONTROL PLANE・DRIVER FRAMEWORK・TRANSPORT・VIRTUAL / OVERLAY を横断し、security semantics/state と execution placement / network integration の関係を示す。
+
+## Part III から Part IV へ — feature lineage から driver contract へ
+
+前章では networking mechanism を end-to-end の lineage として追った。Part IV では視点を変え、個々の driver の責務のうち何が共通 networking-core framework へ移されたかを見る。
 
 
 # Part IV — Network Device Driver Framework
@@ -1085,6 +1087,7 @@ Part II–V を通過すると、この2段のつながりを具体的に言え�
 | forwarding / device state | switchdev・devlink → representor / TC offload → XFRM packet offload | kernel が canonical semantics/control state を保持しながら software path と hardware path を選べる |
 | control-plane state | nexthop objects → YNL → per-netns RTNL | reusable object / machine-readable API / narrower synchronization scope の下で configuration を並行化する |
 | policy / flow state | nftables → conntrack consumers → flowtable / HW offload | transactional policy と shared state を保ちながら slow / fast / hardware path を選択する |
+| security state / policy | kTLS / XFRM / WireGuard | kernel-visible security state を保ちつつ software / NIC execution または通常の netdevice integration を選択 |
 
 表中の `→` は図の記法どおり lineage continuation であり、直接依存を意味しない。また各行は「一つの contract が後続機能を直接生んだ」という因果を主張するものではなく、**共存を可能にした architecture 上の接続点**を要約している。
 
@@ -1136,7 +1139,7 @@ Part VI は release note の網羅表ではない。採用するのは、本文�
 
 ## Verification status
 
-Part VI は chronology であり、この列は **参照先ではなく attribution の検証状態**を示す。外部 source は Part VII の exact anchor と Appendix の source index から辿る。`Primary ref` は exact SHA がある場合は Part VII、release-level attribution には source index / release source を示す。
+Part VI は chronology であり、この列は **参照先ではなく attribution の検証状態**を示す。外部 source は Part VII の exact anchor と Appendix の release から辿る。
 
 - **release** — final release containment を確認済み。
 - **anchor: Part VII** — final release に加え、Part VII に40桁 representative mainline SHA がある。
@@ -1151,164 +1154,143 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 
 ### 3.0–3.18
 
-| Release | Milestone                                       | Axis                           | Domain            | Primary ref |
+| Release | Milestone                                       | Axis                           | Domain            | Verification status |
 |:--------|:------------------------------------------------|:-------------------------------|:------------------|----------------|
-| 3.0     | namespace FD / setns()                          | CONTROL PLANE                  | —                 |source index|
+| 3.0     | namespace FD / setns()                          | CONTROL PLANE                  | —                 |release|
 | 3.3     | DQL/BQL                                         | PERFORMANCE / DRIVER FRAMEWORK | —                 | anchor: Part VII     |
 | 3.5     | CoDel                                           | PERFORMANCE                    | —                 | anchor: Part VII     |
-| 3.5     | fq_codel                                        | PERFORMANCE                    | —                 |source index|
-| 3.6     | TSQ                                             | PERFORMANCE                    | —                 |source index|
-| 3.6     | TFO client                                      | —                              | TRANSPORT         |source index|
-| 3.6     | IPv4 route-cache removal                        | CONTROL PLANE                  | —                 |source index|
-| 3.7     | VXLAN                                           | —                              | VIRTUAL / OVERLAY |source index|
-| 3.7     | TFO server                                      | —                              | TRANSPORT         |source index|
+| 3.5     | fq_codel                                        | PERFORMANCE                    | —                 |release|
+| 3.6     | TSQ                                             | PERFORMANCE                    | —                 |release|
+| 3.6     | TFO client                                      | —                              | TRANSPORT         |release|
+| 3.6     | IPv4 route-cache removal                        | CONTROL PLANE                  | —                 |release|
+| 3.7     | VXLAN                                           | —                              | VIRTUAL / OVERLAY |release|
+| 3.7     | TFO server                                      | —                              | TRANSPORT         |release|
 | 3.9     | bridge VLAN filtering infrastructure              | CONTROL PLANE                  | VIRTUAL / OVERLAY | anchor: Part VII     |
 | 3.9     | TCP/UDP SO_REUSEPORT                            | PERFORMANCE                    | —                 | anchor: Part VII     |
-| 3.11    | SO_BUSY_POLL                                    | PERFORMANCE                    | —                 |source index|
-| 3.12    | sch_fq / TCP pacing / TSO autosizing generation | PERFORMANCE                    | —                 |source index|
-| 3.12    | sch_fq pacing                                              | PERFORMANCE                      | TRANSPORT            | source index |
+| 3.11    | SO_BUSY_POLL                                    | PERFORMANCE                    | —                 |release|
+| 3.12    | sch_fq pacing                                              | PERFORMANCE                      | TRANSPORT            | release |
 | 3.13    | nftables                                        | CONTROL PLANE                  | —                 | anchor: Part VII     |
-| 3.15    | internal BPF ISA rework                         | PROGRAMMABILITY                | —                 |source index|
-| 3.18    | bpf() / maps / verifier generation              | PROGRAMMABILITY                | —                 |source index|
-| 3.18    | DCTCP                                           | —                              | TRANSPORT         |source index|
-| 3.18    | Geneve                                          | —                              | VIRTUAL / OVERLAY |source index|
+| 3.15    | internal BPF ISA rework                         | PROGRAMMABILITY                | —                 |release|
+| 3.18    | bpf() / maps / verifier generation              | PROGRAMMABILITY                | —                 |release|
+| 3.18    | DCTCP                                           | —                              | TRANSPORT         |release|
+| 3.18    | Geneve                                          | —                              | VIRTUAL / OVERLAY |release|
 
 ### 3.19–4.20
 
-| Release | Milestone                            | Axis                     | Domain               | Primary ref |
+| Release | Milestone                            | Axis                     | Domain               | Verification status |
 |:--------|:-------------------------------------|:-------------------------|:---------------------|----------------|
-| 3.19    | switchdev origin                     | DRIVER FRAMEWORK         | —                    |source index|
-| 3.19    | ipvlan                               | —                        | VIRTUAL / OVERLAY    |source index|
-| 3.19    | SO_ATTACH_BPF                        | PROGRAMMABILITY          | —                    |source index|
+| 3.19    | switchdev origin                     | DRIVER FRAMEWORK         | —                    |release|
+| 3.19    | ipvlan                               | —                        | VIRTUAL / OVERLAY    |release|
+| 3.19    | SO_ATTACH_BPF                        | PROGRAMMABILITY          | —                    |release|
 | 4.1     | MPLS routing / AF_MPLS              | CONTROL PLANE            | VIRTUAL / OVERLAY    | anchor: Part VII     |
-| 4.1     | cls_bpf / act_bpf eBPF support       | PROGRAMMABILITY          | —                    |source index / series|
-| 4.1     | kprobe BPF milestone                 | OBSERVABILITY            | —                    |source index / series|
+| 4.1     | cls_bpf / act_bpf eBPF support       | PROGRAMMABILITY          | —                    |series + release|
+| 4.1     | kprobe BPF milestone                 | OBSERVABILITY            | —                    |series + release|
 | 4.2     | Flower classifier                    | PROGRAMMABILITY          | —                    | anchor: Part VII     |
 | 4.3     | VRF device                            | CONTROL PLANE            | VIRTUAL / OVERLAY    | anchor: Part VII     |
 | 4.6     | devlink                              | DRIVER FRAMEWORK         | —                    | anchor: Part VII     |
-| 4.7     | TC BPF direct packet access          | PROGRAMMABILITY          | —                    |source index|
-| 4.8     | XDP                                  | PROGRAMMABILITY          | —                    |source index / series|
+| 4.7     | TC BPF direct packet access          | PROGRAMMABILITY          | —                    |release|
+| 4.8     | XDP                                  | PROGRAMMABILITY          | —                    |series + release|
 | 4.9     | BBR                                  | —                        | TRANSPORT            | anchor: Part VII     |
-| 4.10    | cgroup BPF                           | PROGRAMMABILITY          | —                    |source index / series|
-| 4.10    | BPF LWT                              | PROGRAMMABILITY          | —                    |source index / series|
-| 4.13    | SOCK_OPS                             | PROGRAMMABILITY          | TRANSPORT            |source index|
-| 4.13    | kTLS TX                              | —                        | SECURITY / TRANSPORT |source index|
+| 4.10    | cgroup BPF                           | PROGRAMMABILITY          | —                    |series + release|
+| 4.10    | BPF LWT                              | PROGRAMMABILITY          | —                    |series + release|
+| 4.13    | SOCK_OPS                             | PROGRAMMABILITY          | TRANSPORT            |release|
 | 4.13    | kTLS TX / kernel TLS record datapath                    | PERFORMANCE / CONTROL PLANE      | SECURITY / TRANSPORT | anchor: Part VII |
 | 4.14    | phylink                              | DRIVER FRAMEWORK         | —                    | anchor: Part VII     |
-| 4.14    | SOCKMAP                              | PROGRAMMABILITY          | —                    |source index|
-| 4.14    | XDP devmap                           | PROGRAMMABILITY          | —                    |source index|
+| 4.14    | SOCKMAP                              | PROGRAMMABILITY          | —                    |release|
+| 4.14    | XDP devmap                           | PROGRAMMABILITY          | —                    |release|
 | 4.14    | TCP MSG_ZEROCOPY                     | PERFORMANCE              | —                    | anchor: Part VII     |
-| 4.14    | DEVMAP                                                     | PROGRAMMABILITY                  | —                    | source index |
-| 4.15    | XDP cpumap                           | PROGRAMMABILITY          | —                    |source index|
-| 4.15    | CPUMAP                                                     | PROGRAMMABILITY                  | —                    | source index |
+| 4.14    | DEVMAP                                                     | PROGRAMMABILITY                  | —                    | release |
+| 4.15    | XDP cpumap                           | PROGRAMMABILITY          | —                    |release|
+| 4.15    | CPUMAP                                                     | PROGRAMMABILITY                  | —                    | release |
 | 4.16    | netdevsim                            | DRIVER FRAMEWORK         | —                    | anchor: Part VII     |
-| 4.16    | Net DIM initial generation                   | DRIVER FRAMEWORK         | —                    |source index / series|
-| 4.16    | nftables software flowtable          | PERFORMANCE              | —                    |source index|
+| 4.16    | Net DIM initial generation                   | DRIVER FRAMEWORK         | —                    |series + release|
+| 4.16    | nftables software flowtable          | PERFORMANCE              | —                    |release|
 | 4.17    | BPF_PROG_TYPE_SK_MSG                 | PROGRAMMABILITY          | —                    | anchor: Part VII     |
 | 4.17    | kTLS RX                                                 | PERFORMANCE / CONTROL PLANE      | SECURITY / TRANSPORT | anchor: Part VII |
-| 4.18    | AF_XDP                               | MEMORY / PROGRAMMABILITY | —                    |source index / series|
+| 4.18    | AF_XDP                               | MEMORY / PROGRAMMABILITY | —                    |series + release|
 | 4.18    | page_pool origin / XDP memory return | MEMORY                   | —                    | anchor: Part VII     |
-| 4.18    | TCP_ZEROCOPY_RECEIVE                 | PERFORMANCE              | —                    |source index|
+| 4.18    | TCP_ZEROCOPY_RECEIVE                 | PERFORMANCE              | —                    |release|
 | 4.18    | BTF origin / typed BPF metadata                           | PROGRAMMABILITY / OBSERVABILITY | —                    | anchor: Part VII |
-| 4.18    | generic TLS device offload (TX/RX generation)            | DRIVER FRAMEWORK / PERFORMANCE   | SECURITY / TRANSPORT | anchor: Part VII |
-| 4.19    | SO_TXTIME                            | PERFORMANCE              | —                    |source index|
-| 4.19    | CAKE                                 | PERFORMANCE              | —                    |source index|
-| 4.20    | TCP EDT                              | PERFORMANCE              | —                    |source index|
-| 4.20    | taprio                               | PERFORMANCE              | —                    |source index|
-| 4.20    | BPF flow dissector                   | PROGRAMMABILITY          | —                    |source index|
+| 4.18    | generic TLS device offload TX                              | DRIVER FRAMEWORK / PERFORMANCE   | SECURITY / TRANSPORT | anchor: Part VII |
+| 4.19    | SO_TXTIME                            | PERFORMANCE              | —                    |release|
+| 4.19    | CAKE                                 | PERFORMANCE              | —                    |release|
+| 4.19    | generic TLS device offload RX                              | DRIVER FRAMEWORK / PERFORMANCE   | SECURITY / TRANSPORT | anchor: Part VII |
+| 4.20    | TCP EDT                              | PERFORMANCE              | —                    |release|
+| 4.20    | taprio                               | PERFORMANCE              | —                    |release|
+| 4.20    | BPF flow dissector                   | PROGRAMMABILITY          | —                    |release|
 
 ### 5.0–6.1
 
-| Release | Milestone                              | Axis             | Domain               | Primary ref |
+| Release | Milestone                              | Axis             | Domain               | Verification status |
 |:--------|:---------------------------------------|:-----------------|:---------------------|----------------|
-| 5.0     | UDP GRO                                | PERFORMANCE      | —                    |source index|
-| 5.0     | UDP MSG_ZEROCOPY                       | PERFORMANCE      | —                    |source index|
-| 5.1     | devlink health                         | DRIVER FRAMEWORK | —                    |source index|
-| 5.1     | mac80211 airtime accounting/scheduling | PERFORMANCE      | —                    |source index|
-| 5.3     | nexthop objects                        | CONTROL PLANE    | —                    |source index|
+| 5.0     | UDP GRO                                | PERFORMANCE      | —                    |release|
+| 5.0     | UDP MSG_ZEROCOPY                       | PERFORMANCE      | —                    |release|
+| 5.1     | devlink health                         | DRIVER FRAMEWORK | —                    |release|
+| 5.1     | mac80211 airtime accounting/scheduling | PERFORMANCE      | —                    |release|
+| 5.3     | nexthop objects                        | CONTROL PLANE    | —                    |release|
 | 5.3     | TC ct action                            | PROGRAMMABILITY  | —                    | anchor: Part VII     |
-| 5.3     | DIM generalized into lib/dim           | DRIVER FRAMEWORK | —                    |source index / series|
+| 5.3     | DIM generalized into lib/dim           | DRIVER FRAMEWORK | —                    |series + release|
 | 5.3     | Net DIM common-library integration                      | DRIVER FRAMEWORK                | —                    | anchor: Part VII |
-| 5.5     | nftables flowtable hardware offload          | PERFORMANCE / DRIVER FRAMEWORK | —          |source index|
-| 5.5     | mac80211 AQL                           | PERFORMANCE      | —                    |source index|
-| 5.6     | MPTCP                                  | —                | TRANSPORT            |source index|
-| 5.6     | WireGuard                              | —                | SECURITY / VIRTUAL / OVERLAY |source index|
-| 5.6     | BPF struct_ops / TCP CC                | PROGRAMMABILITY  | TRANSPORT            |source index|
+| 5.5     | nftables flowtable hardware offload          | PERFORMANCE / DRIVER FRAMEWORK | —          |release|
+| 5.5     | mac80211 AQL                           | PERFORMANCE      | —                    |release|
+| 5.6     | MPTCP                                  | —                | TRANSPORT            |release|
+| 5.6     | BPF struct_ops / TCP CC                | PROGRAMMABILITY  | TRANSPORT            |release|
 | 5.6     | ethtool Generic Netlink                | DRIVER FRAMEWORK | —                    | anchor: Part VII     |
 | 5.6     | WireGuard mainline secure L3 netdevice                    | DRIVER FRAMEWORK / CONTROL PLANE | SECURITY / VIRTUAL / OVERLAY | anchor: Part VII |
 | 5.9     | BPF_PROG_TYPE_SK_LOOKUP                | PROGRAMMABILITY  | —                    | anchor: Part VII     |
 | 5.11    | auxiliary bus                          | DRIVER FRAMEWORK | —                    | anchor: Part VII     |
-| 5.12    | threaded NAPI                          | DRIVER FRAMEWORK | —                    |source index|
-| 5.17    | structured drop-reason foundation      | OBSERVABILITY    | —                    |source index|
-| 5.18    | XDP multi-buffer / frags generation    | PROGRAMMABILITY  | —                    |source index / series|
+| 5.12    | threaded NAPI                          | DRIVER FRAMEWORK | —                    |release|
+| 5.17    | structured drop-reason foundation      | OBSERVABILITY    | —                    |release|
+| 5.18    | XDP multi-buffer / frags generation    | PROGRAMMABILITY  | —                    |series + release|
 | 5.19    | IPv6 BIG TCP                           | PERFORMANCE      | —                    | anchor: Part VII     |
-| 5.19    | drop-reason expansion                  | OBSERVABILITY    | —                    |source index|
-| 6.0     | io_uring SEND_ZC                       | PERFORMANCE      | —                    |source index|
-| 6.0     | io_uring multishot receive             | PERFORMANCE      | —                    |source index|
+| 5.19    | drop-reason expansion                  | OBSERVABILITY    | —                    |release|
+| 6.0     | io_uring SEND_ZC                       | PERFORMANCE      | —                    |release|
+| 6.0     | io_uring multishot receive             | PERFORMANCE      | —                    |release|
 
 ### 6.2–7.3-rc
 
-| Release | Milestone                                             | Axis                             | Domain               | Primary ref |
+| Release | Milestone                                             | Axis                             | Domain               | Verification status |
 |:--------|:------------------------------------------------------|:---------------------------------|:---------------------|----------------|
-| 6.2     | TCP PLB                                               | —                                | TRANSPORT            |source index|
+| 6.2     | TCP PLB                                               | —                                | TRANSPORT            |release|
 | 6.2     | XFRM/IPsec packet offload                             | DRIVER FRAMEWORK                 | SECURITY             | anchor: Part VII     |
-| 6.3     | YNL / YAML Netlink tooling                            | CONTROL PLANE                    | —                    |source index|
-| 6.3     | IPv4 BIG TCP                                          | PERFORMANCE                      | —                    |source index|
-| 6.4     | BPF netfilter programs (`BPF_PROG_TYPE_NETFILTER`) | PROGRAMMABILITY | —             |source index|
-| 6.6     | AF_XDP multi-buffer                                   | MEMORY / PROGRAMMABILITY         | —                    |source index|
-| 6.6     | TCX / bpf_mprog                                       | PROGRAMMABILITY                  | —                    |source index|
+| 6.3     | YNL / YAML Netlink tooling                            | CONTROL PLANE                    | —                    |release|
+| 6.3     | IPv4 BIG TCP                                          | PERFORMANCE                      | —                    |release|
+| 6.4     | BPF netfilter programs (`BPF_PROG_TYPE_NETFILTER`) | PROGRAMMABILITY | —             |release|
+| 6.6     | AF_XDP multi-buffer                                   | MEMORY / PROGRAMMABILITY         | —                    |release|
+| 6.6     | TCX / bpf_mprog                                       | PROGRAMMABILITY                  | —                    |release|
 | 6.7     | netkit                                                | PROGRAMMABILITY                  | VIRTUAL / OVERLAY    | anchor: Part VII     |
-| 6.7     | TCP-AO                                                | —                                | SECURITY / TRANSPORT |source index|
+| 6.7     | TCP-AO                                                | —                                | SECURITY / TRANSPORT |release|
 | 6.8     | Rust phylib / Asix reference PHY                      | DRIVER FRAMEWORK                 | —                    | anchor: Part VII     |
-| 6.8     | queue/NAPI netdev-genl visibility                     | DRIVER FRAMEWORK / OBSERVABILITY | —                    |source index / series|
+| 6.8     | queue/NAPI netdev-genl visibility                     | DRIVER FRAMEWORK / OBSERVABILITY | —                    |series + release|
 | 6.8     | page_pool identity / Netlink introspection              | OBSERVABILITY / MEMORY          | —                    | anchor: Part VII |
-| 6.11    | virtio-net AF_XDP RX zero-copy                        | MEMORY                           | VIRTUAL / OVERLAY    |source index|
+| 6.11    | virtio-net AF_XDP RX zero-copy                        | MEMORY                           | VIRTUAL / OVERLAY    |release|
 | 6.12    | Device Memory TCP RX                                  | MEMORY                           | —                    | anchor: Part VII |
 | 6.13    | per-netns RTNL infrastructure milestone               | CONTROL PLANE                    | —                    | anchor: Part VII |
 | 6.15    | io_uring ZCRX                                         | MEMORY                           | —                    | anchor: Part VII |
-| 6.15    | further RTNL breakup                                  | CONTROL PLANE                    | —                    |source index / series|
+| 6.15    | further RTNL breakup                                  | CONTROL PLANE                    | —                    |series + release|
 | 6.15    | page_pool custom memory-provider hooks                  | MEMORY / DRIVER FRAMEWORK       | —                    | anchor: Part VII |
 | 6.16    | Device Memory TCP TX                                  | MEMORY                           | —                    | anchor: Part VII |
-| 6.16    | BPF qdisc                                             | PROGRAMMABILITY                  | —                    |source index / series|
-| 6.18    | AccECN core                                           | —                                | TRANSPORT            |source index / series|
-| 6.18    | UDP RX evolution                                      | PERFORMANCE                      | —                    |source index / series|
-| 6.19    | `dev_queue_xmit()` llist TX scheduling                | PERFORMANCE                      | —                    |source index|
-| 6.19    | threaded-NAPI kthread busy-poll extension             | DRIVER FRAMEWORK                 | —                    |source index|
-| 6.19    | WireGuard YNL-described Netlink                       | CONTROL PLANE                    | SECURITY             |source index|
-| 7.0     | cake_mq                                               | PERFORMANCE                      | —                    |source index|
-| 7.0     | IPv6 BIG TCP without synthetic HBH jumbo header       | PERFORMANCE                      | —                    |source index|
-| 7.0     | AccECN enablement                                     | —                                | TRANSPORT            |source index|
-| 7.0     | large RX buffers for memory providers / io_uring ZCRX | MEMORY                           | —                    |source index|
+| 6.16    | BPF qdisc                                             | PROGRAMMABILITY                  | —                    |series + release|
+| 6.18    | AccECN core                                           | —                                | TRANSPORT            |series + release|
+| 6.18    | UDP RX evolution                                      | PERFORMANCE                      | —                    |series + release|
+| 6.19    | `dev_queue_xmit()` llist TX scheduling                | PERFORMANCE                      | —                    |release|
+| 6.19    | threaded-NAPI kthread busy-poll extension             | DRIVER FRAMEWORK                 | —                    |release|
+| 6.19    | WireGuard YNL-described Netlink                       | CONTROL PLANE                    | SECURITY             |release|
+| 7.0     | cake_mq                                               | PERFORMANCE                      | —                    |release|
+| 7.0     | IPv6 BIG TCP without synthetic HBH jumbo header       | PERFORMANCE                      | —                    |release|
+| 7.0     | AccECN enablement                                     | —                                | TRANSPORT            |release|
+| 7.0     | large RX buffers for memory providers / io_uring ZCRX | MEMORY                           | —                    |release|
 | 7.1     | RX HW queue leasing                                   | MEMORY / DRIVER FRAMEWORK        | —                    | anchor: Part VII |
-| 7.1     | dedicated qdisc-drop tracepoint                       | OBSERVABILITY                    | —                    |source index|
+| 7.1     | dedicated qdisc-drop tracepoint                       | OBSERVABILITY                    | —                    |release|
 | 7.3-rc  | BIG TCP over VXLAN/GENEVE                             | PERFORMANCE                      | VIRTUAL / OVERLAY    | mainline; final pending       |
 | 7.3-rc  | RTNL-less FIB-rule updates                            | CONTROL PLANE                    | —                    | mainline; final pending       |
 | 7.3-rc  | devmem buffers \>PAGE_SIZE                            | MEMORY                           | —                    | mainline; final pending       |
 | 7.3-rc  | per-netns netdev-unregistration infrastructure        | CONTROL PLANE                    | —                    | mainline; final pending       |
 
-### Architecture-critical items with open canonical boundary
-
-次の項目は本文の中心 lineage に属するため chronology から消さず、**release attribution を断定しない boundary-open register** としてここに残す。これは canonical release row ではない。
-
-| Item | Axis | なぜ本編に必要か | Open boundary |
-|---|---|---|---|
-| `netmem` | MEMORY | `struct page` と packet memory identity の分離 | canonical origin / first final release |
 
 ## Part VI から Part VII へ — chronology から provenance へ
 
-Part VI は「いつ」を正規化し、Part VII はその attribution を再監査できる exact anchor を保持する。canonical boundary が未確定の項目は Part VI の boundary-open register に集約する。
-
-### Primary-source key for early architecture milestones
-
-Part VI の古い milestone は recent feature と同じ密度で exact SHA を並べるのではなく、architecture 上の転換点を一次資料へ結び付ける。代表的な入口は以下である。
-
-- **DQL/BQL (3.3)** — LWN/netdev patch series, *bql: Byte Queue Limits*: https://lwn.net/Articles/469652/
-- **nftables (3.13)** — LWN, *3.13 Merge window, part 1*: https://lwn.net/Articles/573272/
-- **bpf() / maps / verifier (3.18)** — LWN/netdev series, *BPF syscall, maps, verifier, samples*: https://lwn.net/Articles/603816/
-- **bridge VLAN filtering / MPLS / Flower / VRF** — exact mainline anchors are listed in Part VII.
-- **phylink / page_pool / SK_MSG / SK_LOOKUP / BIG TCP / XFRM packet offload** — exact mainline anchors are listed in Part VII.
-
-この source key は「古い release を増やして件数を均す」ためではない。Era 1–2 の foundation が、Era 4 の resource-placement features と同じ監査可能性で読めるようにするための入口である。
+Part VI は「いつ」を正規化し、Part VII はその attribution を再監査できる exact anchor を保持する。
 # Part VII — 正規 provenance ledger
 
 **Evidence model:** Part VII の SHA は feature series の「代表 anchor」であり、anchor の存在だけで series 全体を証明しない。 各項目は **SHA identity / feature correspondence / release containment** を別々に監査する。
@@ -1351,10 +1333,11 @@ Part VI の古い milestone は recent feature と同じ密度で exact SHA を�
 | auxiliary bus | origin | `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` | `Add auxiliary bus support` | v5.11 |
 | IPv6 BIG TCP / GRO | enablement | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | allow `gro_max_size` > 65536 | v5.19 |
 | IPv6 BIG TCP / GSO | enablement | `7c4e983c4f3cf94fcd879730c6caa877e0768a4d` | allow `gso_max_size` > 65536 | v5.19 |
+| XFRM/IPsec crypto offload API | origin | `d77e38e612a017480157fe6d2c1422f42cb5b7e3` | `xfrm: Add an IPsec hardware offloading API`; introduces `xfrmdev_ops` for SA/ESP hardware crypto offload | v4.12 |
 | kTLS TX / kernel TLS | origin | `3c4d7559159bfe1e3b94df3a657b2cda3a34e218` | `tls: kernel TLS support`; TLS ULP + software TX record datapath | v4.13 |
 | kTLS RX | enablement | `c46234ebb4d1eee5e09819f49169e51cfc6eb909` | `tls: RX path for ktls`; `TLS_RX`, recvmsg/splice/poll | v4.17 |
 | TLS device offload TX | integration | `e8f69799810c32dd40c6724d829eccc70baad07f` | `net/tls: Add generic NIC offload infrastructure`; same kTLS API/state with NIC TX crypto | v4.18 |
-| TLS device offload RX | integration | `4799ac81e52a72a6404827bf2738337bb581a174` | `tls: Add rx inline crypto offload`; completes generic RX device-offload infrastructure | v4.18 |
+| TLS device offload RX | integration | `4799ac81e52a72a6404827bf2738337bb581a174` | `tls: Add rx inline crypto offload`; completes generic RX device-offload infrastructure | v4.19 |
 | WireGuard | origin | `e7096c131e5161fa3b8e52a650d7719d2857adfd` | `net: WireGuard secure network tunnel`; L3 secure tunnel as normal netdevice | v5.6 |
 | XFRM packet offload | integration | `d14f28b8c1de668bab863bf5892a49c824cb110d` | packet-level IPsec offload; policy/SA synchronization with NIC | v6.2 |
 | BTF origin | origin | `69b693f0aefa0ed521e8bd02260523b5ae446ad7` | `bpf: btf: Introduce BPF Type Format (BTF)`; typed metadata for BPF program/map | v4.18 |
@@ -1369,7 +1352,6 @@ Part VI の古い milestone は recent feature と同じ密度で exact SHA を�
 | per-netns RTNL start | merge | `fcc79e1714e8c2b8e216dc3149812edd37884eef` | merge tag `net-next-6.13`; initial per-netns RTNL conversion wave, explicitly in-progress | v6.13 |
 | io_uring ZCRX | merge | `71f0dd5a3293d75d26d405ffbaedfdda4836af32` | merge branch `io_uring-zero-copy-rx`; queue-bound userspace-page RX / memory-provider integration | v6.15 |
 | Device Memory TCP TX | merge | `1b98f357dadd6ea613a435fbaef1a5dd7b35fd21` | merge tag `net-next-6.16`; Device Memory TCP transmit path | v6.16 |
-| XFRM packet offload | enablement | `d14f28b8c1de668bab863bf5892a49c824cb110d` | add packet offload flag | v6.2 |
 | netkit | origin | `35dfaad7188cdc043fde31709c796f5a692ba2bd` | netkit core anchor | v6.7 |
 | Rust PHY abstractions | integration | `f20fd5449ada3872dcd67aca397f0e27ca2e8ad6` | Rust core abstractions for network PHY drivers | v6.8 |
 | netdev-genl queue object | integration | `bc877956272f0521fef107838555817112a450dc` | YAML spec for queue object | v6.8 |
