@@ -7,7 +7,7 @@ title: Linux Networking Evolution
 > **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras, Parts III–V the lineages / driver-framework / observability story. Part VI is the only normative release chronology, Part VII the provenance ledger, and Appendix material is supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02  
-**構成改訂:** 2026-10-06（r42）
+**構成改訂:** 2026-10-06（r43）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
@@ -509,6 +509,19 @@ FIB/route は「次hopを決める control-plane state」、TC classifier/action
 
 hardware offload では、kernel rulesetを捨ててNIC独自APIを直接操作するのではなく、kernel objectを canonical state とし、driver callback が hardware resourceへ同期する。したがって offload failure、resource exhaustion、unsupported action では software pathとの関係が重要になる。この設計はswitchdev/devlinkとPart IVで再び現れる。
 
+
+### FIB / nexthop object — route entry から reusable forwarding object へ
+
+従来のrouteはgateway、output device、weight等のnexthop情報をroute entry側へ埋め込む形が中心だった。nexthop objectはこれを独立したID付きobjectへ切り出し、複数routeから同じnexthopまたはnexthop groupを参照できるようにする。これによりroute prefixの変更とforwarding adjacencyの変更を分離でき、ECMP groupの構成変更も「多数のrouteを書き換える」操作から「共有objectを更新する」操作へ寄せられる。
+
+このobject化はcontrol-plane scalabilityだけでなくhardware offloadにも意味がある。ASIC側でもroute tableとadjacency/nexthop tableは別resourceであることが多く、kernel側に同様のidentity/lifetimeがあるとmappingしやすい。したがってnexthop APIは本書の **reusable object / explicit identity** というCONTROL PLANE lineageの代表例である。
+
+### TC classifier/action — packet policy を composable graph として表す
+
+TC ingress/egress pathではclassifierがpacketを識別し、actionがdrop、redirect/mirror、mark、police、conntrack等の処理を行う。FlowerはEthernet/IP/L4/tunnel metadata等をfield-oriented keyとして表現するため、driverがhardware match keyへ変換しやすい。`mirred`、`vlan`、`tunnel_key`、`ct`等のactionを組み合わせることで、単なるQoS schedulerを越えてhost/switch datapath policyを表現できる。
+
+offload時にはTC ruleそのものがhardware-native ruleへ置換されるのではなく、kernelが保持するclassifier/action representationから`flow_rule`等の共通表現を介してdriverへ渡される。このため「何がoffload可能か」「一部actionだけunsupportedならどうするか」「statsをどこから読むか」がcontractになる。switchdev/devlinkと同様、**kernel canonical state + optional hardware execution** という設計で読む。
+
 ## Routing / Netlink / RTNL
 
 Routing/control-plane scalability では、共有状態の削減、再利用可能な routing object、machine-readable API、lock scope の縮小が並行して進んだ。IPv4 route-cache removal（3.6）は per-destination shared cache を外した早い転換点であり、nexthop object や per-netns RTNL の直接の祖先ではないが、global/shared state を減らすという同じ scalability pressure に応えた。
@@ -756,6 +769,33 @@ DCTCPはECN markingをbinary congestion eventではなく congestion extent のf
 
 MPTCPは1本のlogical connectionの下に複数TCP subflowを持ち、endpoint/address/path-manager stateを追加する。TCP-AOはTCP connection自体にkeyed authenticationを加える。これらはpage_poolやXDPのようなpacket execution placementではなく、**connection semantics / congestion model / path management / authentication** を変更するためTRANSPORT lineageに置く。
 
+
+### MPTCP — connection と path を別objectとして扱う
+
+MPTCPではapplicationから見える1本のsocket/byte streamの下に複数のTCP subflowを持つ。MP_CAPABLEでMPTCP connectionを確立し、MP_JOINで追加subflowを参加させ、DSS mappingでMPTCP-level data sequence spaceと各subflowのTCP sequence spaceを対応付ける。このため「TCP connection = 1 path」という従来の暗黙の対応が崩れ、**logical connection、subflow、local/remote endpoint、address advertisement、scheduler/path manager** が別々のstateになる。
+
+Path Managerはsubflowの生成・削除と`ADD_ADDR`/`REMOVE_ADDR`によるaddress advertisementを担当する。現在は全connectionへ共通ruleを適用するin-kernel PMと、connectionごとにuserspace daemonが判断できるuserspace PMがあり、Netlink APIでendpoint/path stateを制御する。これはTRANSPORTの中でも、本書の「implicit stateをnamed object/control APIへ出す」流れと強く接続する。
+
+```text
+application byte stream
+        ↓
+MPTCP connection / data sequence space
+        ├─ subflow A → path A
+        ├─ subflow B → path B
+        └─ Path Manager
+              ├─ endpoint object
+              ├─ ADD_ADDR / REMOVE_ADDR
+              └─ subflow create / destroy
+```
+
+kernel documentation: https://docs.kernel.org/networking/mptcp.html
+
+### PLB と AccECN — congestion signal の意味を豊かにする
+
+Protective Load Balancing (PLB) はECMP環境で、単一flowがpersistent congestionのあるpathへhashされた場合にflow label/hash等を変更して別pathを選び直す。通常のTCP congestion controlが「そのpath上でsending rateをどう変えるか」を扱うのに対し、PLBは **どのECMP pathを使うか** までtransport reactionの対象にする点が異なる。
+
+Accurate ECN (AccECN) はclassic ECNのECE/CWRによる粗いfeedbackより多くのcongestion-marking情報をsenderへ返す。DCTCPのようなECN-sensitive algorithmやdatacenter congestion controlでは、単なる「congestionがあった/なかった」より、markingの程度を把握できることが重要になる。したがってDCTCP → PLB → AccECNは一直線の機能継承ではないが、**loss以外のnetwork signalをtransport decisionへ取り込む粒度が上がった**という並行した流れとして読める。
+
 ## SECURITY / kTLS / XFRM / WireGuard — security semantics と execution placement の分離
 
 SECURITY は第7の architecture axis ではなく、TRANSPORT や VIRTUAL / OVERLAY と同じ **cross-cutting lineage** として扱う。ここで追う共通テーマは「暗号方式の変遷」そのものではなく、**security state / policy を kernel が保持し、その semantics を変えずに software・accelerator・NIC のどこで実行するかを明示的な contract で選べるようになったこと**である。
@@ -839,6 +879,70 @@ TCP-AO は transport authentication semantics 自体の更新なので Part III�
 | WireGuard | peer / key / allowed-IP + netdevice | kernel implementation | secure tunnelを通常のnetwork object/APIへ統合 |
 
 **Takeaway:** securityの進化も「専用fast pathへの置換」ではなく、**security semantics / stateをkernel-visibleなcontractとして保持し、そのexecution placementやnetwork integrationを明示する方向**として読むことができる。この lineage は CONTROL PLANE・DRIVER FRAMEWORK・TRANSPORT・VIRTUAL / OVERLAY を横断し、security semantics/state と execution placement / network integration の関係を示す。
+
+
+## Observability — counter から packet provenance / typed introspection へ
+
+network observabilityの進化は「counterが増えた」だけではない。従来の`/proc/net/*`、`ip -s`、ethtool stats、SNMP counterは「どこかで何件起きたか」を集約して示すのに強い一方、特定packetがkernel内のどのfunction/objectを通り、なぜdropされたかを復元するには情報が足りない。tracepoint、BPF、BTF、drop reasonが組み合わさることで、観測対象は **aggregate counter → event → typed kernel object → packet provenance** へ広がった。
+
+### BTF — kernel internal type を観測可能なschemaへ変える
+
+BTFはBPF program/mapに関連するC type metadataとして始まり、struct/union/enumだけでなくfunction prototype、variable、line/function infoへ拡張された。重要なのは単なるdebug symbol圧縮ではなく、kernelとuserspaceの間に **type IDで参照可能なmachine-readable schema** を提供したことである。
+
+これによりlibbpf/CO-REはcompile時とruntime kernelのstruct layout差をrelocationでき、tracing toolは`struct sk_buff`や`struct sock`のfieldをkernel versionごとのhard-coded offsetなしに参照しやすくなる。BTF documentationはkernel APIをuserspace/kernel間のcontract、ELF formatをloaderとのcontractとして明示している。BTFはしたがってPROGRAMMABILITYだけでなくOBSERVABILITYの基盤でもある。
+
+kernel documentation: https://docs.kernel.org/bpf/btf.html  
+original BTF series: https://lwn.net/Articles/750695/
+
+### skb drop reason — 「freeされた」から「なぜdropされたか」へ
+
+従来の`kfree_skb` tracepointだけでは、packetがfreeされた場所を見てもdropの意味を一意に決められない場合がある。`kfree_skb_reason()` / `enum skb_drop_reason`はdrop siteがreasonを明示してtracepointへ渡すcontractを導入し、IP、neighbour、link layer、TCPなどへcoverageを広げた。
+
+```text
+packet disappears
+      ↓
+kfree_skb tracepoint + call site
+      ↓
+kfree_skb_reason(skb, reason)
+      ↓
+typed drop reason
+      ├─ routing / neighbour
+      ├─ qdisc / backlog
+      ├─ XDP / ingress
+      └─ transport state
+```
+
+これはobservabilityを外部toolの推測からkernel producer側のsemantic annotationへ移す変更である。現在のnetworking KAPIにも`kfree_skb_reason`系とdrop-reason subsystem registrationが公開され、subsystemごとのreason namespaceを拡張できる。IP/neighbourへの展開は https://lwn.net/Articles/886138/ 、`net/core/dev.c`への展開は https://lwn.net/Articles/886798/ にpatch seriesが残っている。
+
+### pwru — 1 packet の kernel traversal を function level で追う
+
+`pwru` (packet, where are you?) はeBPF tracingを使い、packetに対応する`skb`等を手掛かりにkernel function traversalを追跡する。tcpdumpがinterface境界でpacketを観測するのに対し、pwruは「interface間のkernel内部で何が起きたか」を対象にする。この違いはcontainer/veth、routing、Netfilter、BPF programが重なるhost networkingで特に大きい。
+
+LPC 2024のpwru講演は、host network stackだけでなくBPF program tracingへ対象を拡張した理由を説明している。BPF datapathが増えるほど「kernel C functionだけ追えばpacket pathが分かる」という前提も崩れるためである。LPC 2024: https://lpc.events/event/18/contributions/1942/
+
+### Retis — collector を組み合わせて packet event を構造化する
+
+Retisはpacket tracingを単一probeの出力ではなく、kernel networking subsystemごとのcollectorから得たeventをpacket単位で相関させる方向を取る。skb tracking、drop reason、Netfilter、OVS、BPF等の情報を同じpacket journeyへ重ねられるため、「関数を全部traceして後から読む」方法よりsemantic layerを高くできる。
+
+pwruとRetisは競合する単純な代替関係ではない。pwruは低レベルなfunction traversalを直接見るdebuggerとして強く、Retisは複数subsystemのstructured metadataをpacket journeyへ統合する方向に強い。本書では両者を、BTF/drop reason/BPF tracingというkernel側の観測contractがuserspace debuggerを高度化した例として扱う。
+
+### Observability の architecture takeaway
+
+```text
+aggregate counters
+      ↓
+tracepoints / perf events
+      ↓
+BPF dynamic tracing
+      ↓
+BTF typed kernel objects
+      ↓
+semantic annotations (skb_drop_reason)
+      ↓
+packet-centric correlation (pwru / Retis)
+```
+
+この系列の本質は「より多くtraceする」ことではない。kernel側がtype、reason、object identityを明示し、userspace toolがそれらを相関できるようになったことで、**observability自体がimplicit implementation knowledgeからexplicit contractへ移った**点にある。LPC 2025の“Methodology and Practice in Observing Kernel Networking”も、hot pathの全function/counterを盲目的に収集する方法はperformance・metric quality・storage costの面で実運用に向かないと問題提起しており、semantic/selective observabilityの必要性を補強する（https://lpc.events/event/19/contributions/2055/）。
 
 ## Part III から Part IV へ — feature lineage から driver contract へ
 
