@@ -7,7 +7,7 @@ title: Linux Networking Evolution
 > **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras, Parts III–V the lineages / driver-framework / observability story. Part VI is the only normative release chronology, Part VII the provenance ledger, and Appendix material is supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02  
-**構成改訂:** 2026-10-06（r40）
+**構成改訂:** 2026-10-06（r41）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
@@ -967,24 +967,31 @@ physical netdev
 ここでqueue identityはOBSERVABILITYとCONTROL PLANEの接点になる。
 
 
+## Source-audit policy
+
+Part IV の `Canonical source` は、同じ種類の証拠を無理に全行へ割り当てない。**API / object semantics の現在形**は kernel documentation、**mainline に入った境界**は Part VII の exact anchor、**merge/release attribution** は release coverage または merge source を使う。conference material は設計意図や背景の補助資料として使うが、mainline boundary の正本にはしない。
+
+特に switchdev は Part VII に exact origin anchor をまだ置いていないため、現時点では kernel documentation を canonical architecture source とする。kernel docs は switchdev を、kernel の forwarding data plane を switch device へ offload する in-kernel driver model と定義している。devlink は device class に直接属さない chip-wide / switch-ASIC-wide resource/configuration を公開する API、phylink は MAC と PHY/SFP/in-band negotiation の状態協調、page_pool は packet memory の recycling / DMA / in-flight lifetime を共通化する API として、それぞれ現在の contract を直接記述している。
+
 ## Driver framework の synthesis
 
 15年間を通して見ると、driver framework の変化は次のように要約できる。
 
-| 以前 driver 内に埋もれていたもの | 共通化した代表 framework | 代表 release | 主な contract | Source |
+| 以前 driver 内に埋もれていたもの | 共通化した代表 framework | 代表 release | 主な contract | Canonical source |
 |---|---|---:|---|---|
-| outstanding TX work | DQL/BQL | 3.3 | accounting / backpressure | Part VII / source index |
-| switch forwarding state | switchdev | 3.19 | object / notification | Part VII / source index |
-| device-wide resource | devlink | 4.6 | object / API | kernel devlink docs |
-| MAC–PHY/PCS topology | phylink | 4.14 | API / state coordination | Part VII |
-| hardware-independent API test | netdevsim | 4.16 | selftest / contract validation | kernel netdevsim docs |
-| interrupt moderation logic | DIM | 4.16→5.3 | measurement / policy | Part VII |
-| RX packet-memory recycling | page_pool | 4.18 | lifetime / object | Part VII |
-| device health/recovery | devlink health | 5.1 | lifecycle / observability | kernel devlink-health docs |
-| NIC configuration | ethtool netlink | 5.6 | structured API | source index |
-| multi-function driver binding | auxiliary bus | 5.11 | composition / lifetime | source index |
-| NAPI execution placement | threaded NAPI | 5.12; busy-poll 6.19 | execution choice | source index |
-| queue / NAPI identity | netdev-genl | 6.8+ | object / assignment | kernel netdev spec |
+| outstanding TX work | DQL/BQL | 3.3 | accounting / backpressure | LWN/netdev patch series: https://lwn.net/Articles/469652/ |
+| switch forwarding state | switchdev | 3.19 | object / notification | kernel docs: https://docs.kernel.org/networking/switchdev.html |
+| device-wide resource | devlink | 4.6 | object / API | kernel docs: https://docs.kernel.org/networking/devlink/ |
+| MAC–PHY/PCS topology | phylink | 4.14 | API / state coordination | kernel docs: https://docs.kernel.org/networking/sfp-phylink.html ; origin anchor: Part VII |
+| hardware-independent API test | netdevsim | 4.16 | selftest / contract validation | kernel docs: https://docs.kernel.org/networking/devlink/netdevsim.html |
+| interrupt moderation logic | DIM | 4.16→5.3 | measurement / policy | kernel docs: https://docs.kernel.org/networking/net_dim.html ; 5.3 integration anchor: Part VII |
+| RX packet-memory recycling | page_pool | 4.18 | lifetime / object | kernel docs: https://docs.kernel.org/networking/page_pool.html ; origin anchor: Part VII |
+| device health/recovery | devlink health | 5.1 | lifecycle / observability | kernel docs: https://docs.kernel.org/networking/devlink/devlink-health.html |
+| NIC configuration | ethtool netlink | 5.6 | structured API | LWN 5.6 merge window: https://lwn.net/Articles/810780/ |
+| multi-function driver binding | auxiliary bus | 5.11 | composition / lifetime | origin anchor: Part VII |
+| NAPI execution placement | threaded NAPI | 5.12; busy-poll 6.19 | execution choice | release/source evidence in Part VI; exact boundary retained where audited |
+| queue / NAPI identity | netdev-genl | 6.8+ | object / assignment | kernel Netlink spec: https://docs.kernel.org/networking/netlink_spec/netdev.html ; queue-object anchor: Part VII |
+
 
 
 この表は各frameworkが同じ問題を解くという意味ではない。共通するのは、**driver-privateだったstate/resource/algorithm boundaryをkernel共通のcontractへ引き上げ、複数driver・複数hardware・複数execution modelから再利用可能にしたこと**である。
