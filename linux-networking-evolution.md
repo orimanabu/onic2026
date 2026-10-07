@@ -1695,56 +1695,62 @@ Part VI は release chronology の正本である。各 milestone の `Architect
 
 巨大な series を恣意的な1 patch で代表させるより、pull/merge message が feature generation を明示する場合は `merge` を優先する。特に per-netns RTNL のような複数 release にまたがる migration では、`merge` は「完成 commit」ではなく **その generation の開始/ 統合点**を意味する。本文の台帳では representative SHA と first final release に絞り、first-containing rc tag の機械監査は作業ログへ分離する。
 
-| Item | Anchor type | Exact mainline anchor | Subject / role | First final release |
-|---|---|---|---|---|
-| DQL | origin | `75957ba36c05b979701e9ec64b37819adc12f830` | `dql: Dynamic queue limits` | v3.3 |
-| CoDel | origin | `76e3cc126bb223013a6b9a0e2a51238d1ef2e409` | CoDel qdisc core anchor | v3.5 |
-| SO_REUSEPORT infrastructure | origin | `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a` | `soreuseport: infrastructure` | v3.9 |
-| nftables core | origin | `96518518cc417bb0a8c80b9fb736202e28acdf96` | `netfilter: add nftables` | v3.13 |
-| nftables set API | integration | `20a69341f2d00cd042e81c82289fba8a13c05a25` | set-API anchor; not core origin | v3.13 |
-| bridge VLAN filtering | origin | `243a2e63f5f47763b802e9dee8dbf1611a1c1322` | bridge VLAN filtering infrastructure | v3.9 |
-| MPLS routing / AF_MPLS | origin | `0189197f441602acdca3f97750d392a895b778fd` | MPLS label-based routing / AF_MPLS | v4.1 |
-| Flower classifier | origin | `77b9900ef53ae047e36a37d13a2aa33bb2d60641` | initial `cls_flower` classifier | v4.2 |
-| VRF device | origin | `193125dbd8eb292d88feb201f030889b488b0a02` | VRF device / routing-domain separation | v4.3 |
-| TC ct action | integration | `b57dc7c13ea90e09ae15f821d2583fa0231b4935` | conntrack state/metadata as TC action | v5.3 |
-| devlink | origin | `bfcd3a46617209454cfc0947ab093e37fd1e84ef` | `Introduce devlink infrastructure` | v4.6 |
-| BBR | origin | `0f8782ea14974ce992618b55f0c041ef43ed0b78` | initial BBR mainline anchor | v4.9 |
-| phylink | origin | `9525ae83959b60c6061fe2f2caabdc8f69a48bc6` | `phylink: add phylink infrastructure` | v4.14 |
-| netdevsim | origin | `83c9e13aa39aed5cf9a2f8dd69770b7c35ba1281` | hardware-independent offload test device | v4.16 |
-| SK_MSG | enablement | `4f738adba30a7cfc006f605707e7aee847ffefa0` | socket-message verdict / `BPF_PROG_TYPE_SK_MSG` | v4.17 |
-| TCP MSG_ZEROCOPY | enablement | `f214f915e7db99091f1312c48b30928c1e0c90b7` | `tcp: enable MSG_ZEROCOPY` | v4.14 |
-| page_pool origin | origin | `ff7d6b27f894f1469dc51ccb828b7363ccd9799f` | page_pool core origin anchor | v4.18 |
-| page_pool/XDP integration | integration | `60bbf7eeef10dc647430646d7fe5e3d8d132dbec` | mlx5 page_pool/XDP integration | v4.18 |
-| ethtool Generic Netlink | origin | `2b4a8990b7df55875745a80a609a1ceaaf51f322` | `ethtool: introduce ethtool netlink interface` | v5.6 |
-| SK_LOOKUP | origin | `e9ddbb7707ff5891616240026062b8c1e29864ca` | dedicated SK_LOOKUP program type / attach point | v5.9 |
-| auxiliary bus | origin | `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` | `Add auxiliary bus support` | v5.11 |
-| IPv6 BIG TCP / GRO | enablement | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | allow `gro_max_size` > 65536 | v5.19 |
-| IPv6 BIG TCP / GSO | enablement | `7c4e983c4f3cf94fcd879730c6caa877e0768a4d` | allow `gso_max_size` > 65536 | v5.19 |
-| XFRM/IPsec crypto offload API | origin | `d77e38e612a017480157fe6d2c1422f42cb5b7e3` | `xfrm: Add an IPsec hardware offloading API`; introduces `xfrmdev_ops` for SA/ESP hardware crypto offload | v4.12 |
-| kTLS TX / kernel TLS | origin | `3c4d7559159bfe1e3b94df3a657b2cda3a34e218` | `tls: kernel TLS support`; TLS ULP + software TX record datapath | v4.13 |
-| kTLS RX | enablement | `c46234ebb4d1eee5e09819f49169e51cfc6eb909` | `tls: RX path for ktls`; `TLS_RX`, recvmsg/splice/poll | v4.17 |
-| TLS device offload TX | integration | `e8f69799810c32dd40c6724d829eccc70baad07f` | `net/tls: Add generic NIC offload infrastructure`; same kTLS API/state with NIC TX crypto | v4.18 |
-| TLS device offload RX | integration | `4799ac81e52a72a6404827bf2738337bb581a174` | `tls: Add rx inline crypto offload`; completes generic RX device-offload infrastructure | v4.19 |
-| WireGuard | origin | `e7096c131e5161fa3b8e52a650d7719d2857adfd` | `net: WireGuard secure network tunnel`; L3 secure tunnel as normal netdevice | v5.6 |
-| XFRM packet offload | integration | `d14f28b8c1de668bab863bf5892a49c824cb110d` | packet-level IPsec offload; policy/SA synchronization with NIC | v6.2 |
-| BTF origin | origin | `69b693f0aefa0ed521e8bd02260523b5ae446ad7` | `bpf: btf: Introduce BPF Type Format (BTF)`; typed metadata for BPF program/map | v4.18 |
-| Net DIM common-library integration | integration | `4f75da3666c0c572967729a2401ac650be5581b6` | `linux/dim: Move implementation to .c files`; driver-local/header logic becomes common `lib/dim` implementation | v5.3 |
-| vDPA bus | origin | `961e9c84077f6c8579d7a628cbe94a675cb67ae4` | `vDPA: introduce vDPA bus`; common virtio datapath / vendor-control abstraction | v5.7 |
-| netmem abstraction | origin | `18ddbf5cf0e7553fd05c3e1a02d740514ee3f0a6` | `net: introduce abstraction for network memory`; `netmem_ref` decouples network memory references from `struct page` | v6.9 |
-| page_pool userspace identity | enablement | `f17c69649c698e4df3cfe0010b7bbf142dec3e40` | `net: page_pool: id the page pools`; creates stable IDs for uAPI references | v6.8 |
-| page_pool netlink GET | enablement | `950ab53b77ab829defeb22bc98d40a5e926ae018` | `net: page_pool: implement GET in the netlink API`; exposes pool identity / ifindex / NAPI ID | v6.8 |
-| page_pool netlink statistics | integration | `d49010adae737638447369a4eff8f1aab736b076` | `net: page_pool: expose page pool stats via netlink`; driver-independent observability | v6.8 |
-| page_pool custom memory providers | integration | `57afb483015768903029c8336ee287f4b03c1235` | `net: page_pool: create hooks for custom memory providers`; shared allocator hook for devmem TCP and io_uring ZCRX | v6.15 |
-| Device Memory TCP RX | merge | `9410645520e9b820069761f3450ef6661418e279` | merge tag `net-next-6.12`; Device Memory TCP RX generation | v6.12 |
-| per-netns RTNL start | merge | `fcc79e1714e8c2b8e216dc3149812edd37884eef` | merge tag `net-next-6.13`; initial per-netns RTNL conversion wave, explicitly in-progress | v6.13 |
-| io_uring ZCRX | merge | `71f0dd5a3293d75d26d405ffbaedfdda4836af32` | merge branch `io_uring-zero-copy-rx`; queue-bound userspace-page RX / memory-provider integration | v6.15 |
-| Device Memory TCP TX | merge | `1b98f357dadd6ea613a435fbaef1a5dd7b35fd21` | merge tag `net-next-6.16`; Device Memory TCP transmit path | v6.16 |
-| netkit | origin | `35dfaad7188cdc043fde31709c796f5a692ba2bd` | netkit core anchor | v6.7 |
-| Rust PHY abstractions | integration | `f20fd5449ada3872dcd67aca397f0e27ca2e8ad6` | Rust core abstractions for network PHY drivers | v6.8 |
-| netdev-genl queue object | integration | `bc877956272f0521fef107838555817112a450dc` | YAML spec for queue object | v6.8 |
-| RX HW queue leasing / queue-create | enablement | `7789c6bb76acf21539c2c74b0cc869bb57de99e6` | `net: Add queue-create operation`; virtual RX queue may lease a physical RX queue | v7.1 |
-| RX HW queue leasing generation | merge | `91a4855d6c03e770e42f17c798a36a3c46e63de2` | merge tag `net-next-7.1`; pull message explicitly lists HW queue leasing | v7.1 |
-| net-next 7.3 merge | merge | `91ec2035134982b98fab0609a9fd8480e8217dc1` | merge tag `net-next-7.3` | 7.3 final pending |
+| Item | Anchor type | Exact mainline anchor | Exact subject | Architectural role | First final release |
+|---|---|---|---|---|---|
+| DQL | origin | `75957ba36c05b979701e9ec64b37819adc12f830` | `dql: Dynamic queue limits` | dynamic queue-limit accounting primitive | v3.3 |
+| CoDel | origin | `76e3cc126bb223013a6b9a0e2a51238d1ef2e409` | `codel: Controlled Delay AQM` | CoDel qdisc core anchor | v3.5 |
+| SO_REUSEPORT infrastructure | origin | `055dc21a1d1d219608cd4baac7d0683fb2cbbe8a` | `soreuseport: infrastructure` | shared reuseport selection infrastructure | v3.9 |
+| nftables core | origin | `96518518cc417bb0a8c80b9fb736202e28acdf96` | `netfilter: add nftables` | nftables core rule engine | v3.13 |
+| nftables set API | integration | `20a69341f2d00cd042e81c82289fba8a13c05a25` | `netfilter: nf_tables: add netlink set API` | set-API anchor; not core origin | v3.13 |
+| bridge VLAN filtering | origin | `243a2e63f5f47763b802e9dee8dbf1611a1c1322` | `bridge: Add vlan filtering infrastructure` | bridge VLAN filtering infrastructure | v3.9 |
+| MPLS routing / AF_MPLS | origin | `0189197f441602acdca3f97750d392a895b778fd` | `mpls: Basic routing support` | MPLS label-based routing / AF_MPLS | v4.1 |
+| Flower classifier | origin | `77b9900ef53ae047e36a37d13a2aa33bb2d60641` | `tc: introduce Flower classifier` | initial `cls_flower` classifier | v4.2 |
+| VRF device | origin | `193125dbd8eb292d88feb201f030889b488b0a02` | `net: Introduce VRF device driver` | VRF device / routing-domain separation | v4.3 |
+| TC ct action | integration | `b57dc7c13ea90e09ae15f821d2583fa0231b4935` | `net/sched: Introduce action ct` | conntrack state/metadata as TC action | v5.3 |
+| devlink | origin | `bfcd3a46617209454cfc0947ab093e37fd1e84ef` | `Introduce devlink infrastructure` | driver/device management infrastructure | v4.6 |
+| BBR | origin | `0f8782ea14974ce992618b55f0c041ef43ed0b78` | `tcp_bbr: add BBR congestion control` | initial BBR mainline anchor | v4.9 |
+| phylink | origin | `9525ae83959b60c6061fe2f2caabdc8f69a48bc6` | `phylink: add phylink infrastructure` | MAC/PCS/PHY coordination framework | v4.14 |
+| netdevsim | origin | `83c9e13aa39aed5cf9a2f8dd69770b7c35ba1281` | `netdevsim: add software driver for testing offloads` | hardware-independent offload test device | v4.16 |
+| SK_MSG | enablement | `4f738adba30a7cfc006f605707e7aee847ffefa0` | `bpf: create tcp_bpf_ulp allowing BPF to monitor socket TX/RX data` | socket-message verdict / `BPF_PROG_TYPE_SK_MSG` | v4.17 |
+| TCP MSG_ZEROCOPY | enablement | `f214f915e7db99091f1312c48b30928c1e0c90b7` | `tcp: enable MSG_ZEROCOPY` | representative anchor for this architectural milestone | v4.14 |
+| page_pool origin | origin | `ff7d6b27f894f1469dc51ccb828b7363ccd9799f` | `page_pool: refurbish version of page_pool code` | page_pool core origin anchor | v4.18 |
+| page_pool/XDP integration | integration | `60bbf7eeef10dc647430646d7fe5e3d8d132dbec` | `mlx5: use page_pool for xdp_return_frame call` | mlx5 page_pool/XDP integration | v4.18 |
+| ethtool Generic Netlink | origin | `2b4a8990b7df55875745a80a609a1ceaaf51f322` | `ethtool: introduce ethtool netlink interface` | Netlink-based ethtool control plane | v5.6 |
+| SK_LOOKUP | origin | `e9ddbb7707ff5891616240026062b8c1e29864ca` | `bpf: Introduce SK_LOOKUP program type with a dedicated attach point` | dedicated SK_LOOKUP program type / attach point | v5.9 |
+| auxiliary bus | origin | `7de3697e9cbd4bd3d62bafa249d57990e1b8f294` | `Add auxiliary bus support` | common auxiliary-device bus | v5.11 |
+| IPv6 BIG TCP / GRO | enablement | `0fe79f28bfaf73b66b7b1562d2468f94aa03bd12` | `net: allow gro_max_size to exceed 65536` | allow `gro_max_size` > 65536 | v5.19 |
+| IPv6 BIG TCP / GSO | enablement | `7c4e983c4f3cf94fcd879730c6caa877e0768a4d` | `net: allow gso_max_size to exceed 65536` | allow `gso_max_size` > 65536 | v5.19 |
+| XFRM/IPsec crypto offload API | origin | `d77e38e612a017480157fe6d2c1422f42cb5b7e3` | `xfrm: Add an IPsec hardware offloading API` | introduces `xfrmdev_ops` for SA/ESP hardware crypto offload | v4.12 |
+| kTLS TX / kernel TLS | origin | `3c4d7559159bfe1e3b94df3a657b2cda3a34e218` | `tls: kernel TLS support` | TLS ULP + software TX record datapath | v4.13 |
+| kTLS RX | enablement | `c46234ebb4d1eee5e09819f49169e51cfc6eb909` | `tls: RX path for ktls` | `TLS_RX`, recvmsg/splice/poll | v4.17 |
+| TLS device offload TX | integration | `e8f69799810c32dd40c6724d829eccc70baad07f` | `net/tls: Add generic NIC offload infrastructure` | same kTLS API/state with NIC TX crypto | v4.18 |
+| TLS device offload RX | integration | `4799ac81e52a72a6404827bf2738337bb581a174` | `tls: Add rx inline crypto offload` | completes generic RX device-offload infrastructure | v4.19 |
+| WireGuard | origin | `e7096c131e5161fa3b8e52a650d7719d2857adfd` | `net: WireGuard secure network tunnel` | L3 secure tunnel as normal netdevice | v5.6 |
+| XFRM packet offload | integration | `d14f28b8c1de668bab863bf5892a49c824cb110d` | `xfrm: add new packet offload flag` | packet-level IPsec offload; policy/SA synchronization with NIC | v6.2 |
+| BTF origin | origin | `69b693f0aefa0ed521e8bd02260523b5ae446ad7` | `bpf: btf: Introduce BPF Type Format (BTF)` | typed metadata for BPF program/map | v4.18 |
+| Net DIM common-library integration | integration | `4f75da3666c0c572967729a2401ac650be5581b6` | `linux/dim: Move implementation to .c files` | driver-local/header logic becomes common `lib/dim` implementation | v5.3 |
+| vDPA bus | origin | `961e9c84077f6c8579d7a628cbe94a675cb67ae4` | `vDPA: introduce vDPA bus` | common virtio datapath / vendor-control abstraction | v5.7 |
+| netmem abstraction | origin | `18ddbf5cf0e7553fd05c3e1a02d740514ee3f0a6` | `net: introduce abstraction for network memory` | `netmem_ref` decouples network memory references from `struct page` | v6.9 |
+| page_pool userspace identity | enablement | `f17c69649c698e4df3cfe0010b7bbf142dec3e40` | `net: page_pool: id the page pools` | creates stable IDs for uAPI references | v6.8 |
+| page_pool netlink GET | enablement | `950ab53b77ab829defeb22bc98d40a5e926ae018` | `net: page_pool: implement GET in the netlink API` | exposes pool identity / ifindex / NAPI ID | v6.8 |
+| page_pool netlink statistics | integration | `d49010adae737638447369a4eff8f1aab736b076` | `net: page_pool: expose page pool stats via netlink` | driver-independent observability | v6.8 |
+| page_pool custom memory providers | integration | `57afb483015768903029c8336ee287f4b03c1235` | `net: page_pool: create hooks for custom memory providers` | shared allocator hook for devmem TCP and io_uring ZCRX | v6.15 |
+| Device Memory TCP RX | merge | `9410645520e9b820069761f3450ef6661418e279` | `Merge tag 'net-next-6.12' of git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next` | merge tag `net-next-6.12`; Device Memory TCP RX generation | v6.12 |
+| per-netns RTNL start | merge | `fcc79e1714e8c2b8e216dc3149812edd37884eef` | `Merge tag 'net-next-6.13' of git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next` | merge tag `net-next-6.13`; initial per-netns RTNL conversion wave, explicitly in-progress | v6.13 |
+| io_uring ZCRX | merge | `71f0dd5a3293d75d26d405ffbaedfdda4836af32` | `Merge branch 'io_uring-zero-copy-rx'` | merge branch `io_uring-zero-copy-rx`; queue-bound userspace-page RX / memory-provider integration | v6.15 |
+| Device Memory TCP TX | merge | `1b98f357dadd6ea613a435fbaef1a5dd7b35fd21` | `Merge tag 'net-next-6.16' of git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next` | merge tag `net-next-6.16`; Device Memory TCP transmit path | v6.16 |
+| netkit | origin | `35dfaad7188cdc043fde31709c796f5a692ba2bd` | `netkit, bpf: Add bpf programmable net device` | netkit core anchor | v6.7 |
+| Rust PHY abstractions | integration | `f20fd5449ada3872dcd67aca397f0e27ca2e8ad6` | `rust: core abstractions for network PHY drivers` | Rust core abstractions for network PHY drivers | v6.8 |
+| netdev-genl queue object | integration | `bc877956272f0521fef107838555817112a450dc` | `netdev-genl: spec: Extend netdev netlink spec in YAML for queue` | YAML spec for queue object | v6.8 |
+| RX HW queue leasing / queue-create | enablement | `7789c6bb76acf21539c2c74b0cc869bb57de99e6` | `net: Add queue-create operation` | virtual RX queue may lease a physical RX queue | v7.1 |
+| RX HW queue leasing generation | merge | `91a4855d6c03e770e42f17c798a36a3c46e63de2` | `Merge tag 'net-next-7.1' of git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next` | merge tag `net-next-7.1`; pull message explicitly lists HW queue leasing | v7.1 |
+| net-next 7.3 merge | merge | `91ec2035134982b98fab0609a9fd8480e8217dc1` | `Merge tag 'net-next-7.3' of git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next` | merge tag `net-next-7.3` | 7.3 final pending |
+
+### Upstream anchor audit status
+
+Part VII の48 anchor は upstream Git object と照合済みである。48/48 で SHA と exact commit subject を確認し、final release が確定している47 anchor は **記載 final tag が commit を含み、直前 final tag が含まない**ことを確認したため、first final release も47/47で再検証済みである。`net-next-7.3` merge (`91ec2035...`) は mainline merge と exact subject まで確認済みだが、この版の基準時点では final release 未確定なので `7.3 final pending` を維持する。
+
+このため台帳では、機械監査できる **Exact subject** と、文書上の意味づけである **Architectural role** を別列にする。前者は Git object の属性、後者は本書の architecture synthesis における解釈であり、混同しない。
 
 ### Exact-anchor interpretation notes
 
