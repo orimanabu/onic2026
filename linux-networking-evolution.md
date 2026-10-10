@@ -7,7 +7,7 @@ title: Linux Networking Evolution
 > **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras, Parts III–V the lineages / driver-framework / observability story. Part VI is the only normative release chronology, Part VII the provenance ledger, and Appendix material is supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02
-**構成改訂:** 2026-10-07（r57）
+**構成改訂:** 2026-10-07（r58）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
@@ -169,6 +169,14 @@ Observability も 7 番目の contract form とはしない。typed identity、d
 
 Part II–V はこの thesis を architecture の観点から説明し、Part VI–VII が release attribution と provenance を検証・再監査可能な形で保持する。
 
+### 読者別の読み方
+
+| 目的 | 推奨ルート |
+|---|---|
+| **10 分で全体像** | Part I → Part II の4 era → Synthesis |
+| **kernel / driver architecture** | Part I → Part III → Part IV → Part V |
+| **release / provenance 監査** | Part VI → Part VII → Appendix source index |
+
 # Part II — Four architecture eras
 
 ここでの era は kernel major version の境界ではなく、**外部の圧力に対して networking architecture が主に何を解こうとしたか**で区切る。境界は重なり、ある era で始まった仕組みは後続 era でも継続して発展する。
@@ -178,7 +186,7 @@ Part II–V はこの thesis を architecture の観点から説明し、Part VI
 | **Era 1 — Queue & scalability foundation** | ～2014 頃 | 10/40GbE、multicore server、virtualization/container、datacenter latency | queue backlog、multicore、namespace、overlay、filtering の基礎 | BQL, CoDel/fq_codel, TSQ, pacing, namespace/setns, VXLAN, nftables, eBPF foundation |
 | **Era 2 — Programmable datapath** | 2015～2018 頃 | cloud networking、high packet rate、SmartNIC/offload、kernel-bypass pressure | packet path を安全に拡張し、hardware/offload と接続する | TC BPF, XDP, cgroup/LWT BPF, SOCKMAP, switchdev, devlink, AF_XDP, page_pool |
 | **Era 3 — Programmability becomes infrastructure** | 2019～2022 頃 | hyperscale operations、protocol experimentation、100GbE 級、typed tooling | programmable mechanism を protocol / operations / memory infrastructure に広げる | BTF ecosystem, struct_ops, SK_LOOKUP, MPTCP, BIG TCP, io_uring networking, drop reason, devlink health |
-| **Era 4 — Explicit placement & scoped control** | 2023～ | accelerator/device memory、400GbE 級、heterogeneous execution、global-lock scalability | queue・memory・device・locking scope を明示的 object/contract として配置・制御する | netmem, memory providers, Device Memory TCP, netdev-genl queue/NAPI objects, queue leasing, per-netns RTNL, BPF qdisc, YNL |
+| **Era 4 — Heterogeneous I/O & control scalability** | 2023～ | accelerator/device memory、400GbE 級、heterogeneous execution、global-lock scalability | queue・memory・device・locking scope を明示的 object/contract として配置・制御する | netmem, memory providers, Device Memory TCP, netdev-genl queue/NAPI objects, queue leasing, per-netns RTNL, BPF qdisc, YNL |
 
 Era 1 の foundation は 4 つに要約できる。**queue/scalability**（BQL・TSQ・fq/pacing）、**virtualization/control**（namespace/setns・VXLAN・route-cache removal・nftables）、**programmability**（eBPF ISA → `bpf()`/maps/verifier）、**server/transport**（SO_REUSEPORT・SO_BUSY_POLL・TFO・DCTCP）である。これは新しい taxonomy ではなく、後続 lineage の出発条件を示す要約である。
 
@@ -207,6 +215,8 @@ How explicitly can placement, lifetime and synchronization be controlled?
 ------------------------------------------------------------------------
 
 # Part III — Long-term lineages
+
+Part III の役割は **architecture story** である。各 topic について release chronology を再掲するのではなく、「何が変わり、それによってどの execution / memory / control model が共存できるようになったか」を追う。API や driver-internal mechanism の詳細は Part IV、release/provenance は Part VI–VII を正本とする。
 
 Part III では release 順ではなく、同じ設計課題が長期間にどう変化したかを追う。図の矢印は、明示しない限り直接の親子関係を意味せず、dependency / extension / parallel development / shared design problem を区別する。各 milestone の release は Part VI の chronology に対応する。
 
@@ -587,7 +597,7 @@ zero-copy には page pinning、completion notification、small-packet では co
 <a id="detail-routing-tc-offload"></a>
 ### Routing / TC / offload — forwarding semantics と hardware mapping の並行進化
 
-routing / forwarding control は BPF だけでは説明できない。bridge VLAN filtering、MPLS、VRF は Linux 内部の forwarding domain / lookup semantics を明示した。TC/Flower の match/action と hardware-offload contract は後段の `TC classifier/action` でまとめて扱う。これらは後の hardware offload と接続するが、すべてが switchdev を経由するわけではない。
+routing / forwarding control は BPF だけでは説明できない。bridge VLAN filtering、MPLS、VRF は Linux 内部の forwarding domain / lookup semantics を明示した。TC/Flower の match/action と hardware-offload contract は後段の `TC classifier/action` でまとめて扱う。これらは後の hardware offload と接続するが、hardware offload には switchdev と並行する複数の driver path がある。
 
 ``` text
 bridge VLAN filtering (3.9) ─┐
@@ -844,149 +854,52 @@ named netns もこの性質を利用しており、`/var/run/netns/NAME` を ope
 ------------------------------------------------------------------------
 
 <a id="detail-rdma"></a>
-### RDMA — explicit queue / memory objects から accelerator peer memory へ
+### RDMA — registered memory と offloaded execution の比較対象
 
-RDMA は Linux networking の進化を説明するうえで重要な「別の datapath」である。通常の socket path が system call、socket buffer、kernel protocol stack を中心に構成されるのに対し、RDMA verbs は **QP (Queue Pair) / CQ (Completion Queue) / MR (Memory Region) / PD (Protection Domain)** を userspace-visible object として明示し、application が work request を queue へ post し、NIC/HCA が registered memory に DMA し、completion を CQ から回収する。
-
-`rdma_cm(7)` が RDMA CM を「socket に似ているが QP semantics に適応した connection-management API」と説明しているように、control path には address/route resolution と connection establishment が残る一方、data path は verbs object と queue を中心に進む。`ibv_create_qp(3)` は SQ/RQ と CQ の association、`ibv_post_send(3)` は work request の posting、`ibv_reg_mr(3)` は PD に属する MR と local/remote access permission、`lkey` / `rkey` を明示する。この object model 自体が、通常の socket/`skb` path とは異なる resource contract である。
+RDMA は本書の第 7 の axis ではなく、通常の socket/netdev path と対照的な execution / memory model を示す selective case study である。verbs path では **QP / CQ / MR / PD** が明示的 resource object となり、application が work request を queue へ postし、NIC/HCA が registered memory へ DMA する。control/setupにはRDMA-CMやLinuxのaddress/route stateが関与し、data executionはverbs queueとHCAへ大きくplacementされる。
 
 ``` text
-control / setup
-    RDMA CM: address → route → connection
-                         │
-                         ▼
-data / execution
-    QP: SQ/RQ -- work request --> NIC/HCA
-          │                         │
-          └------ CQ < completion --┘
-                         │
-                         ▼
-memory
-    PD ── MR ── {VA / ODP / dma-buf}
-           └── lkey / rkey / access permission
+Linux netdev / IP control state
+            │
+         RDMA-CM
+            │
+       QP / CQ / MR
+        /       \
+ execution      memory
+   HCA      registered region
 ```
 
-Linux 3.0 の時点ですでに RDMA subsystem と verbs model は成熟していたため、本書は RDMA の「起源」を対象期間内へ無理に置かない。見るべき変化は、**transport placement、memory registration、memory backing、lifetime / invalidation、observability がどのように一般化されたか**である。
+Linux 3.0 の時点でRDMA subsystem自体は既に成熟していたため、本書では起源ではなく、対象期間内に **memory backing・lifetime・implementation placement が一般化された境界**を見る。
 
-#### RoCEv2 — RDMA semantics と Linux Ethernet/IP control plane の接続
+#### RoCEv2 / RXE — control state と execution placement
 
-RDMA は InfiniBand fabric だけの話ではない。NetDev 1.1 の RDMA/LAG talk は upstream RDMA stack が IB / RoCE / iWARP を扱い、RoCE application が **RDMA-CM を control path、verbs を data path**として使う構造を整理している。Linux 4.5 の RDMA pull では core、mlx4、mlx5 の RoCEv2 support が入り、RoCEv2 は UDP/IP 上へ RDMA transport を載せることで routable Ethernet fabric と verbs datapath を接続した。
+4.5 の RoCEv2 support は routable Ethernet/IP fabric とverbs datapathを接続した。IP address、route、neighbor、netdev stateはLinux control planeと関係しながら、established data pathのtransport処理はHCAへplacementできる。4.8のSoft-RoCE/RXEは同じRDMA/RoCE semanticsをsoftwareでも実行できるようにし、**verbs semantics とhardware implementationを分離できる**ことを示した。
+
+したがってRDMAを単純な「kernel bypass」と呼ぶより、Linux control stateとoffloaded executionを組み合わせるarchitectureとして読む方が、本書のexecution-placement storyに合う。
+
+#### ODP → dma-buf MR — registered memory の backing を一般化する
+
+traditional MRではprocess VA、access permission、DMA可能なbacking memoryをregistration時に強く結び付ける。3.19のODPはregistration contractと全pageのeager/permanent pinningを分離し、fault時のmappingとMMU invalidationをHCA translation lifecycleと協調させる方向を導入した。
+
+5.12のRDMA dma-buf MRはさらに、ordinary userspace RAMだけでなくdma-bufで表現されたdevice/accelerator memoryをMRへimportする共通経路を導入した。
 
 ``` text
-Linux netdev / IP addressing / route / ARP-ND
-                     │
-                  RDMA-CM
-                     │
-             RoCEv2 over UDP/IP
-                     │
-          QP / CQ / MR verbs datapath
+process VA ── MR ── eager pinned RAM
+       │
+       └─ ODP ── fault / invalidation-managed backing
+
+GPU / device memory ── dma-buf ── RDMA MR ── RNIC
 ```
 
-ここは本書の CONTROL PLANE と DRIVER FRAMEWORK の重要な接続点である。IP address や route、bond/team 等の通常の netdev state が control plane に関与する一方、established RDMA data path の transport processing と memory access は HCA 側へ大きく placement される。したがって RoCE は「Linux network stack を完全に使わない」と説明するより、**Linux netdev/IP control state と offloaded verbs datapath を組み合わせる architecture**と捉える方が正確である。
+ここでの変化は単なるzero-copy最適化ではない。**memory type、registration、permission、mapping、revocation/lifetimeを別々のcontractとして扱える範囲が広がった**ことが重要である。これはsocket/netdev側の `page_pool → netmem → memory providers` と異なるdatapath上で、よく似たarchitecture pressureへ応答した例になる。
 
-NetDev 0x16 の RDMA programming tutorial も、RDMA の特徴を asynchronous work/completion queues、kernel bypass、transport offload、one-sided operations、memory pre-registration/pinningとして整理し、同時に IB / RoCE / iWARP 等の transport difference と accelerator-memory extension を扱っている。これは socket path と RDMA path の比較基準として有用である。
+#### AI / HPC と observability
 
-#### ODP — memory registration と physical pinning を分離する
+AI trainingはRDMAを生んだworkloadではないが、大規模collective communicationとaccelerator-resident dataによって、CPU involvement、system-memory copy、fabric congestionのcostを強く可視化した。RoCEv2/RDMAはその代表的transportであり、GPU/device memoryをRNICへ直接接続するdma-buf/P2P modelの価値も大きくなった。
 
-traditional MR registration は userspace virtual range を登録し、NIC が DMA できる backing memory と translation を安定させる。`ibv_reg_mr(3)` が示すように、MR は access permission と `lkey` / `rkey` を持つ explicit capability object でもある。
+同時にexecutionをHCAへ移すほど、通常のkernel packet traceだけではfailureを説明しにくくなる。LPC 2025のproduction事例が示すように、large-model trainingではQP/MR/device-resource stateとapplication errorを結び付けるobservabilityが必要になる。これはPart Vの「evidence layer」のRDMA版である。
 
-3.19 の On-Demand Paging (ODP) core support は、MR を登録することと全 page を最初から permanent に pin することを分離した。kernel RDMA documentation の `ib_umem_odp_get()` は ODP memory について「pinning を避け、将来の page fault handling のため `mm` を保持し MMU notifier と協調する」と説明する。必要な範囲は fault 時に pin/DMA-map され、MMU invalidation と HCA translation update を同期する。
-
-``` text
-traditional MR
-    register VA
-       └─ pin backing pages
-          └─ DMA map
-             └─ HCA translation
-
-ODP MR
-    register VA / access contract
-       └─ fault when needed
-          ├─ pin + DMA map current backing
-          └─ MMU invalidation ↔ HCA translation update
-```
-
-ここで重要なのは単なる paging optimization ではない。**MR の virtual-address/access contract と、その時点で resident / DMA-mapped な physical backing を別 lifecycle として扱えるようになった**ことである。`ibv_advise_mr(3)` の prefetch advice は、その分離後に application が将来の access pattern を hint できることも示している。
-
-#### Soft-RoCE / RXE — verbs semantics と hardware implementation を分離する
-
-4.8 の RXE (Soft-RoCE) は RDMA/RoCE verbs semantics を software implementation として Ethernet/IP 上で実行できるようにした。性能面では dedicated HCA の代替ではないが、QP/CQ/MR という object model と RoCE semantics が特定 hardware implementation だけに閉じたものではないことを示す。
-
-これは本書の中心命題とも整合する。同じ API / object semantics に対して execution placement が hardware HCA と software RXE に分かれ得るためである。2026 年には RXE へ dma-buf support を加え、GPU 等が export した memory と zero-copy/P2P-like workflow を可能にする series も提案されている。これは未確定 series なので canonical chronology には入れない。
-
-#### PCI P2PDMA と dma-buf — 「どの memory を NIC が DMA するか」の一般化
-
-accelerator / storage / NIC 間の peer DMA を考えると、問題は単なる zero-copy ではない。**memory の owner は誰か、backing storage はどこか、NIC がその memory を addressable か、移動・invalidate・revoke と DMA access をどう同期するか**が contract になる。
-
-Linux PCI P2PDMA documentation は、RDMA driver が client となり RNIC が NVMe device の exposed memory へ直接 DMA する構成を明示している。一方 dma-buf は exporter が backing storage と migration を管理し、importer が `dma_buf_attachment` を通じて device access を得る cross-subsystem buffer-sharing framework である。最新 kernel documentation では importer の `allow_peer2peer` や mapping invalidation、`dma_resv` / fence synchronization まで contract に含まれる。
-
-5.12 の RDMA dma-buf MR support はこの dma-buf object を RDMA MR として import する共通経路を導入した。導入 series は GPU VRAM を明示的 motivation とし、従来の `get_user_pages()` + `dma_map_sg_attrs()` が `struct page` を持たない peer device memory には適さないこと、dma-buf dynamic attach と ODP を組み合わせて migration/invalidation を扱うことを説明している。
-
-``` text
-GPU / accelerator
-   owns backing memory
-          │
-       dma-buf fd
-          │
-          ▼
-   RDMA dma-buf MR
-    / umem importer
-          │
-   dynamic attach / map
-          │
-          ▼
-        RNIC
-          │
-       PCIe P2P
-```
-
-userspace API でも `ibv_reg_dmabuf_mr()` が dma-buf FD、offset、length、IOVA、access flags から MR を作るため、**「RDMA memory = process VA backed by ordinary RAM」ではない**ことが API 上も明示されている。
-
-#### AI / ML cluster — なぜこの lineage が再び中心になったか
-
-AI training は RDMA を生んだ workload ではない。しかし大規模 collective communication は大量の accelerator-resident data を node 間で移動するため、CPU involvement、system-memory copy、tail latency、memory bandwidth pressure を顕在化させる。NetDev 0x19 の “AI Networks - RoCEv2 and the role of netdev” workshop は、NCCL 等が socket/TCP または RDMA を利用できること、LLM 規模と 800G Ethernet により full socket-stack traversal の overhead が重要になったことを問題設定としている。同 conference の congestion-control talk も、AI/ML datacenter で RDMA/RoCEv2 が high-throughput / low-latency transport として使われる一方、large-scale fabric では congestion control が主要課題になることを扱う。
-
-したがって AI networking の story は単なる「高速 NIC」ではなく、
-
-``` text
-accelerator-resident state
-        │
- explicit shared-memory object
-        │
- registration / permission / lifetime
-        │
- NIC execution + transport offload
-        │
- high-bandwidth fabric
-```
-
-という **memory contract + execution placement + fabric control** の組み合わせとして読むべきである。これは page_pool/netmem/Device Memory TCP/io_uring ZCRX が socket/netdev 側で進めている異種 memory integration と対比できる。ただし両者を同一 datapath と見なしてはいけない。RDMA は QP/CQ/MR verbs model、socket/netdev 側は socket/NAPI/page_pool/netmem 等の model を維持したまま、それぞれ memory ownership/lifetime を explicit にしている。
-
-#### Observability — offload が大きいほど「kernel から見えない」が問題になる
-
-RDMA の execution placement は性能上の利点と同時に observability gap を作る。NetDev 0x17 の io_uring ZC RX talk は、RDMA では NIC が state と flow handling を担うため、failure 時の debugging や変更が難しくなる点を socket zero-copy path との trade-off として指摘している。
-
-この問題は AI cluster で operational issue になっている。LPC 2025 の “Lessons from scaling BPF to detect RDMA Device Drivers Bugs in real time” は、大規模 model training で RDMA-related syscall error が job failure に結びつき、application/kernel 間の hardware-resource view mismatch と RDMA syscall の opacity のため既存 observability が不足した事例を報告し、BPF を用いて kernel RDMA state を低 overhead で追跡する設計を議論している。
-
-これは Part V の thesis と直接接続する。execution を HCA へ移すほど kernel packet path の tracepoint だけでは説明できず、**QP/MR/CQ/device-resource state を object identity とともに観測する observability contract** が必要になる。
-
-#### 2026 — dma-buf が「共通 memory descriptor」へ近づく
-
-2026 年の RDMA development は dma-buf integration をさらに一般化する方向を示している。generic UMEM buffer-descriptor series は、uverbs command ごとに user VA と dma-buf 用の ad-hoc attribute を増やす代わりに、両者を共通 buffer descriptor で渡す infrastructure を提案している。また RDMA device memory 自体を dma-buf FD として export する series は、RDMA PCI-backed memory を graphics/media/other process と共有し、P2P DMA と revocation/lifecycle を共通 dma-buf semantics へ寄せようとしている。
-
-これらはこの版の基準時点では proposal / development evidence として扱い、Part VI の canonical milestone には入れない。しかし方向性としては、
-
-``` text
-userspace VA ─┐
-              ├─ generic UMEM buffer descriptor → QP/CQ/MR resource
-dma-buf fd ───┘
-
-RDMA device memory ── export as dma-buf ──> other subsystem/device
-```
-
-という形で、RDMA 内部の memory representation も「memory の種類ごとの特別 API」から **typed/shared buffer object + explicit lifetime** へ向かっている。
-
-**Takeaway:** RDMA は通常の `skb` path を置き換える系列ではなく、QP/CQ/MR と registered-memory を中心にした別 execution model である。RoCEv2 はそれを Linux netdev/IP control plane と接続し、ODP は registration と physical backing lifecycle を分離し、dma-buf MR は device/accelerator memory を同じ verbs memory contract へ接続した。AI/HPC はこの architecture の価値を強く可視化し、同時に congestion control と observability という新しい pressure を前面に出している。
+**Takeaway:** RDMAはsocket/`skb` pathを置き換える系列ではなく、QP/CQ/MRとregistered memoryを中心にした並行execution modelである。RoCEv2/RXEはexecution placementの選択肢を、ODP/dma-bufはmemory backingとlifetimeの選択肢を広げた。AI/HPCはこの既存architectureの価値と、congestion/observabilityの課題を同時に前面化した。
 
 ------------------------------------------------------------------------
 
@@ -1161,6 +1074,8 @@ TCP-AO は transport authentication semantics 自体の更新なので Part III�
 
 
 # Part IV — Network Device Driver Framework
+
+Part IV は Part III の物語を driver/framework 側から支える。焦点は個別機能の再説明ではなく、**driver-local convention が common object / accounting / API / assignment / lifetime / synchronization contract へ昇格した過程**である。
 
 Part III が packet path / control path の長期 lineage を追ったのに対し、Part IV は **driver-local な実装知識がどのように共通 framework / object / API へ引き上げられたか**を見る。ここで重要なのは、個々の driver の高速化ではなく、NIC が持つ queue、link、switch、health、memory、interrupt moderation などの能力を networking core から共通に扱えるようにしたことである。
 
@@ -1461,6 +1376,8 @@ Part III の MEMORY/PROGRAMMABILITY/CONTROL PLANE が「datapath 側で何が共
 <a id="detail-observability"></a>
 # Part V — Observability / Explainability
 
+Part V は複雑化した datapath を **operationally explainable にする evidence layer** を扱う。programmability、offload、zero-copy、RDMA のように execution point が分散するほど、packet traceだけでなく typed reason、object identity、resource state を横断して観測する必要がある。
+
 Part V は **kernel 側の observability primitive の進化**に限定する。Observability は独立した軸であると同時に、programmable / offloaded / zero-copy path が増えて複雑化した networking を **operationally explainable にする evidence layer** と位置付ける。 Retis / pwru はこれらを利用する case study であり、kernel release chronology そのものではないため、本 Part V の tool-side case study として primitive から分離して扱う。Appendix は資料索引に限定する。
 
 ## Kernel observability primitive
@@ -1549,6 +1466,10 @@ pwru は **function-level trajectory** を広く探索する debugger として�
 
 # Synthesis — thesis への回帰と未完の仕事
 
+Linux networking の全機能が一つの原理へ収束したわけではない。transport、aggregation、RDMA、driver scalability はそれぞれ独自の問題を解いてきた。その一方で、複数の execution / memory model を同じ system で共存させる必要が高まるほど、queue、memory、policy、device state、synchronization を **明示的な contract と object** として扱う変更が繰り返し現れた。これが本書で追ってきた主要 architecture trend である。
+
+Part I の「1 本の RX queue を誰が使うのか」に戻ると、2011 年頃には driver/NAPI/kernel stack に強く結び付いていた queue が、2026 年にはAF_XDP、io_uring ZCRX、device-memory path、virtual deviceなど複数consumerとの間でidentity/assignment/lifetimeを明示して扱える対象へ変わっている。重要なのは全packetが新しいpathへ移ったことではなく、**同じNIC resourceへ異なるmodelを安全に接続するための境界が増えたこと**である。
+
 Part I の中心命題は 2 段からなる。Linux networking は従来の system-RAM + `skb` path を置き換えたのではなく、複数の execution / memory-ownership model を**共存**させる architecture へ拡張した。そして、その共存を可能にした主要な mechanism が **explicit resource / control contracts** である。
 
 Part II–V を通過すると、この 2 段のつながりを具体的に言える。新しい path は既存 path の隣に独立して追加されたのではない。driver-private / implicit / global だった state が共通 contract として明示された箇所を**接続点**として、そこに追加された。
@@ -1586,6 +1507,12 @@ Part II–V を通過すると、この 2 段のつながりを具体的に言�
 - **OBSERVABILITY:** typed reason / identity / tracing は、複雑化した programmable / offloaded / zero-copy path を operationally explainable にする evidence layer になった。
 - **DRIVER FRAMEWORK:** BQL、switchdev、devlink、phylink、DIM、page_pool、netdev-genl は driver-local convention を common contract へ引き上げた。
 
+## 読者にとっての含意
+
+- **driver / kernel developer:** fast pathそのものだけでなく、resource identity、ownership/lifetime、fallback、synchronization、observabilityをuAPI/driver contractの一部として設計する。
+- **operator / SRE:** `skb` packet traceだけを前提にせず、queue/NAPI、page_pool、offload state、RDMA QP/MRなど「どのobjectがどこで実行されているか」を観測対象にする。
+- **researcher / architect:** kernel bypass対kernel stackという二択より、control semanticsをどこに残し、data executionとmemory ownershipをどこへplacementするかというdesign spaceとして比較する。
+
 ## 未完の仕事 — contract がまだ届いていない箇所
 
 未完点は「次に入る機能」の一覧ではなく、**explicit contracts の適用範囲がまだ届いていない箇所**として読む。
@@ -1599,7 +1526,7 @@ Part II–V を通過すると、この 2 段のつながりを具体的に言�
 
 これらは将来の release で評価が変わり得るため、確定史ではなく本書の open questions として扱う。
 
-したがって本書の thesis は未来予測ではなく、既存 milestone を横断した説明モデルである。次の Part VI では、この story からいったん離れ、各 milestone の release attribution を 1 行 1 項目で正規化する。
+したがって explicit-contract thesis は未来予測でも全機能を単一原理へ還元する主張でもなく、並行する複数系列を横断して現れる主要 architecture trend を説明するモデルである。次の Part VI では、この story からいったん離れ、各 milestone の release attribution を 1 行 1 項目で正規化する。
 
 ------------------------------------------------------------------------
 
@@ -1625,8 +1552,6 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 - **anchor: Part VII** — final release に加え、Part VII に 40 桁 representative mainline SHA がある。
 - **series + release** — patch series/pull と final release の双方で確認。
 - **mainline; final pending** — Linus mainline merge 済みで final release は未公開。
-
-監査手続き、rc-tag containment、昇格候補、改訂履歴は本文から分離し、別ファイル `linux-networking-evolution-audit-worklog.md` に置く。
 
 ## Canonical milestone table
 
