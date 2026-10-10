@@ -294,7 +294,7 @@ driver RX
             └─ XSKMAP → AF_XDP / UMEM
 ```
 
-native XDPでは`skb`構築前のbufferにprogramを実行し、`XDP_REDIRECT`でpacketを別device/CPU/XSKへ移す。AF_XDPではFILL/RX/TX/COMPLETION ringsとUMEM frameのlifetimeをuserspace/kernel/driver間で共有し、zero-copy modeではRX queue bindingとbuffer ownershipがcorrectnessの一部になる。
+native XDPは`skb`構築前にprogramを実行し、redirect objectを通じてdevice/CPU/XSKへexecutionを分岐する。AF_XDPはRX queueとuserspace-owned UMEMを明示的にbindingし、queue assignmentとbuffer ownershipをdatapath contractへ加えた。ring/APIの実装詳細より、このbinding boundaryをarchitecture上の変化として扱う。
 
 multi-bufferは「1 packet = 1 contiguous buffer」という初期制約を緩め、AF_XDP multi-bufferは同じ問題をXSK/UMEM側へ接続した。metadata/RX hintsはtimestamp、RSS hash等をpacket bytesとは別のtyped metadataとしてprogram/userspace pathへ渡す。
 
@@ -318,9 +318,7 @@ driver-local recycle
  → system RAM / userspace / device memory
 ```
 
-page_poolはallocation、DMA mapping reuse、recyclingとin-flight lifetimeを共通化する。netmemはpacket memoryを`struct page`と同義にせず、異なるbacking typeを表現する土台を作る。memory-provider hooksはallocation sourceを外部providerへ広げ、Device Memory TCPやio_uring ZCRXのようなconsumerとqueue/buffer lifecycleを接続する。
-
-driver-facingなpage_pool detach/release mechanismはPart IVを正本とし、ここでは **memory type・provider identity・queue assignment・in-flight lifetime** が一つのarchitecture boundaryへ集約された点を追う。
+page_poolはRX buffer recyclingを共通化し、netmemはpacket memoryを`struct page`と同義にしないabstractionを加え、memory-provider hooksは外部backingをRX pathへ接続する。Part IIIではこの **memory type・provider identity・queue assignment・lifetime** の分離をarchitecture storyとして扱い、page_pool/providerのdriver-facing APIとdetach/release mechanismはPart IVを正本とする。
 
 **Takeaway:** packet memoryはallocation optimizationから、複数memory backingを明示的lifetime/assignmentの下で同じRX architectureへ接続するmodelへ進んだ。
 
@@ -480,7 +478,7 @@ overlayではtunnel GSO/GRO、checksum/segmentation metadata、TC tunnel offload
 <a id="detail-rdma"></a>
 ### RDMA — registered memory と offloaded execution の比較対象
 
-RDMA は本書の第 7 の axis ではなく、通常の socket/netdev path と対照的な execution / memory model を示す selective case study である。verbs path では **QP / CQ / MR / PD** が明示的 resource object となり、application が work request を queue へ postし、NIC/HCA が registered memory へ DMA する。control/setupにはRDMA-CMやLinuxのaddress/route stateが関与し、data executionはverbs queueとHCAへ大きくplacementされる。
+RDMA は本書では通常の socket/netdev path と対照的な execution / memory model を示す selective cross-cutting case study として扱う。verbs path では **QP / CQ / MR / PD** が明示的 resource object となり、application が work request を queue へ postし、NIC/HCA が registered memory へ DMA する。control/setupにはRDMA-CMやLinuxのaddress/route stateが関与し、data executionはverbs queueとHCAへ大きくplacementされる。
 
 ``` text
 Linux netdev / IP control state
@@ -499,7 +497,7 @@ Linux 3.0 の時点でRDMA subsystem自体は既に成熟していたため、�
 
 4.5 の RoCEv2 support は routable Ethernet/IP fabric とverbs datapathを接続した。IP address、route、neighbor、netdev stateはLinux control planeと関係しながら、established data pathのtransport処理はHCAへplacementできる。4.8のSoft-RoCE/RXEは同じRDMA/RoCE semanticsをsoftwareでも実行できるようにし、**verbs semantics とhardware implementationを分離できる**ことを示した。
 
-したがってRDMAを単純な「kernel bypass」と呼ぶより、Linux control stateとoffloaded executionを組み合わせるarchitectureとして読む方が、本書のexecution-placement storyに合う。
+したがってRDMAをcontrol plane と data execution の分離として読むと、Linux control stateとoffloaded executionを組み合わせるarchitectureとして読む方が、本書のexecution-placement storyに合う。
 
 #### ODP → dma-buf MR — registered memory の backing を一般化する
 
@@ -573,7 +571,7 @@ WireGuard peer/key/allowed-IP ── secure netdevice
 
 kTLSはhandshake/key-exchange policyをuserspaceに残しつつ、established TLS record stateをTCP socketへ渡してTX/RX record processingをkernelへ配置する。generic TLS device offloadは同じsocket/security semanticsを維持したままcrypto executionをNICへ移せるようにした。
 
-XFRMではSA/policyがcanonical kernel stateであり、4.12のcrypto offloadは暗号処理をNICへ、6.2のpacket offloadはpolicy/encapsulationを含むより広いexecutionをhardwareへ配置する。ここではstate lifetime、rekey、policy synchronizationがoffload contractの中心になる。
+XFRMではSA/policyがcanonical kernel stateであり、4.12のcrypto offloadは暗号処理をNICへ、6.2のpacket offloadはpolicy/encapsulationを含むより広いexecutionをhardwareへ配置する。Part IIIではこのplacement boundaryを扱い、driver-facing offload API/lifecycleの詳細はPart IV側のframework storyへ委ねる。
 
 WireGuardはpeer/key/allowed-IP stateを持つL3 secure tunnelを通常の`net_device`として統合し、RTNL、Generic Netlink、UDP tunnel、GRO/GSO、NAPI等の既存networking infrastructureへ接続する。kTLS/XFRMがexecution placementを広げる例なら、WireGuardはsecurity semanticsをstandard network object/APIへ統合する例である。
 
@@ -891,7 +889,7 @@ Part III の MEMORY/PROGRAMMABILITY/CONTROL PLANE が「datapath 側で何が共
 <a id="detail-observability"></a>
 # Part V — Observability / Explainability
 
-Part V は **kernel observability primitive と、それを相関する tool-side case study** を扱う。execution point が分散するほど、packet traceだけでなく typed reason、object identity、timestamp、resource state を横断する evidence layer が必要になる。Retis / pwru はその利用例、release chronology は Part VI を正本とする。
+Part V は **kernel observability primitive と、それを相関する tool-side case study** に責務を限定する。execution point が分散するほど、packet traceだけでなく typed reason、object identity、timestamp、resource state を横断する evidence layer が必要になる。各primitiveの「いつ入ったか」はPart VI、datapath自体のmechanismはPart III/IVを正本とし、ここでは「何を根拠に説明できるか」を扱う。Retis / pwru はその相関例である。
 
 ## Kernel observability primitive
 
