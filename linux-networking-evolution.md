@@ -220,14 +220,14 @@ Part I の主要 architecture trend の観点で4 erasを読み直すと、Era 1
 
 # Part III — Long-term lineages
 
-Part III は Part II の時代区分を横切る **architecture series** を追う。release 順の列挙ではなく、同じ設計課題が複数 erasを通じてどう変化したかを **位置づけ → lineage / mechanism → Takeaway** の順で読む。各 seriesはSynthesisで再び接続し、explicit-contract architecture trendがどこに現れ、どこでは別の説明軸が必要な箇所を区別する。driver-internal mechanismは Part IV、observability primitiveは Part V、release/provenanceは Part VI–VIIを正本とする。
+Part IIIはPart IIの時代区分を横切る **architecture series** を追う。release順の列挙ではなく、同じ設計課題が複数erasを通じてどう変化したかを **位置づけ → lineage / mechanism → Takeaway** の順で読む。各seriesはSynthesisで再び接続し、explicit-contract architecture trendがどこに現れ、どこでは別の説明軸が必要な箇所を区別する。driver-internal mechanismはPart IV、observability primitiveはPart V、release/provenanceはPart VI–VIIを正本とする。
 
 ## PERFORMANCE — queueing, aggregation, pacing, CPU/queue placement
 
 <a id="detail-queueing"></a>
-### Queueing / latency / pacing — backlog から placement / time control へ
+### Queueing / latency / pacing — backlogからplacement / time controlへ
 
-queueing の15年は、単一qdiscの世代交代ではなく、**どこに backlog があり、何をfeedback signalとし、どのCPU/queueへ置き、いつ送るか**を層ごとに制御できるようになった過程である。
+queueingの15年は、単一qdiscの世代交代ではなく、**どこにbacklogがあり、何をfeedback signalとし、どのCPU/queueへ置き、いつ送るか**を層ごとに制御できるようになった過程である。
 
 ```text
 socket / transport   TSQ · pacing · BBR
@@ -243,33 +243,33 @@ CPU / queue mapping  RPS/RFS/XPS
 <a id="detail-aqm-pacing"></a>
 #### CoDel / AQM / pacing / time scheduling
 
-DQL/BQL は NIC へ渡した bytes と completion をaccountし、driver/hardware側のhidden backlogを抑える。TSQはsocket側、CoDel/fq_codelはsojourn timeとflow isolation、`sch_fq`/ETF/TAPRIOはpacingとexplicit transmission timeを扱う。つまりqueue lengthだけでなく **completion・delay・time** が別々のcontrol signalになった。
+DQL/BQLはNICへ渡したbytesとcompletionをaccountし、driver/hardware側のhidden backlogを抑える。TSQはsocket側、CoDel/fq_codelはsojourn timeとflow isolation、`sch_fq`/ETF/TAPRIOはpacingとexplicit transmission timeを扱う。つまりqueue lengthだけでなく **completion・delay・time** が別々のcontrol signalになった。
 
 <a id="detail-rps-rfs"></a>
 #### CPU / queue placement
 
-RPS/RFS/XPS は hardware queueの外側でCPU/queue placementを制御する前史であり、後年のqueue leasingとは異なる粒度で同じplacement problemを扱う。
+RPS/RFS/XPSはhardware queueの外側でCPU/queue placementを制御する前史であり、後年のqueue leasingとは異なる粒度で同じplacement problemを扱う。
 
 <a id="detail-wifi-airtime"></a>
 #### Wi-Fi airtime / AQL
 
-Wi-Fi では airtime scheduling/AQLがbytesではなくmedium占有時間をaccountし、resourceに適した単位でhidden queue pressureを可視化する。
+Wi-Fiではairtime scheduling/AQLがbytesではなくmedium占有時間をaccountし、resourceに適した単位でhidden queue pressureを可視化する。
 
 <a id="detail-tx-llist"></a>
 #### TX shared-qdisc scalability
 
-6.19 の `dev_queue_xmit()` llistはshared-qdisc serializationを縮小するimplementation-scalability milestone、7.0の`cake_mq`はmodern multiqueue topologyへqdisc controlを広げるmilestoneである。これらを含め、queueingは **backpressure → delay/fairness → pacing/time scheduling → multiqueue scalability** と層を増やした。
+6.19の`dev_queue_xmit()` llistはshared-qdisc serializationを縮小するimplementation-scalability milestone、7.0の`cake_mq`はmodern multiqueue topologyへqdisc controlを広げるmilestoneである。これらを含め、queueingは **backpressure → delay/fairness → pacing/time scheduling → multiqueue scalability** と層を増やした。
 
-**Takeaway:** queueing evolution は backlog を一か所で管理する方向ではなく、socket/qdisc/CPU/driver/NICごとに適切な accounting・placement・time contractを持たせる方向へ進んだ。
+**Takeaway:** queueing evolutionはbacklogを一か所で管理する方向ではなく、socket/qdisc/CPU/driver/NICごとに適切なaccounting・placement・time contractを持たせる方向へ進んだ。
 
 ------------------------------------------------------------------------
 
 <a id="detail-aggregation"></a>
 ### Packet aggregation — GRO/GSO → BIG TCP
 
-GRO/GSO は複数の packetを大きな processing unit として扱い、stack traversalとper-packet costをamortizeする。BIG TCPはこのmodelを64 KiB超のinternal aggregation unitへ拡張した。wire MTU を変更せず、stack内部では大きな`skb`/GSO unitを保持し、segmentation boundaryで通常のpacketへ戻す。
+GRO/GSOは複数のpacketを大きなprocessing unitとして扱い、stack traversalとper-packet costをamortizeする。BIG TCPはこのmodelを64 KiB超のinternal aggregation unitへ拡張した。wire MTUを変更せず、stack内部では大きな`skb`/GSO unitを保持し、segmentation boundaryで通常のpacketへ戻す。
 
-UDP GRO/GSO も同じ processing-granularity modelを datagram workload へ広げる。`gso_size`/`gso_type`、checksum state、segment metadata、device feature advertisementが、stackとNICの間で「どこまで大きなunitを保持できるか」を接続する。
+UDP GRO/GSOも同じprocessing-granularity modelをdatagram workloadへ広げる。`gso_size`/`gso_type`、checksum state、segment metadata、device feature advertisementが、stackとNICの間で「どこまで大きなunitを保持できるか」を接続する。
 
 **Takeaway:** aggregationはownershipではなく **processing granularity** を拡張する並行系列であり、1回の処理で扱うpacket workを増やして高速linkのper-packet overheadを抑える。
 
@@ -277,9 +277,9 @@ UDP GRO/GSO も同じ processing-granularity modelを datagram workload へ広�
 
 <a id="detail-bpf"></a>
 <a id="detail-sockops"></a>
-### BPF — filter から verified stack extension へ
+### BPF — filterからverified stack extensionへ
 
-BPF は filter expression から、**verified program + typed attach point + persistent map/object**を持つkernel extension infrastructureへ拡張した。
+BPFはfilter expressionから、**verified program + typed attach point + persistent map/object**を持つkernel extension infrastructureへ拡張した。
 
 ```text
 classic BPF
@@ -297,9 +297,9 @@ classic BPF
 
 <a id="detail-xdp-afxdp"></a>
 <a id="detail-xdp-extensions"></a>
-### XDP / AF_XDP — early execution point から queue / buffer binding へ
+### XDP / AF_XDP — early execution pointからqueue / buffer bindingへ
 
-XDP は4.8世代に driver RX の早い位置へverified BPF execution pointを置いた。その後DEVMAP/CPUMAPはredirect先をnamed objectへ、AF_XDPはRX queueとUMEM/userspace ringsを結び付けるqueue-bound datapathへ発展した。
+XDPは4.8世代にdriver RXの早い位置へverified BPF execution pointを置いた。その後DEVMAP/CPUMAPはredirect先をnamed objectへ、AF_XDPはRX queueとUMEM/userspace ringsを結び付けるqueue-bound datapathへ発展した。
 
 ```text
 driver RX
@@ -311,13 +311,13 @@ driver RX
             └─ XSKMAP → AF_XDP / UMEM
 ```
 
-native XDP は `skb` 構築前にprogramを実行し、redirect objectを通じてdevice/CPU/XSKへexecutionを分岐する。AF_XDP は RX queueと userspace-owned UMEM を明示的にbindingし、queue assignmentとbuffer ownershipをdatapath contractへ加えた。ring/APIの実装詳細より、このbinding boundaryをarchitecture上の変化として扱う。
+native XDPは`skb`構築前にprogramを実行し、redirect objectを通じてdevice/CPU/XSKへexecutionを分岐する。AF_XDPはRX queueとuserspace-owned UMEMを明示的にbindingし、queue assignmentとbuffer ownershipをdatapath contractへ加えた。ring/APIの実装詳細より、このbinding boundaryをarchitecture上の変化として扱う。
 
 multi-bufferは「1 packet = 1 contiguous buffer」という初期制約を緩め、AF_XDP multi-bufferは同じ問題をXSK/UMEM側へ接続した。metadata/RX hintsはtimestamp、RSS hash等をpacket bytesとは別のtyped metadataとしてprogram/userspace pathへ渡す。
 
 このlineageは後年のqueue leasingと共通する問題を先取りしている。kernel control/protectionを維持したまま、**execution point、redirect target、queue assignment、buffer lifetime**を明示してfast/userspace pathを選択できるようにしたからである。
 
-**Takeaway:** XDP/AF_XDP は「早いBPF hook」から、redirect object・RX queue・UMEM ownershipを組み合わせるexplicit datapathへ発展した。
+**Takeaway:** XDP/AF_XDPは「早いBPF hook」から、redirect object・RX queue・UMEM ownershipを組み合わせるexplicit datapathへ発展した。
 
 ------------------------------------------------------------------------
 
@@ -335,7 +335,7 @@ driver-local recycle
  → system RAM / userspace / device memory
 ```
 
-page_pool は RX buffer recycling を共通化し、netmem は packet memory を`struct page`と同義にしないabstractionを加え、memory-provider hooks は外部 backing をRX pathへ接続する。 Part III ではこの **memory type・provider identity・queue assignment・lifetime** の分離をarchitecture storyとして扱い、page_pool/providerのdriver-facing APIとdetach/release mechanismは Part IV を正本とする。
+page_poolはRX buffer recyclingを共通化し、netmemはpacket memoryを`struct page`と同義にしないabstractionを加え、memory-provider hooksは外部backingをRX pathへ接続する。 Part IIIではこの **memory type・provider identity・queue assignment・lifetime** の分離をarchitecture storyとして扱い、page_pool/providerのdriver-facing APIとdetach/release mechanismはPart IVを正本とする。
 
 **Takeaway:** packet memoryはallocation optimizationから、複数memory backingを明示的lifetime/assignmentの下で同じRX architectureへ接続するmodelへ進んだ。
 
@@ -344,9 +344,9 @@ page_pool は RX buffer recycling を共通化し、netmem は packet memory を
 <a id="detail-io-uring"></a>
 <a id="detail-tcp-zc-rx"></a>
 <a id="detail-socket-zerocopy"></a>
-### io_uring / socket zero-copy — completion と buffer lifetime の分離
+### io_uring / socket zero-copy — completionとbuffer lifetimeの分離
 
-socket zero-copy と io_uring networking の共通点は、copy回避そのものより **submission/completion と buffer lifetime を明示すること**にある。
+socket zero-copyとio_uring networkingの共通点は、copy回避そのものより **submission/completionとbuffer lifetimeを明示すること**にある。
 
 ```text
 application buffer
@@ -360,16 +360,16 @@ RX buffer
    └─ recycle / return
 ```
 
-`MSG_ZEROCOPY` はsend syscallの形を保ちながら、送信完了通知までapplication bufferを再利用しないlifetime modelを導入した。`IORING_OP_SEND_ZC` はこのmodelをio_uringのsubmission/completion frameworkへ統合し、送信要求とbuffer reuse可能時点をCQEで扱う。したがって **SEND_ZC は MSG_ZEROCOPY のlifetime分離モデルを継承し、completion APIをio_uringへ統合した**と整理できる。
+`MSG_ZEROCOPY`はsend syscallの形を保ちながら、送信完了通知までapplication bufferを再利用しないlifetime modelを導入した。`IORING_OP_SEND_ZC`はこのmodelをio_uringのsubmission/completion frameworkへ統合し、送信要求とbuffer reuse可能時点をCQEで扱う。したがって **SEND_ZCはMSG_ZEROCOPYのlifetime分離モデルを継承し、completion APIをio_uringへ統合した**と整理できる。
 
 RX側では`TCP_ZEROCOPY_RECEIVE`がmapped receive bufferをapplicationへ露出する方式を、io_uring ZCRXがregistered buffer/memory-providerとqueue pathを接続する方式を示す。後者ではpacket memory節で扱ったprovider/ownership modelとio_uring completion modelが交差する。
 
-**Takeaway:** io_uring networking は新しいsocket semanticsを作るより、I/O request、completion、buffer ownership/lifetimeを共通ring modelへ統合し、copy pathとzero-copy pathを同じcompletion contractで扱えるようにした。
+**Takeaway:** io_uring networkingは新しいsocket semanticsを作るより、I/O request、completion、buffer ownership/lifetimeを共通ring modelへ統合し、copy pathとzero-copy pathを同じcompletion contractで扱えるようにした。
 
 ------------------------------------------------------------------------
 
 <a id="detail-routing-tc-offload"></a>
-### Routing / TC / offload — forwarding object と hardware mapping
+### Routing / TC / offload — forwarding objectとhardware mapping
 
 routing/forwardingでは、bridge VLAN、MPLS、VRF、nexthop、TC policyを **kernel-visible object/state** として表し、必要に応じてdriver/hardwareへ写像する方向が進んだ。
 
@@ -398,7 +398,7 @@ switchdevのbridge/FDB/VLAN/FIB object pathとTC offload pathは別のcontrol AP
 <a id="detail-routing-netlink-rtnl"></a>
 <a id="detail-netdev-unreg"></a>
 <a id="detail-seg6-ioam"></a>
-### Routing / Netlink / RTNL — object API と synchronization scope
+### Routing / Netlink / RTNL — object APIとsynchronization scope
 
 control plane scalabilityでは、**reusable routing object、machine-readable API、global lock scopeの縮小**が並行して進んだ。
 
@@ -440,7 +440,7 @@ nftables policy
               └─ optional HW offload
 ```
 
-nftables は ruleset をexpression/set/mapとNetlink transactionで表現する。conntrack は direction/state、NAT mapping、mark/label、timeout等を共有flow-stateとして提供する。flowtable は policy/conntrack が選んだestablished flowをsoftware fast pathへ移し、対応topologyではhardwareへさらにplacementする。exceptionはclassic forwarding pathへ戻るため、複数execution pathが同じpolicy/state semanticsの下で共存する。
+nftablesはrulesetをexpression/set/mapとNetlink transactionで表現する。conntrackはdirection/state、NAT mapping、mark/label、timeout等を共有flow-stateとして提供する。flowtableはpolicy/conntrackが選んだestablished flowをsoftware fast pathへ移し、対応topologyではhardwareへさらにplacementする。exceptionはclassic forwarding pathへ戻るため、複数execution pathが同じpolicy/state semanticsの下で共存する。
 
 BPF/XDPは別のprogrammable execution pointを提供し、Netfilterはtransactional policyとstateful flow modelを提供するため、両者はpolicy boundaryに応じて組み合わせられる。
 
@@ -472,14 +472,14 @@ virtio/vhost/vDPAはguest-visible virtio semanticsとexecution placementを分�
 
 overlayではtunnel GSO/GRO、checksum/segmentation metadata、TC tunnel offloadがinner/outer header境界とNIC capabilityを接続し、software encapsulationとhardware executionを選択できる。近年のAF_XDP/virtio-net zero-copyやRX HW queue leasingはさらに、virtual deviceとphysical queue/buffer resourceのassignmentを明示する。
 
-**Takeaway:** Virtual networking は namespace、virtual device、overlay、guest ABI、hardware/queue assignmentを独立した接続点にし、kernel path・accelerated path・direct assignment・programmable pathを同じhostで選択できるようにした。
+**Takeaway:** Virtual networkingはnamespace、virtual device、overlay、guest ABI、hardware/queue assignmentを独立した接続点にし、kernel path・accelerated path・direct assignment・programmable pathを同じhostで選択できるようにした。
 
 ------------------------------------------------------------------------
 
 <a id="detail-rdma"></a>
-### RDMA — registered memory と offloaded execution の比較対象
+### RDMA — registered memoryとoffloaded executionの比較対象
 
-RDMA は本書では通常の socket/netdev path と対照的な execution / memory modelを示す selective cross-cutting case study として扱う。verbs path では **QP / CQ / MR / PD** が明示的 resource object となり、application が work request を queueへ postし、NIC/HCA が registered memory へ DMA する。control/setupにはRDMA-CMやLinuxのaddress/route stateが関与し、data executionはverbs queueとHCAへ大きくplacementされる。
+RDMAは本書では通常のsocket/netdev pathと対照的なexecution / memory modelを示すselective cross-cutting case studyとして扱う。verbs pathでは **QP / CQ / MR / PD** が明示的resource objectとなり、applicationがwork requestをqueueへpostし、NIC/HCAがregistered memoryへDMAする。control/setupにはRDMA-CMやLinuxのaddress/route stateが関与し、data executionはverbs queueとHCAへ大きくplacementされる。
 
 ```text
 Linux netdev / IP control state
@@ -492,15 +492,15 @@ Linux netdev / IP control state
    HCA      registered region
 ```
 
-Linux 3.0 の時点でRDMA subsystem自体は既に成熟していたため、本書では起源ではなく、対象期間内に **memory backing・lifetime・implementation placement が一般化された境界**を見る。
+Linux 3.0の時点でRDMA subsystem自体は既に成熟していたため、本書では起源ではなく、対象期間内に **memory backing・lifetime・implementation placementが一般化された境界**を見る。
 
-#### RoCEv2 / RXE — control state と execution placement
+#### RoCEv2 / RXE — control stateとexecution placement
 
-4.5 の RoCEv2 support は routable Ethernet/IP fabric とverbs datapathを接続した。IP address、route、neighbor、netdev stateはLinux control planeと関係しながら、established data pathのtransport処理はHCAへplacementできる。4.8のSoft-RoCE/RXEは同じRDMA/RoCE semanticsをsoftwareでも実行できるようにし、**verbs semantics とhardware implementationを分離できる**ことを示した。
+4.5のRoCEv2 supportはroutable Ethernet/IP fabricとverbs datapathを接続した。IP address、route、neighbor、netdev stateはLinux control planeと関係しながら、established data pathのtransport処理はHCAへplacementできる。4.8のSoft-RoCE/RXEは同じRDMA/RoCE semanticsをsoftwareでも実行できるようにし、**verbs semanticsとhardware implementationを分離できる**ことを示した。
 
-RDMA は、connection/resource control を Linux 側で管理しつつ、registered memory と queue pair を用いる data execution を HCA へ配置する architecture である。本書では、通常の socket/network stack と対照的な execution / memory modelを示す cross-cutting case study として扱う。
+RDMAは、connection/resource controlをLinux側で管理しつつ、registered memoryとqueue pairを用いるdata executionをHCAへ配置するarchitectureである。本書では、通常のsocket/network stackと対照的なexecution / memory modelを示すcross-cutting case studyとして扱う。
 
-#### ODP → dma-buf MR — registered memory の backing を一般化する
+#### ODP → dma-buf MR — registered memoryのbackingを一般化する
 
 traditional MRではprocess VA、access permission、DMA可能なbacking memoryをregistration時に強く結び付ける。3.19のODPはregistration contractと全pageのeager/permanent pinningを分離し、fault時のmappingとMMU invalidationをHCA translation lifecycleと協調させる方向を導入した。
 
@@ -514,13 +514,13 @@ process VA ── MR ── eager pinned RAM
 GPU / device memory ── dma-buf ── RDMA MR ── RNIC
 ```
 
-ここでの変化は単なるzero-copy最適化とは異なる。**memory type、registration、permission、mapping、revocation/lifetimeを別々のcontractとして扱える範囲が広がった**ことが重要である。これはsocket/netdev側の `page_pool → netmem → memory providers` と異なるdatapath上で、よく似たarchitecture pressureへ応答した例になる。
+ここでの変化は単なるzero-copy最適化とは異なる。**memory type、registration、permission、mapping、revocation/lifetimeを別々のcontractとして扱える範囲が広がった**ことが重要である。これはsocket/netdev側の`page_pool → netmem → memory providers`と異なるdatapath上で、よく似たarchitecture pressureへ応答した例になる。
 
-#### AI / HPC と observability
+#### AI / HPCとobservability
 
 AI trainingはRDMAを生んだworkloadとは別系統だが、大規模collective communicationとaccelerator-resident dataによって、CPU involvement、system-memory copy、fabric congestionのcostを強く可視化した。RoCEv2/RDMAはその代表的transportであり、GPU/device memoryをRNICへ直接接続するdma-buf/P2P modelの価値も大きくなった。
 
-同時にexecutionをHCAへ移すほど、通常のkernel packet traceだけではfailureを説明しにくくなる。LPC 2025のproduction事例が示すように、large-model trainingではQP/MR/device-resource stateとapplication errorを結び付けるobservabilityが必要になる。これは Part V の「evidence layer」のRDMA版である。
+同時にexecutionをHCAへ移すほど、通常のkernel packet traceだけではfailureを説明しにくくなる。LPC 2025のproduction事例が示すように、large-model trainingではQP/MR/device-resource stateとapplication errorを結び付けるobservabilityが必要になる。これはPart Vの「evidence layer」のRDMA版である。
 
 **Takeaway:** RDMAはsocket/`skb` pathを置き換える系列ではなく、QP/CQ/MRとregistered memoryを中心にした並行execution modelである。RoCEv2/RXEはexecution placementの選択肢を、ODP/dma-bufはmemory backingとlifetimeの選択肢を広げた。AI/HPCはこの既存architectureの価値と、congestion/observabilityの課題を同時に前面化した。
 
@@ -560,7 +560,7 @@ TCP_REPAIRはlive TCP stateをcheckpoint/restore lifecycleへ、TSQ/pacingはsoc
 ------------------------------------------------------------------------
 
 <a id="detail-security"></a>
-### SECURITY / kTLS / XFRM / WireGuard — security state と execution placement
+### SECURITY / kTLS / XFRM / WireGuard — security stateとexecution placement
 
 SECURITYはTRANSPORTやVIRTUAL/OVERLAYを横断し、**kernel-visible security state/policyとcrypto/packet executionの配置を分離する**storyとして整理できる。
 
@@ -572,7 +572,7 @@ WireGuard peer/key/allowed-IP ── secure netdevice
 
 kTLSはhandshake/key-exchange policyをuserspaceに残しつつ、established TLS record stateをTCP socketへ渡してTX/RX record processingをkernelへ配置する。generic TLS device offloadは同じsocket/security semanticsを維持したままcrypto executionをNICへ移せるようにした。
 
-XFRMではSA/policyがcanonical kernel stateであり、4.12のcrypto offloadは暗号処理をNICへ、6.2のpacket offloadはpolicy/encapsulationを含むより広いexecutionをhardwareへ配置する。 Part III ではこのplacement boundaryを扱い、driver-facing offload API/lifecycleの詳細は Part IV 側のframework storyへ委ねる。
+XFRMではSA/policyがcanonical kernel stateであり、4.12のcrypto offloadは暗号処理をNICへ、6.2のpacket offloadはpolicy/encapsulationを含むより広いexecutionをhardwareへ配置する。 Part IIIではこのplacement boundaryを扱い、driver-facing offload API/lifecycleの詳細はPart IV側のframework storyへ委ねる。
 
 WireGuardはpeer/key/allowed-IP stateを持つL3 secure tunnelを通常の`net_device`として統合し、RTNL、Generic Netlink、UDP tunnel、GRO/GSO、NAPI等の既存networking infrastructureへ接続する。kTLS/XFRMがexecution placementを広げる例なら、WireGuardはsecurity semanticsをstandard network object/APIへ統合する例である。
 
@@ -586,13 +586,13 @@ WireGuardはpeer/key/allowed-IP stateを持つL3 secure tunnelを通常の`net_d
 
 ------------------------------------------------------------------------
 
-## Part III から Part IV へ — feature lineage から driver contract へ
+## Part IIIからPart IVへ — feature lineageからdriver contractへ
 
-前章では networking mechanism を end-to-end の lineage として追った。 Part IV では視点を変え、個々の driverの責務のうち何が共通 networking-core framework へ移されたかを見る。
+前章ではnetworking mechanismをend-to-endのlineageとして追った。 Part IVでは視点を変え、個々のdriverの責務のうち何が共通networking-core frameworkへ移されたかを見る。
 
 # Part IV — Network Device Driver Framework
 
-Part IV は、driver-privateなresource/state管理がnetworking coreから扱えるcommon contractへ昇格した過程を追う。対象は object、accounting、API、assignment、lifetime、synchronization であり、Part III のfeature lineageを再説明せず、**driver/framework側で何が共通化されたか**に焦点を置く。
+Part IVは、driver-privateなresource/state管理がnetworking coreから扱えるcommon contractへ昇格した過程を追う。対象はobject、accounting、API、assignment、lifetime、synchronizationであり、Part IIIのfeature lineageを再説明せず、**driver/framework側で何が共通化されたか**に焦点を置く。
 
 ```text
 driver-local convention
@@ -606,14 +606,14 @@ driver-local convention
    └─ queue/NAPI identity ────→ netdev-genl
 ```
 
-これらは別々の subsystem だが、共通する方向は **「driver 内部にしか見えなかった resource/state を kernel 共通の contract として表現する」**ことである。
+これらは別々のsubsystemだが、共通する方向は **「driver内部にしか見えなかったresource/stateをkernel共通のcontractとして表現する」**ことである。
 
 
 ## Queue accounting — DQL/BQL
 
-DQL/BQL は driver ring の大きさそのものを標準化する framework ではない。driver/NIC に渡した bytes と completion された bytes を accounting し、software queue が device に過剰な backlog を押し込むのを抑える仕組みである。
+DQL/BQLはdriver ringの大きさそのものを標準化するframeworkではない。driver/NICに渡したbytesとcompletionされたbytesをaccountingし、software queueがdeviceに過剰なbacklogを押し込むのを抑える仕組みである。
 
-Part III の queueing 節では BQL を latency / pacing の一部として扱った。driver-framework の観点では、より重要なのは **各 driver が経験則で決めていた outstanding work を共通 accounting model にしたこと**である。
+Part IIIのqueueing節ではBQLをlatency / pacingの一部として扱った。driver-frameworkの観点では、より重要なのは **各driverが経験則で決めていたoutstanding workを共通accounting modelにしたこと**である。
 
 ```text
 qdisc
@@ -627,14 +627,14 @@ driver queue
 NIC ring ───────────────┘
 ```
 
-したがって BQL の contract form は ownership ではなく **accounting / backpressure** である。
+したがってBQLのcontract formはownershipではなく **accounting / backpressure** である。
 
 
 <a id="detail-switchdev"></a>
-## switchdev — kernel forwarding object と switch ASIC
+## switchdev — kernel forwarding objectとswitch ASIC
 
-ここでは switchdev の **driver-facing object/state synchronization contract** に限定する。
-switchdev は Linux bridge/FDB/VLAN などの kernel forwarding state を switch ASIC に同期するための framework として発展した。目的は「hardware switch を特別な別世界として管理する」ことではなく、Linux networking object を canonical control state として維持しながら forwarding execution を hardware に配置できるようにすることである。
+ここではswitchdevの **driver-facing object/state synchronization contract** に限定する。
+switchdevはLinux bridge/FDB/VLANなどのkernel forwarding stateをswitch ASICに同期するためのframeworkとして発展した。目的は「hardware switchを特別な別世界として管理する」ことではなく、Linux networking objectをcanonical control stateとして維持しながらforwarding executionをhardwareに配置できるようにすることである。
 
 ```text
 Linux bridge / FDB / VLAN / FIB objects
@@ -649,7 +649,7 @@ Linux bridge / FDB / VLAN / FIB objects
                  ASIC
 ```
 
-ただし TC hardware offload はこの直列 path の一部ではない。TC classifier/action の offload は `ndo_setup_tc` や flow-block callback など別の kernel API path を通り、driver/hardware 側で switchdev 系の forwarding object と交差し得る。
+ただしTC hardware offloadはこの直列pathの一部ではない。TC classifier/actionのoffloadは`ndo_setup_tc`やflow-block callbackなど別のkernel API pathを通り、driver/hardware側でswitchdev系のforwarding objectと交差し得る。
 
 ```text
 bridge / FIB / VLAN objects                 TC classifier / actions
@@ -665,7 +665,7 @@ switchdev notifications / objects          ndo_setup_tc / flow-block callbacks
                            hardware
 ```
 
-この区別は Part III の Routing / TC / offload 節で説明した control-path separation を、driver API 側から見たものである。
+この区別はPart IIIのRouting / TC / offload節で説明したcontrol-path separationを、driver API側から見たものである。
 
 
 port は通常の `net_device` として既存 Linux control plane に残るため、bridge への enslave、FDB learning notification、VLAN filtering、STP state、unsupported operation の扱いを kernel canonical state との整合性として議論できる。現在の architecture/API semantics は kernel switchdev documentation（<https://docs.kernel.org/networking/switchdev.html>）を参照。
@@ -673,8 +673,8 @@ port は通常の `net_device` として既存 Linux control plane に残るた�
 <a id="detail-devlink"></a>
 ## devlink — device-wide control object
 
-ここでは **device-wide resource / configuration / health lifecycle** を driver framework として扱う。
-devlink は port/netdev 単位だけでは表しにくい **device-wide resource / parameter / port / health state** を扱う object として導入された。特に switch ASIC や SmartNIC のように、一つの device が複数 port、representor、resource、firmware state を持つ場合、netdev だけでは device 全体の control plane を表現しにくい。
+ここでは **device-wide resource / configuration / health lifecycle** をdriver frameworkとして扱う。
+devlinkはport/netdev単位だけでは表しにくい **device-wide resource / parameter / port / health state** を扱うobjectとして導入された。特にswitch ASICやSmartNICのように、一つのdeviceが複数port、representor、resource、firmware stateを持つ場合、netdevだけではdevice全体のcontrol planeを表現しにくい。
 
 ```text
 PCI / physical device
@@ -691,17 +691,17 @@ PCI / physical device
         └─ driver / firmware / ASIC
 ```
 
-devlink health はこの object model を observability/recovery に広げた。driver-specific debug command の集合ではなく、reporter、diagnose、dump、recover という共通 interface を通して failure state を扱う点に意味がある。
+devlink healthはこのobject modelをobservability/recoveryに広げた。driver-specific debug commandの集合ではなく、reporter、diagnose、dump、recoverという共通interfaceを通してfailure stateを扱う点に意味がある。
 
-devlink は datapath 自体を提供しない。switchdev/TC offload が「どこで forwarding を実行するか」を扱うのに対し、devlink はその device の **resource / configuration / health lifecycle** を扱う。
+devlinkはdatapath自体を提供しない。switchdev/TC offloadが「どこでforwardingを実行するか」を扱うのに対し、devlinkはそのdeviceの **resource / configuration / health lifecycle** を扱う。
 
 
 `devlink resource` は TCAM 等の有限 hardware resource を階層 object として公開し、size 変更や occupancy を control plane から扱える。trap、rate、line card 等も device-wide management model に入り、netdev がまだ存在しない初期化段階や複数 port で共有する ASIC resource を表現できる。health reporter は error detection、dump、recover を driver-specific debugfs から共通 lifecycle へ持ち上げる。詳細は devlink docs（<https://docs.kernel.org/networking/devlink/>）、resource（<https://docs.kernel.org/networking/devlink/devlink-resource.html>）、health（<https://docs.kernel.org/networking/devlink/devlink-health.html>）。
 
 <a id="detail-phylink"></a>
-## phylink — link topology と MAC/PHY/PCS coordination
+## phylink — link topologyとMAC/PHY/PCS coordination
 
-phylink は MAC driver が PHY、fixed-link、SFP、PCS などの link topology を個別に扱う重複を減らす framework である。4.14 世代に導入され、link negotiation / mode change / carrier state に関する共通 orchestration を networking core 側へ引き上げた。
+phylinkはMAC driverがPHY、fixed-link、SFP、PCSなどのlink topologyを個別に扱う重複を減らすframeworkである。4.14世代に導入され、link negotiation / mode change / carrier stateに関する共通orchestrationをnetworking core側へ引き上げた。
 
 ```text
 MAC driver
@@ -712,23 +712,23 @@ MAC driver
 PHY PCS        fixed-link / SFP
 ```
 
-重要なのは「PHY API を置き換えた」ことではない。MAC と link-side component の関係を framework が仲介し、driver が topology ごとの state machine を重複実装する必要を減らしたことである。
+重要なのは「PHY APIを置き換えた」ことではない。MACとlink-side componentの関係をframeworkが仲介し、driverがtopologyごとのstate machineを重複実装する必要を減らしたことである。
 
-Rust PHY abstraction もこの lineage 上に置ける。Rust networking support の初期段階では、high-performance NIC driver 全体を書き換えるより、PHY abstraction のような比較的明確な interface boundary から型安全な binding/abstraction を作る方向が先行した。
+Rust PHY abstractionもこのlineage上に置ける。Rust networking supportの初期段階では、high-performance NIC driver全体を書き換えるより、PHY abstractionのような比較的明確なinterface boundaryから型安全なbinding/abstractionを作る方向が先行した。
 
 
-### phylink の state machine
+### phylinkのstate machine
 
-phylink は MAC driver、PHY、PCS、SFP cage、fixed-link、in-band autonegotiation の組合せで生じる link state coordination を共通 state machine へ移す。MAC driver は `phylink_mac_ops` 等を実装し、link mode validation/config、MAC prepare/config/finish、link up/down を phylink lifecycle へ接続する。
+phylinkはMAC driver、PHY、PCS、SFP cage、fixed-link、in-band autonegotiationの組合せで生じるlink state coordinationを共通state machineへ移す。MAC driverは`phylink_mac_ops`等を実装し、link mode validation/config、MAC prepare/config/finish、link up/downをphylink lifecycleへ接続する。
 
 価値は「PHY を簡単にする」ことではなく、MAC/PCS/PHY の責務境界を明確にし、SFP hotplug や in-band negotiation を含む複雑な topology を driver ごとの ad-hoc state machine から外すことにある。Kernel documentation: <https://docs.kernel.org/networking/sfp-phylink.html>
 
 <a id="detail-dim"></a>
-## DIM — interrupt moderation policy の共通化
+## DIM — interrupt moderation policyの共通化
 
-PERFORMANCE 側では adaptive moderation の効果が主題になる。ここでは **measurement → policy decision → driver setting** を共通 library contract にした点だけを扱う。
+PERFORMANCE側ではadaptive moderationの効果が主題になる。ここでは **measurement → policy decision → driver setting** を共通library contractにした点だけを扱う。
 
-Dynamic Interrupt Moderation (DIM) は packet/byte/event rate を観測し、interrupt coalescing parameter を workload に応じて調整する仕組みである。複数 driver が似た adaptive moderation logic を独自実装する代わりに、測定と profile selection を共通 library/framework に寄せた。
+Dynamic Interrupt Moderation (DIM) はpacket/byte/event rateを観測し、interrupt coalescing parameterをworkloadに応じて調整する仕組みである。複数driverが似たadaptive moderation logicを独自実装する代わりに、測定とprofile selectionを共通library/frameworkに寄せた。
 
 ```text
 packet / byte / event samples
@@ -742,14 +742,14 @@ packet / byte / event samples
 driver coalescing parameters
 ```
 
-これは datapath ownership の contract ではなく、**measurement → policy decision → driver setting** を再利用可能にした framework 化の例である。
+これはdatapath ownershipのcontractではなく、**measurement → policy decision → driver setting** を再利用可能にしたframework化の例である。
 
 
-## page_pool — packet-memory lifecycle の共通化
+## page_pool — packet-memory lifecycleの共通化
 
-page_pool の詳細な発展史は Part III「Packet memory」で扱う。ここでは driver framework としての意味だけに絞る。
+page_poolの詳細な発展史はPart III「Packet memory」で扱う。ここではdriver frameworkとしての意味だけに絞る。
 
-従来、RX driver は page allocation、DMA mapping、recycling、fragment handling を driver ごとに組み合わせていた。page_pool は RX packet memory の allocation/recycling lifecycle と DMA-aware handling を共通化し、XDP を含む高速 RX path から利用できる framework を提供した。
+従来、RX driverはpage allocation、DMA mapping、recycling、fragment handlingをdriverごとに組み合わせていた。page_poolはRX packet memoryのallocation/recycling lifecycleとDMA-aware handlingを共通化し、XDPを含む高速RX pathから利用できるframeworkを提供した。
 
 ```text
 RX queue
@@ -764,59 +764,59 @@ page_pool
       driver
 ```
 
-後年の netmem / memory providers / Device Memory TCP は page_pool の前段の仕組みを置き換えるのではなく、異なる責務を共通化する。しかし page_pool が **packet memory lifetime を driver-private convention から共通 object へ移した**ことが、system RAM 以外の memory provider を扱うための重要な前提になった。
+後年のnetmem / memory providers / Device Memory TCPは、page_poolが確立したpacket-memory lifetime / recyclingの共通基盤を土台に、memory objectの表現、backing type、provider selectionを明示する方向へ拡張した。page_poolはdriverとnetworking coreの間でRX bufferのallocation / recycle / lifetimeを担い、後続の仕組みはその上で利用可能なmemory backingとconsumerを広げる。
 
-page_pool は通常 RX queue / NAPI に近い単位で配置され、packet が stack や redirect 先へ渡された後も buffer が in-flight になり得るため、pool detach と最終 release は別イベントになる。fragment support、page-pool introspection、custom memory provider もこの lifetime model の上に積み上がる。したがって本質は「高速 allocator」だけではなく、**RX packet memory の ownership / recycling / DMA lifetime を driver 共通 contract にしたこと**にある。
+page_poolは通常RX queue / NAPIに近い単位で配置され、packetがstackやredirect先へ渡された後もbufferがin-flightになり得るため、pool detachと最終releaseは別イベントになる。fragment support、page-pool introspection、custom memory providerもこのlifetime modelの上に積み上がる。したがって本質は「高速allocator」だけではなく、**RX packet memoryのownership / recycling / DMA lifetimeをdriver共通contractにしたこと**にある。
 
-ここでは Part III と同じ release chronology を繰り返さず、driver-framework としての役割だけを保持する。
+ここではPart IIIと同じrelease chronologyを繰り返さず、driver-frameworkとしての役割だけを保持する。
 
 <a id="detail-netdevsim"></a>
-## netdevsim — framework API を hardware なしで検証する
+## netdevsim — framework APIをhardwareなしで検証する
 
-netdevsim（4.16）は実 NIC を模倣するための一般的な emulator というより、networking core / driver API を **hardware independent に selftest できる test device** として重要である。devlink resource、FIB offload、rate object など、driver-facing contract が増えるほど「特定 vendor hardware なしに API semantics を検証できること」が framework evolution の一部になる。
+netdevsim（4.16）は実NICを模倣するための一般的なemulatorというより、networking core / driver APIを **hardware independentにselftestできるtest device** として重要である。devlink resource、FIB offload、rate objectなど、driver-facing contractが増えるほど「特定vendor hardwareなしにAPI semanticsを検証できること」がframework evolutionの一部になる。
 
 Kernel documentation: <https://docs.kernel.org/networking/devlink/netdevsim.html>
 
 
 <a id="detail-auxiliary-bus"></a>
-## auxiliary bus — device 内部機能の分割
+## auxiliary bus — device内部機能の分割
 
-auxiliary bus は、一つの physical device/PCI function に含まれる複数の機能を、親 driver と補助 driver の間で分離して扱うための共通 infrastructure である。networking 専用ではないが、SmartNIC/RDMA/network driver のように一つの device が複数 subsystem へ機能を公開する構成で重要になった。
+auxiliary busは、一つのphysical device/PCI functionに含まれる複数の機能を、親driverと補助driverの間で分離して扱うための共通infrastructureである。networking専用ではないが、SmartNIC/RDMA/network driverのように一つのdeviceが複数subsystemへ機能を公開する構成で重要になった。
 
-これは devlink のような userspace-visible control object とは役割が異なる。auxiliary bus は **driver composition / binding boundary** を提供する。
+これはdevlinkのようなuserspace-visible control objectとは役割が異なる。auxiliary busは **driver composition / binding boundary** を提供する。
 
 
-### auxiliary bus の composition contract
+### auxiliary busのcomposition contract
 
-auxiliary bus は 1 つの physical PCI device/driver が内部に複数の機能単位を持ち、それぞれを別 driver/module へ bind したい場合の composition mechanism である。network driver では RDMA、crypto、subfunction 等と core device state を共有しながら、巨大な monolithic driver に統合し続けるのを避ける用途がある。
+auxiliary busは1つのphysical PCI device/driverが内部に複数の機能単位を持ち、それぞれを別driver/moduleへbindしたい場合のcomposition mechanismである。network driverではRDMA、crypto、subfunction等とcore device stateを共有しながら、巨大なmonolithic driverに統合し続けるのを避ける用途がある。
 
-ここで共有されるのは hardware そのものだが、lifetime と probe/remove boundary は auxiliary device/driver object として明示される。このため Part IV では performance feature ではなく **driver composition / lifetime contract** として扱う。
+ここで共有されるのはhardwareそのものだが、lifetimeとprobe/remove boundaryはauxiliary device/driver objectとして明示される。このためPart IVではperformance featureではなく **driver composition / lifetime contract** として扱う。
 
 <a id="detail-threaded-napi"></a>
-## threaded NAPI — execution context の選択肢
+## threaded NAPI — execution contextの選択肢
 
-NAPI は通常 softirq context で poll されるが、threaded NAPI は poll 処理を kernel thread で実行できる選択肢を追加した。これは XDP や AF_XDP のような新しい packet path ではなく、既存 NAPI processing の **execution context / scheduling placement** を変える仕組みである。
+NAPIは通常softirq contextでpollされるが、threaded NAPIはpoll処理をkernel threadで実行できる選択肢を追加した。これはXDPやAF_XDPのような新しいpacket pathではなく、既存NAPI processingの **execution context / scheduling placement** を変える仕組みである。
 
-real-time 性、CPU scheduling、isolation の要件によって softirq と threaded execution を選択できる点が重要であり、「一つの最適な NAPI execution model」へ統一する変更ではない。6.19 世代では threaded NAPI に busy-poll mode が加わり、threaded execution の中でも IRQ-driven と polling-oriented な配置を選べる方向へ進んだ。
+real-time性、CPU scheduling、isolationの要件によってsoftirqとthreaded executionを選択できる点が重要であり、「一つの最適なNAPI execution model」へ統一する変更ではない。6.19世代ではthreaded NAPIにbusy-poll modeが加わり、threaded executionの中でもIRQ-drivenとpolling-orientedな配置を選べる方向へ進んだ。
 
 Kernel netdev specification: <https://docs.kernel.org/7.1/netlink/specs/netdev.html>
 
 
 <a id="detail-threaded-busypoll"></a>
-### Threaded NAPI busy-poll — NAPI ごとの dedicated polling execution
+### Threaded NAPI busy-poll — NAPIごとのdedicated polling execution
 
-threaded NAPI は softirq ではなく kernel thread で NAPI poll を実行する選択肢を導入した。後の threaded busy-poll 拡張は、その thread を continuous polling させ、RX/TX descriptor を低 jitter で回収する用途を追加する。Netlink から NAPI 単位で threaded/busy-poll を選択し、userspace が thread PID を取得して affinity、priority、scheduler policy を設定できる設計である。
+threaded NAPIはsoftirqではなくkernel threadでNAPI pollを実行する選択肢を導入した。後のthreaded busy-poll拡張は、そのthreadをcontinuous pollingさせ、RX/TX descriptorを低jitterで回収する用途を追加する。NetlinkからNAPI単位でthreaded/busy-pollを選択し、userspaceがthread PIDを取得してaffinity、priority、scheduler policyを設定できる設計である。
 
 これは単なる busy loop optimization ではなく、**NAPI object ごとに execution context と CPU scheduling policy を割り当てる contract**への進化である。AF_XDP の hard low-latency use case が series の motivation として明示されている。LWN patch series: <https://lwn.net/Articles/1030809/>
 
 <a id="detail-ethtool-genl"></a>
-## ethtool netlink と YNL — driver control API の構造化
+## ethtool netlinkとYNL — driver control APIの構造化
 
-CONTROL PLANE の時系列を繰り返さず、ここでは ethtool family の **structured API / schema evolution** と driver-facing control contract に焦点を置く。
+CONTROL PLANEの時系列を繰り返さず、ここではethtool familyの **structured API / schema evolution** とdriver-facing control contractに焦点を置く。
 
-従来の ethtool ioctl interface は長年利用されてきたが、機能追加、dump、notification、extensible attribute という面では Netlink の方が扱いやすい。ethtool netlink は link modes、coalescing、channels などの device configuration を structured Netlink API へ移す方向を示した。
+従来のethtool ioctl interfaceは長年利用されてきたが、機能追加、dump、notification、extensible attributeという面ではNetlinkの方が扱いやすい。ethtool netlinkはlink modes、coalescing、channelsなどのdevice configurationをstructured Netlink APIへ移す方向を示した。
 
-さらに YNL は Netlink family の schema を machine-readable に記述し、policy/documentation/userspace helper 生成へ接続する。ethtool netlink と YNL は同じ feature ではないが、
+さらにYNLはNetlink familyのschemaをmachine-readableに記述し、policy/documentation/userspace helper生成へ接続する。ethtool netlinkとYNLは同じfeatureではないが、
 
 ```text
 ad-hoc ioctl / hand-written Netlink
@@ -826,17 +826,17 @@ structured Netlink objects
 machine-readable schema / generated tooling
 ```
 
-という control API の長期的な方向を示す。
+というcontrol APIの長期的な方向を示す。
 
 
-Generic Netlink family `ethtool` は link modes、features、rings、channels、coalescing、pause、EEE、FEC、module、stats 等を nested attributes で表し、GET / SET / ACT、dump、notification、extended ACK、bitset representation を利用できる。移行は ioctl を一度に廃止する方式ではなく機能単位で Netlink command を追加する形で進み、後の YNL は structured API を YAML schema から扱う方向をさらに明確にした。
+Generic Netlink family `ethtool`はlink modes、features、rings、channels、coalescing、pause、EEE、FEC、module、stats等をnested attributesで表し、GET / SET / ACT、dump、notification、extended ACK、bitset representationを利用できる。移行はioctlを一度に廃止する方式ではなく機能単位でNetlink commandを追加する形で進み、後のYNLはstructured APIをYAML schemaから扱う方向をさらに明確にした。
 
 <a id="detail-netdev-genl"></a>
-## netdev-genl — queue / NAPI identity を control plane object へ
+## netdev-genl — queue / NAPI identityをcontrol plane objectへ
 
-Observability 側では queue/NAPI/page_pool visibility が主題になる。ここでは後続の queue-bound API が参照できる **stable object identity / schema contract** に焦点を置く。
+Observability側ではqueue/NAPI/page_pool visibilityが主題になる。ここでは後続のqueue-bound APIが参照できる **stable object identity / schema contract** に焦点を置く。
 
-netdev generic Netlink family では、NAPI instance や RX/TX queue の identity を userspace から列挙・参照できる方向が進んだ。これは単なる observability enhancement ではない。AF_XDP、io_uring ZCRX、memory providers、queue leasing のように **特定 queue へ resource を binding する API** が増えると、queue そのものを安定して指し示す control plane identity が必要になるためである。
+netdev generic Netlink familyでは、NAPI instanceやRX/TX queueのidentityをuserspaceから列挙・参照できる方向が進んだ。これは単なるobservability enhancementではない。AF_XDP、io_uring ZCRX、memory providers、queue leasingのように **特定queueへresourceをbindingするAPI** が増えると、queueそのものを安定して指し示すcontrol plane identityが必要になるためである。
 
 ```text
 physical netdev
@@ -848,19 +848,19 @@ physical netdev
           └─ later queue-bound APIs
 ```
 
-ここで queue identity は OBSERVABILITY と CONTROL PLANE の接点になる。
+ここでqueue identityはOBSERVABILITYとCONTROL PLANEの接点になる。
 
 
 <a id="detail-driver-modern"></a>
 ### Modern driver contracts — XDP features / queue objects / Rust PHY
 
-近年の driver framework では「この driver が XDP を実装しているか」という binary な判定から、redirect、ndo_xmit、zero-copy 等の feature capability を machine-readable に公開する方向へ進んだ。netdev-genl の queue/NAPI/page_pool object と組み合わせると、control plane は **capability + resource identity + assignment** を別々に問い合わせられる。
+近年のdriver frameworkでは「このdriverがXDPを実装しているか」というbinaryな判定から、redirect、ndo_xmit、zero-copy等のfeature capabilityをmachine-readableに公開する方向へ進んだ。netdev-genlのqueue/NAPI/page_pool objectと組み合わせると、control planeは **capability + resource identity + assignment** を別々に問い合わせられる。
 
-Rust PHY support は network driver 全体を Rust へ置き換えるものではなく、PHY abstraction という比較的明確な driver contract から Rust binding/implementation を導入した例である。本書では言語移行そのものより、既存 C subsystem API の ownership/lifetime rule を Rust type system へどう写像するかという DRIVER FRAMEWORK の変化として位置付ける。
+Rust PHY supportはnetwork driver全体をRustへ置き換えるものではなく、PHY abstractionという比較的明確なdriver contractからRust binding/implementationを導入した例である。本書では言語移行そのものより、既存C subsystem APIのownership/lifetime ruleをRust type systemへどう写像するかというDRIVER FRAMEWORKの変化として位置付ける。
 
-## Driver framework の synthesis
+## Driver frameworkのsynthesis
 
-15 年間を通して見ると、driver framework の変化は次のように要約できる。
+15年間を通して見ると、driver frameworkの変化は次のように要約できる。
 
 | 以前 driver 内に埋もれていたもの | 共通化した代表 framework | 代表 release | 主な contract | Evidence / source |
 |---|---|---:|---|---|
@@ -878,20 +878,20 @@ Rust PHY support は network driver 全体を Rust へ置き換えるもので�
 | queue / NAPI identity | netdev-genl | 6.8+ | object / assignment | kernel Netlink spec: <https://docs.kernel.org/networking/netlink_spec/netdev.html> ; queue-object anchor: Part VII |
 
 
-この表は各 framework が同じ問題を解くという意味ではない。共通するのは、**driver-private だった state/resource/algorithm boundary を kernel 共通の contract へ引き上げ、複数 driver・複数 hardware・複数 execution model から再利用可能にしたこと**である。
+この表は各frameworkが同じ問題を解くという意味ではない。共通するのは、**driver-privateだったstate/resource/algorithm boundaryをkernel共通のcontractへ引き上げ、複数driver・複数hardware・複数execution modelから再利用可能にしたこと**である。
 
-Part III の MEMORY/PROGRAMMABILITY/CONTROL PLANE が「datapath 側で何が共存できるようになったか」を説明するのに対し、 Part IV はその共存を支える **driver-facing contract surface** がどう増えたかを説明する。
+Part IIIのMEMORY/PROGRAMMABILITY/CONTROL PLANEが「datapath側で何が共存できるようになったか」を説明するのに対し、 Part IVはその共存を支える **driver-facing contract surface** がどう増えたかを説明する。
 
 ------------------------------------------------------------------------
 
 <a id="detail-observability"></a>
 # Part V — Observability / Explainability
 
-Part V は **kernel observability primitive と、それを相関する tool-side case study** に責務を限定する。execution point が分散するほど、packet traceだけでなく typed reason、object identity、timestamp、resource state を横断する evidence layer が必要になる。各primitiveの「いつ入ったか」は Part VI、datapath自体のmechanismは Part III/IVを正本とし、ここでは「どの evidence から挙動を説明できるか」を扱う。Retis / pwru はその相関例である。
+Part Vは **kernel observability primitiveと、それを相関するtool-side case study** に責務を限定する。execution pointが分散するほど、packet traceだけでなくtyped reason、object identity、timestamp、resource stateを横断するevidence layerが必要になる。各primitiveの「いつ入ったか」はPart VI、datapath自体のmechanismはPart III/IVを正本とし、ここでは「どのevidenceから挙動を説明できるか」を扱う。Retis / pwruはその相関例である。
 
 ## Kernel observability primitive
 
-Linux networking の observability は、単純な interface counter / packet capture から、 kernel 内部の typed event と packet-lifecycle metadata を相関できる方向へ進化した。
+Linux networkingのobservabilityは、単純なinterface counter / packet captureから、 kernel内部のtyped eventとpacket-lifecycle metadataを相関できる方向へ進化した。
 
 ```text
 Observability primitives (parallel / complementary)
@@ -907,7 +907,7 @@ Observability primitives (parallel / complementary)
   packet-journey reconstruction は、それらを相関する tool / analysis 側の目標である。
 ```
 
-### Primitive が提供する情報と限界
+### Primitiveが提供する情報と限界
 
 | Primitive | 主に提供するもの | 境界 / 注意点 |
 |:------------------------|:-------------------------------------------------|:----------------------------------------------------------------|
@@ -917,39 +917,39 @@ Observability primitives (parallel / complementary)
 | timestamping | 特定地点での時刻情報 | clock、取得地点、HW/SW timestamp semantics に依存 |
 | netdev-genl | queue / NAPI 等の identity、state、configuration | 可視化できることと自由に ownership/configuration できることは別 |
 
-したがって cross-layer packet journey は単一 primitive の機能ではなく、tool が複数の identifier、event、 timestamp、metadata を相関して **推論する目標**として扱う。
+したがってcross-layer packet journeyは単一primitiveの機能ではなく、toolが複数のidentifier、event、 timestamp、metadataを相関して **推論する目標**として扱う。
 
 <a id="detail-btf"></a>
-### BTF と eBPF tracing
+### BTFとeBPF tracing
 
-BTF により running kernel の型情報を利用できるため、observability tool は private kernel structure の固定 offset に依存する必要を減らせる。これは networking のように内部構造の変化が 速い領域で特に重要である。
+BTFによりrunning kernelの型情報を利用できるため、observability toolはprivate kernel structureの固定offsetに依存する必要を減らせる。これはnetworkingのように内部構造の変化が 速い領域で特に重要である。
 
-BTF は単なる debug symbol の圧縮ではなく、struct / union / enum / function prototype 等を type ID で参照できる machine-readable schema として働く。libbpf/CO-RE はこの型情報を使って compile 時と runtime kernel の layout 差を relocation でき、tracing tool は `struct sk_buff` や `struct sock` の field を version ごとの hard-coded offset に依存せず参照しやすくなる。
+BTFは単なるdebug symbolの圧縮ではなく、struct / union / enum / function prototype等をtype IDで参照できるmachine-readable schemaとして働く。libbpf/CO-REはこの型情報を使ってcompile時とruntime kernelのlayout差をrelocationでき、tracing toolは`struct sk_buff`や`struct sock`のfieldをversionごとのhard-coded offsetに依存せず参照しやすくなる。
 
 したがって BTF は PROGRAMMABILITY と OBSERVABILITY の接続点である。ただし BTF 自体を本書の contract form に追加するのではなく、観測側が利用できる **typed evidence** と位置付ける。Kernel documentation: <https://docs.kernel.org/bpf/btf.html>
 
 <a id="detail-drop-reason"></a>
 ### Structured drop reason
 
-Linux 5.17 の `kfree_skb_reason()` / `skb_drop_reason` 世代は、「packet が消えた」という観測を 「どの理由で drop されたか」という structured metadata へ変えた。その後、coverage は networking stack の各所へ拡張されている。
+Linux 5.17の`kfree_skb_reason()` / `skb_drop_reason`世代は、「packetが消えた」という観測を 「どの理由でdropされたか」というstructured metadataへ変えた。その後、coverageはnetworking stackの各所へ拡張されている。
 
-7.1 の dedicated qdisc-drop tracepoint は、qdisc 内の drop context を generic tracing から直接観測しやすくした例であり、structured drop reason と補完関係にある。
+7.1のdedicated qdisc-drop tracepointは、qdisc内のdrop contextをgeneric tracingから直接観測しやすくした例であり、structured drop reasonと補完関係にある。
 
-`kfree_skb_reason()` / `enum skb_drop_reason` は、tool が free site から理由を推測するだけでなく、drop producer 側が semantic reason を event に付与できるようにする。IP / neighbour / core receive path / TCP 等へ coverage が拡大し、subsystem 固有 reason も扱えるようになった。
+`kfree_skb_reason()` / `enum skb_drop_reason`は、toolがfree siteから理由を推測するだけでなく、drop producer側がsemantic reasonをeventに付与できるようにする。IP / neighbour / core receive path / TCP等へcoverageが拡大し、subsystem固有reasonも扱えるようになった。
 
-ここでも重要なのは「counter → drop reason へ置換された」という複数の観測点を相関して読む構成になる。counter、tracepoint、call-site、structured reason は併存し、問いに応じて異なる evidence を提供する。LWN patch series: <https://lwn.net/Articles/886138/> , <https://lwn.net/Articles/886798/>
+ここでの要点は、counter、tracepoint、call-site、structured reasonが併存し、問いに応じて異なるevidenceを提供することである。
 
-### Timestamping と packet lifecycle
+### Timestampingとpacket lifecycle
 
-`SO_TIMESTAMPING`、driver/hardware timestamp、BPF から取得できる時刻・context は、 単一地点の packet capture では見えない queueing / scheduling / offload の時間軸を補う。
+`SO_TIMESTAMPING`、driver/hardware timestamp、BPFから取得できる時刻・contextは、 単一地点のpacket captureでは見えないqueueing / scheduling / offloadの時間軸を補う。
 
-software timestamp と NIC hardware timestamp は packet event を clock domain に結び付ける。PHC (PTP Hardware Clock) を含む timestamping は、pwru/Retis が扱う packet provenance とは別種類の evidence であり、「どこを通ったか」に対して「いつ起きたか」を与える。
+software timestampとNIC hardware timestampはpacket eventをclock domainに結び付ける。PHC (PTP Hardware Clock) を含むtimestampingは、pwru/Retisが扱うpacket provenanceとは別種類のevidenceであり、「どこを通ったか」に対して「いつ起きたか」を与える。
 
 ### Queue / NAPI / page_pool observability
 
-Part IV で説明した queue、NAPI、page_pool の object 化は、control plane だけでなく observability にも 寄与する。packet memory、polling context、queue identity を userspace-visible object として関連付ける ことで、zero-copy / memory-provider 時代の問題を説明しやすくなる。ただし、readable な identity / stats と、 userspace が queue や NAPI の ownership/configuration を変更できる control plane capability は区別する。
+Part IVで説明したqueue、NAPI、page_poolのobject化は、control planeだけでなくobservabilityにも 寄与する。packet memory、polling context、queue identityをuserspace-visible objectとして関連付ける ことで、zero-copy / memory-provider時代の問題を説明しやすくなる。ただし、readableなidentity / statsと、 userspaceがqueueやNAPIのownership/configurationを変更できるcontrol plane capabilityは区別する。
 
-この軸を Part VI の確定 milestone に対応させると、代表的な observability milestone の**時系列**は次のようになる。これは機能間の依存関係を示す図ではない。
+この軸をPart VIの確定milestoneに対応させると、代表的なobservability milestoneの**時系列**は次のようになる。これは機能間の依存関係を示す図ではない。
 
 ```text
 4.1   kprobe-attached eBPF / tracing foundation
@@ -959,27 +959,27 @@ Part IV で説明した queue、NAPI、page_pool の object 化は、control pla
 7.1   dedicated qdisc-drop tracepoint
 ```
 
-`netdev-genl` による queue / NAPI identity と stats は、従来の interface-level counter だけでは説明しにくかった「どの queue / poller で問題が起きているか」を userspace から関連付ける基盤になる。page_pool 側でも pool identity、allocation / recycle information、leak diagnostics が整備され、packet-memory ownership 自体が 観測対象へ移っている。ここでの release attribution は Part VI の値を参照する。
+`netdev-genl`によるqueue / NAPI identityとstatsは、従来のinterface-level counterだけでは説明しにくかった「どのqueue / pollerで問題が起きているか」をuserspaceから関連付ける基盤になる。page_pool側でもpool identity、allocation / recycle information、leak diagnosticsが整備され、packet-memory ownership自体が 観測対象へ移っている。ここでのrelease attributionはPart VIの値を参照する。
 
-## Tool の case study
+## Toolのcase study
 
-Retis と pwru は上記 primitive を利用する代表例だが、本書では kernel evolution そのものと区別する。
+Retisとpwruは上記primitiveを利用する代表例だが、本書ではkernel evolutionそのものと区別する。
 
-- **pwru**: 広い kernel function trajectory から「packet がどこを通ったか」を探索する。
-- **Retis**: networking event、skb metadata、OVS/OVN context などを意味的に enrich して相関する。
+- **pwru**: 広いkernel function trajectoryから「packetがどこを通ったか」を探索する。
+- **Retis**: networking event、skb metadata、OVS/OVN contextなどを意味的にenrichして相関する。
 
-詳細な conference/source provenance は Appendix の case-study index に集約する。
+詳細なconference/source provenanceはAppendixのcase-study indexに集約する。
 
-pwru は **function-level trajectory** を広く探索する debugger として強く、Retis は networking subsystem の structured event / metadata を packet journey へ相関する方向に強い。両者は単純な代替関係ではない。kernel primitive 側の BTF、BPF tracing、drop reason、object identity が richer になるほど、tool 側は raw trace の羅列から semantic correlation へ進める。
+pwruは **function-level trajectory** を広く探索するdebuggerとして強く、Retisはnetworking subsystemのstructured event / metadataをpacket journeyへ相関する方向に強い。両者は単純な代替関係ではない。kernel primitive側のBTF、BPF tracing、drop reason、object identityがricherになるほど、tool側はraw traceの羅列からsemantic correlationへ進める。
 
 
-# Synthesis — architecture framing への回帰と未完の仕事
+# Synthesis — architecture framingへの回帰と未完の仕事
 
-Linux networking の15年は、一つのmechanismへ収束した歴史ではなく、queueing、transport、programmability、memory、control plane、virtualization、security、driver frameworkなどが異なるpressureに応答して並行進化した歴史である。その中で複数 seriesを横断して繰り返し現れたのが、**resource / state / lifetime / assignment / synchronization を明示的contractとして表し、複数のexecution / memory modelを同じsystemで共存させる**方向である。本書ではこれをLinux networking全体を還元する法則ではなく、15年間を理解するための主要architecture trendとして位置づける。
+Linux networkingの15年は、一つのmechanismへ収束した歴史ではなく、queueing、transport、programmability、memory、control plane、virtualization、security、driver frameworkなどが異なるpressureに応答して並行進化した歴史である。その中で複数seriesを横断して繰り返し現れたのが、**resource / state / lifetime / assignment / synchronizationを明示的contractとして表し、複数のexecution / memory modelを同じsystemで共存させる**方向である。本書ではこれをLinux networking全体を還元する法則ではなく、15年間を理解するための主要architecture trendとして位置づける。
 
-Part I の「1 本の RX queue を誰が使うのか」に戻ると、 Part II のscalability pressure、 Part III のXDP/AF_XDP・packet memory・io_uring・virtual networking、 Part IV のdriver contractが一つの場所で交差する。2011年頃にはdriver/NAPI/kernel stackに強く結び付いていたqueueが、2026年にはAF_XDP、io_uring ZCRX、device-memory path、virtual deviceなど複数consumerとの間でidentity/assignment/lifetimeを明示して扱えるresourceへ変わっている。重要なのは全packetが新しいpathへ移ったことではなく、**同じNIC resourceへ異なるmodelを安全に接続するための境界が増えたこと**である。
+Part Iの「1本のRX queueを誰が使うのか」に戻ると、 Part IIのscalability pressure、 Part IIIのXDP/AF_XDP・packet memory・io_uring・virtual networking、 Part IVのdriver contractが一つの場所で交差する。2011年頃にはdriver/NAPI/kernel stackに強く結び付いていたqueueが、2026年にはAF_XDP、io_uring ZCRX、device-memory path、virtual deviceなど複数consumerとの間でidentity/assignment/lifetimeを明示して扱えるresourceへ変わっている。重要なのは全packetが新しいpathへ移ったことではなく、**同じNIC resourceへ異なるmodelを安全に接続するための境界が増えたこと**である。
 
-## Contract が共存を可能にした接続点
+## Contractが共存を可能にした接続点
 
 | 明示化された対象 | Contract の lineage | その接続点で共存できるようになったもの |
 |---|---|---|
@@ -993,28 +993,29 @@ Part I の「1 本の RX queue を誰が使うのか」に戻ると、 Part II �
 | policy / flow state | nftables → conntrack consumers → flowtable / HW offload | transactional policy と shared state を保ちながら slow / fast / hardware path を選択する |
 | security state / policy | kTLS / XFRM / WireGuard | kernel-visible security state を保ちつつ software / NIC execution または通常の netdevice integration を選択 |
 
-表中の `→` は図の記法どおり lineage continuation であり、直接依存を意味しない。また各行は「一つの contract が後続機能を直接生んだ」という因果を主張するものではなく、**共存を可能にした architecture 上の接続点**を要約している。
+表中の`→`は図の記法どおりlineage continuationであり、直接依存を意味しない。また各行は「一つのcontractが後続機能を直接生んだ」という因果を主張するものではなく、**共存を可能にしたarchitecture上の接続点**を要約している。
 
-この表の各行は Part I の 6 軸と一対一には対応しない。6 軸は「何が変わったか」の分類であり、この表は「何が明示されたから、何が共存できたか」という読み方である。OBSERVABILITY は独立した行ではなく、typed drop reason、queue/NAPI identity、page_pool introspection、RDMA QP/MR/device-state tracing などを通じ、これらの接続点で実際に何が起きているかを検証する evidence layer として全行にかかる。
+この表の各行はPart Iの6軸と一対一には対応しない。6軸は「何が変わったか」の分類であり、この表は「何が明示されたから、何が共存できたか」という読み方である。OBSERVABILITYは独立した行ではなく、typed drop reason、queue/NAPI identity、page_pool introspection、RDMA QP/MR/device-state tracingなどを通じ、これらの接続点で実際に何が起きているかを検証するevidence layerとして全行にかかる。
 
-## 並行して進んだ architecture series
+## 並行して進んだarchitecture series
 
-explicit-contract architecture trend と並行して、別の設計軸も継続的に進化した。
+explicit-contract architecture trendと並行して、別の設計軸も継続的に進化した。
 
-- **Transport semantics / algorithms:** TFO、DCTCP/BBR、MPTCP、TCP-AO は、接続確立・輻輳制御・multipath・認証そのものを発展させた。
-- **Processing granularity:** GRO/GSO から BIG TCP への系列は、packet processing の単位を拡大して per-packet cost を下げた。
-- **Implementation scalability:** RPS/RFS/XPS や `dev_queue_xmit()` の llist 化は、CPU/queue placement や共有 qdisc の contention を改善した。
+- **Transport semantics / algorithms:** TFO、DCTCP、BBR、MPTCP、PLB、AccECNは、接続確立、輻輳制御、multipath、loss/ECN signalの扱いを発展させた。
+- **Processing granularity:** GRO/GSOからBIG TCPへの系列は、packet processingの単位を拡大してper-packet costを下げた。
+- **Implementation scalability:** `dev_queue_xmit()`のllist化などは、共有data structureのcontentionを減らす実装上のscalability改善である。
+- **CPU / queue placement:** RPS/RFS/XPSは、packet processingをどのCPU / queueに配置するかという系列であり、後のqueue assignment / leasingを理解する前史になる。
 
-これらを explicit contracts の派生として扱うのではなく、Linux networking を構成する並行 series として重ねて読む。explicit-contract architecture trend は、その中でも execution / memory / control model の共存を説明する横断軸である。
+これらをexplicit contractsの派生として扱うのではなく、Linux networkingを構成する並行seriesとして重ねて読む。explicit-contract architecture trendは、その中でもexecution / memory / control modelの共存を説明する横断軸である。
 
-## 6 軸への回帰
+## 6軸への回帰
 
-- **PERFORMANCE:** queueing は driver-local tuning から accounting / pacing / multi-layer scheduling へ進み、同時に BIG TCP や scalable TX のような contract 外の高速化も進んだ。
-- **PROGRAMMABILITY:** BPF/XDP は単一 fast path から socket / protocol / qdisc / virtual-device へ広がり、再利用可能な infrastructure になった。
-- **MEMORY:** page_pool から netmem / memory providers / device memory へ、allocation・lifetime・assignment が明示的になった。
-- **CONTROL PLANE:** reusable objects、transactional policy、YNL schema、per-netns / fine-grained locking により embedded / global state の範囲が縮小した。
-- **OBSERVABILITY:** typed reason / identity / tracing は、複雑化した programmable / offloaded / zero-copy path を operationally explainable にする evidence layer になった。
-- **DRIVER FRAMEWORK:** BQL、switchdev、devlink、phylink、DIM、page_pool、netdev-genl は driver-local convention を common contract へ引き上げた。
+- **PERFORMANCE:** queueingはdriver-local tuningからaccounting / pacing / multi-layer schedulingへ進み、同時にBIG TCPやscalable TXのようなcontract外の高速化も進んだ。
+- **PROGRAMMABILITY:** BPF/XDPは単一fast pathからsocket / protocol / qdisc / virtual-deviceへ広がり、再利用可能なinfrastructureになった。
+- **MEMORY:** page_poolからnetmem / memory providers / device memoryへ、allocation・lifetime・assignmentが明示的になった。
+- **CONTROL PLANE:** reusable objects、transactional policy、YNL schema、per-netns / fine-grained lockingによりembedded / global stateの範囲が縮小した。
+- **OBSERVABILITY:** typed reason / identity / tracingは、複雑化したprogrammable / offloaded / zero-copy pathをoperationally explainableにするevidence layerになった。
+- **DRIVER FRAMEWORK:** BQL、switchdev、devlink、phylink、DIM、page_pool、netdev-genlはdriver-local conventionをcommon contractへ引き上げた。
 
 ## 読者にとっての含意
 
@@ -1022,22 +1023,21 @@ explicit-contract architecture trend と並行して、別の設計軸も継続�
 - **operator / SRE:** `skb` packet traceだけを前提にせず、queue/NAPI、page_pool、offload state、RDMA QP/MRなど「どのobjectがどこで実行されているか」を観測対象にする。
 - **researcher / architect:** kernel bypass対kernel stackという二択より、control semanticsをどこに残し、data executionとmemory ownershipをどこへplacementするかというdesign spaceとして比較する。
 
-## 未完の仕事 — contract がまだ届いていない箇所
+## 未完の仕事 — contractがまだ届いていない箇所
 
-未完点は「次に入る機能」の一覧ではなく、**explicit contracts の適用範囲がまだ届いていない箇所**として読む。
+未完点は「次に入る機能」の一覧ではなく、**explicit contractsの適用範囲がまだ届いていない箇所**として読む。
 
-- **TX 側の queue assignment** — RX HW queue leasing は 7.1 に入ったが、TX queue leasing は未 merge である。assignment contract は RX 側に偏っている。
-- **global synchronization の縮小** — per-netns RTNL は global RTNL の一括置換ではなく、複数 release にわたる migration である。7.3-rc / mainline の RTNL-less FIB-rule 更新と per-netns netdev unregistration は、その途中経過にあたる。
-- **異種 memory の一般化** — netmem（6.9）と汎用 page_pool memory-provider hooks（6.15）は canonical boundary を確定した。残る課題は、より多くの driver / memory type がこの provider-aware model を利用できるようにすることである。
-- **execution placement の共通化** — switchdev path と TC offload path は並行経路のままであり、XDP も native / generic / offload で実行位置と必要な driver support が異なる。software と hardware のどちらで実行するかを扱う単一の contract はない。
-- **observability の coverage** — drop reason はすべての drop path に付くわけではなく、cross-layer の packet journey は今も tool 側の推論に依存する。
-- **Rust** — networking 側は PHY / core abstraction が中心で、一般的な high-performance NIC driver が Rust へ移行した段階ではない。
+- **TX側のqueue assignment** — RX HW queue leasingは7.1に入ったが、TX queue leasingは未mergeである。assignment contractはRX側に偏っている。
+- **global synchronizationの縮小** — per-netns RTNLはglobal RTNLの一括置換ではなく、複数releaseにわたるmigrationである。7.3-rc / mainlineのRTNL-less FIB-rule更新とper-netns netdev unregistrationは、その途中経過にあたる。
+- **異種memoryの一般化** — netmem（6.9）と汎用page_pool memory-provider hooks（6.15）はcanonical boundaryを確定した。残る課題は、より多くのdriver / memory typeがこのprovider-aware modelを利用できるようにすることである。
+- **execution placementの共通化** — switchdev pathとTC offload pathは並行経路のままであり、XDPもnative / generic / offloadで実行位置と必要なdriver supportが異なる。softwareとhardwareのどちらで実行するかを扱う単一のcontractはない。
+- **observabilityのcoverage** — drop reasonはすべてのdrop pathに付くわけではなく、cross-layerのpacket journeyは今もtool側の推論に依存する。
+- **Rust** — networking側はPHY / core abstractionが中心で、一般的なhigh-performance NIC driverがRustへ移行した段階ではない。
 
-これらは将来の release で評価が変わり得るため、確定史ではなく本書の open questions として扱う。
+これらは将来のreleaseで評価が変わり得るため、確定史ではなく本書のopen questionsとして扱う。
 
 
 ------------------------------------------------------------------------
-
 # Part VI — Canonical release chronology
 
 ここだけが **release attribution と Verification status の正本**である。 Part I–V の version 表記は story/lineage の参照であり、この表を上書きしない。
@@ -1068,9 +1068,10 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 
 `Architecture detail` 列は、各 milestone を Part III / IV の説明へ逆リンクする。ここでは release attribution を説明し直さず、**年表 → mechanism / object model → Part VII exact anchor または source audit** の順に辿れるようにする。`—` は milestone が独立した詳細節を必要としないか、現時点で release chronology のみを保持していることを意味する。
 
-### 3.0–3.18
 
 `Architecture detail` は年表の各 milestone と本文を1対1で再説明する列ではない。複数 milestone が同じ architecture series に属する場合は、共通の節へリンクする。たとえば bridge VLAN / MPLS / VRF は Routing / TC / offload 節、TCP zero-copy RX / socket zero-copy は io_uring / socket zero-copy 節で系列として読む。
+
+### 3.0–3.18
 
 | Release | Milestone | Axis | Domain | Verification status | Architecture detail |
 | :-------- | :------------------------------------------------ | :------------------------------- | :------------------ | ---------------- | --- |
