@@ -332,7 +332,7 @@ driver-facingなpage_pool detach/release mechanismはPart IVを正本とし、�
 
 io_uring networking は、socket I/O を一回ごとの syscall から submission/completion と登録済み resource の model へ移し、network buffer の lifetime と queue binding を userspace-visible な contract として扱う方向へ進んだ。6.0 世代の SEND_ZC / multishot receive は TX copy avoidance と receive batching を進め、6.15 の ZCRX は RX queue と userspace-owned memory の直接的な結び付きを追加した。
 
-TCP `MSG_ZEROCOPY` は send-side copy avoidance の先行 milestone であり、後の io_uring `SEND_ZC` と 同一 API ではないが、userspace↔kernel の data movement cost を減らす PERFORMANCE lineage の 重要な前段として扱う。
+TCP `MSG_ZEROCOPY` は send-side copy avoidance の先行 milestone であり、後の io_uring `SEND_ZC` と 同一 API とは別系統だが、userspace↔kernel の data movement cost を減らす PERFORMANCE lineage の 重要な前段として扱う。
 
 ``` text
 sendmsg / recvmsg
@@ -351,7 +351,7 @@ memory-provider / device-memory integration
 
 #### io_uring networking の resource model
 
-io_uring の networking は単に `sendmsg()` / `recvmsg()` を別 syscall へ置き換えるものではない。submission queue / completion queue により operation submission と completion harvesting を分離し、registered files/buffers や provided-buffer rings によって **I/O operation と resource registration の lifetime を分離**する。
+io_uring の networking は単に `sendmsg()` / `recvmsg()` を別 syscall へ置き換えるものとは異なる。submission queue / completion queue により operation submission と completion harvesting を分離し、registered files/buffers や provided-buffer rings によって **I/O operation と resource registration の lifetime を分離**する。
 
 `SEND_ZC` は送信時の userspace→kernel data copy を避ける方向だが、zero-copy completion は「send operation が完了した」ことと「userspace buffer を再利用してよい」ことを区別する必要がある。ZCRX ではさらに RX queue/page_pool/memory provider と registered userspace memory を接続するため、network queue ownership と buffer lifetime が io_uring object model の外部条件になる。このため本書では io_uring を syscall batching の話だけでなく、**registered resource + asynchronous completion + queue/memory placement** の系列として扱う。
 
@@ -361,7 +361,7 @@ io_uring の networking は単に `sendmsg()` / `recvmsg()` を別 syscall へ�
 
 `MSG_ZEROCOPY` は send path で userspace payload を kernel buffer へ copy する代わりに、userspace pages を networking TX path へ pin/reference して利用する。send syscall の return は buffer 再利用可能を意味しないため、zero-copy completion は socket error queue 経由で別途通知される。この **operation completion と memory lifetime completion の分離** は、後の io_uring `SEND_ZC` にも共通する。
 
-zero-copy には page pinning、completion notification、small-packet では copy の方が安い場合がある等の trade-off があり、単純に常時有効化する optimization ではない。Kernel documentation: <https://docs.kernel.org/networking/msg_zerocopy.html>
+zero-copy には page pinning、completion notification、small-packet では copy の方が安い場合がある等の trade-off があり、単純に常時有効化する optimization とは異なる。Kernel documentation: <https://docs.kernel.org/networking/msg_zerocopy.html>
 
 **Takeaway:** socket I/O を submission/completion と registered resources に分解し、ZCRX では queue と buffer/memory-provider の関係まで明示する方向へ進んだ。
 
@@ -370,118 +370,60 @@ zero-copy には page pinning、completion notification、small-packet では co
 ## CONTROL PLANE — forwarding objects, TC/offload, Netlink/RTNL
 
 <a id="detail-routing-tc-offload"></a>
-### Routing / TC / offload — forwarding semantics と hardware mapping の並行進化
+### Routing / TC / offload — forwarding object と hardware mapping
 
-routing / forwarding control は BPF だけでは説明できない。bridge VLAN filtering、MPLS、VRF は Linux 内部の forwarding domain / lookup semantics を明示した。TC/Flower の match/action と hardware-offload contract は後段の `TC classifier/action` でまとめて扱う。これらは後の hardware offload と接続するが、hardware offload には switchdev と並行する複数の driver path がある。
+routing/forwardingでは、bridge VLAN、MPLS、VRF、nexthop、TC policyを **kernel-visible object/state** として表し、必要に応じてdriver/hardwareへ写像する方向が進んだ。
 
 ``` text
-bridge VLAN filtering (3.9) ─┐
-MPLS routing (4.1)          ├─ Linux forwarding / routing semantics
-VRF device (4.3)            ┘
-
-Flower classifier (4.2) → TC match/action → ndo_setup_tc / flow-block callbacks → driver / hardware
-                                      ↘ TC ct action (5.3): conntrack state/metadata in TC
-
-bridge / FIB / VLAN objects → switchdev notifications / objects → switch driver / hardware
+bridge / VLAN / FIB ── canonical state ── switchdev ── hardware
+route ── nexthop object / group
+TC Flower + actions ── flow rule / callbacks ── driver / hardware
 ```
 
-ここで重要なのは、**switchdev と TC offload を一本の経路として扱わない**ことである。bridge/FDB/VLAN/FIB の object/notification path と、TC classifier/action の `ndo_setup_tc` / flow-block callback path は driver/hardware で合流し得るが、kernel API としては並行する経路である。
-
-
 <a id="detail-fib-nexthop"></a>
-#### FIB / nexthop object — route entry から reusable forwarding object へ
+#### FIB / nexthop object
 
-従来の route は gateway、output device、weight 等の nexthop 情報を route entry 側へ埋め込む形が中心だった。nexthop object はこれを独立した ID 付き object へ切り出し、複数 route から同じ nexthop または nexthop group を参照できるようにする。これにより route prefix の変更と forwarding adjacency の変更を分離でき、ECMP group の構成変更も「多数の route を書き換える」操作から「共有 object を更新する」操作へ寄せられる。
-
-この object 化は control-plane scalability だけでなく hardware offload にも意味がある。ASIC 側でも route table と adjacency/nexthop table は別 resource であることが多く、kernel 側に同様の identity/lifetime があると mapping しやすい。したがって nexthop API は本書の **reusable object / explicit identity** という CONTROL PLANE lineage の代表例である。
+nexthop objectはgateway/device/weight等をroute entryから独立したID付きobjectへ切り出し、複数routeから再利用できるようにした。prefixとforwarding adjacencyのlifecycleを分けられるため、ECMP更新やASICのadjacency resourceとの対応も明確になる。
 
 <a id="detail-tc"></a>
-#### TC classifier/action — packet policy を composable graph として表す
+#### TC classifier / action
 
-TC ingress/egress path では classifier が packet を識別し、action が drop、redirect/mirror、mark、police、conntrack 等の処理を行う。Flower は Ethernet/IP/L4/tunnel metadata 等を field-oriented key として表現するため、driver が hardware match key へ変換しやすい。`mirred`、`vlan`、`tunnel_key`、`ct` 等の action を組み合わせることで、単なる QoS scheduler を越えて host/switch datapath policy を表現できる。
+FlowerとTC actionsはmatch/action policyをfield-oriented representationとして表し、`ct`、redirect、VLAN、tunnel metadata等をcomposableに扱う。offloadではkernel側のpolicy representationをcanonical stateとして保ち、共通flow representation/callbackを通じてhardware executionへ配置する。
 
-offload 時には TC rule そのものが hardware-native rule へ置換されるのではなく、kernel が保持する classifier/action representation から `flow_rule` 等の共通表現を介して driver へ渡される。このため「何が offload 可能か」「一部 action だけ unsupported ならどうするか」「stats をどこから読むか」が contract になる。switchdev/devlink と同様、**kernel canonical state + optional hardware execution** という設計で読む。
+switchdevのbridge/FDB/VLAN/FIB object pathとTC offload pathは別のcontrol APIであり、driver/hardwareで交差する。この分離によって、forwarding semantics、policy representation、execution placementを独立に扱える。
 
-
-**Takeaway:** forwarding semantics を kernel の canonical state として保ちながら、bridge/FIB/TC policy を software または hardware execution へ写像できるようになった。switchdev と TC offload は同じ直列 API ではなく、別の control path が driver/hardware で交差する。
+**Takeaway:** routing/TC evolutionでは、forwarding adjacencyとpacket policyがnamed/reusable objectへ寄り、kernel canonical stateからsoftware/hardware executionを選べるcontrol boundaryが整備された。
 
 ------------------------------------------------------------------------
 
 <a id="detail-routing-netlink-rtnl"></a>
-### Routing / Netlink / RTNL
-
-Routing/control-plane scalability では、共有状態の削減、再利用可能な routing object、machine-readable API、lock scope の縮小が並行して進んだ。IPv4 route-cache removal（3.6）は per-destination shared cache を外した早い転換点であり、nexthop object や per-netns RTNL の直接の祖先ではないが、global/shared state を減らすという同じ scalability pressure に応えた。
-
-6.19 の WireGuard YNL-described Netlink は、machine-readable Netlink schema が個別 subsystem へ広がった例である。
-
-routing は nexthop object により:
-
-``` text
-route → embedded nexthop
-```
-
-だけでなく:
-
-``` text
-route → reusable nexthop object → group / resilient group
-```
-
-へ進んだ。
-
-Netlink は YNL により:
-
-``` text
-YAML specification
-├─ UAPI
-├─ policy
-├─ generated helper
-├─ documentation
-└─ userspace client
-```
-
-という machine-readable API の方向へ進む。
-
-RTNL は:
-
-``` text
-global RTNL
- → unlocked operations
- → RCU readers
- → per-netns RTNL
- → subsystem locks/refcounts
- → RTNL-less FIB rule updates (7.3-rc / mainline)
-```
-
-この `→` は direct extension を意味せず、global RTNL dependency を縮小する複数の locking / refactoring techniques が同じ設計方向に進んだことを示す。
-
-7.3 向け net-next pull では `RTM_NEWRULE` / `RTM_DELRULE` の FIB rule 変更が RTNL-lock-less 化され、further RTNL-dependency reduction や parallel GET 準備と 同じ「global RTNL 依存を減らす」流れとして mainline へ入った。
-
-さらに 7.3-rc / mainline では per-netns netdev unregistration infrastructure が入り、 per-netns RTNL の大きな blocker だった device unregistration path の分解も進んだ。 これは 6.13 以降の per-netns RTNL lineage の継続として扱う。
-
-
-#### Netlink / RTNL の詳細
-
-rtnetlink は link/address/route/neighbour/qdisc 等の network control object を userspace と kernel 間で操作する主要 API である。従来は多数の更新 path が global RTNL mutex に依存していたため、network namespace や device 数が増えると unrelated operation まで直列化される。近年の per-netns RTNL や subsystem-specific lock/refcount 化は、Netlink message format を変えることより **shared mutable state の保護範囲を縮小する**ことが主眼である。
-
-YNL は Generic Netlink family の YAML specification から userspace bindings/documentation/testing を生成できる仕組みで、attribute number を手書きする API から schema-driven control plane へ進める。netdev family が queue、NAPI、page_pool、XDP capability を object として公開することは、この方向の代表例である（<https://docs.kernel.org/networking/netlink_spec/netdev.html>）。
-
 <a id="detail-netdev-unreg"></a>
-#### per-netns netdev unregistration — teardown path も global RTNL から分離する
-
-per-netns RTNL 化では configuration fast path だけでなく、network namespace teardown 時の device unregistration も難所になる。2026 年の ip_tunnel series では per-netns tunnel hash table を mutex で保護し、`unregister_netdevice_queue_net()` を使って cross-netns device unregistration を扱えるようにする準備が進んだ。
-
-さらに uncached route cleanup を device ごとに global list scan することで `cleanup_net()` 中に高い RTNL contention が生じる問題に対し、batched device unregistration 後へ route flush をまとめる series も提案された。これは7.3 時点を「per-netns RTNL 完了」と呼ぶ根拠ではなく、**teardown / unregister / route cleanup を global serialization から段階的に外す進行中の infrastructure**として扱う。LWN: <https://lwn.net/Articles/1093636/> , <https://lwn.net/Articles/1098186/>
-
-
 <a id="detail-seg6-ioam"></a>
-#### Segment Routing / IOAM — packet header に path intent と telemetry を持たせる
+### Routing / Netlink / RTNL — object API と synchronization scope
 
-SRv6 は IPv6 Segment Routing Header (SRH) に segment list を持ち、endpoint behavior を通じて packet path/service function を指定する。Linux では route/seg6 local action として control plane へ統合され、encap/inline/local behavior を routing object として扱う。
+control-plane scalabilityでは、**reusable routing object、machine-readable API、global lock scopeの縮小**が並行して進んだ。
 
-IOAM は packet が通過する node/path の telemetry を packet 自身へ記録する仕組みで、単なる host-local tracing とは異なる。Observability axis で扱う BPF/BTF/drop reason が「kernel 内部を外から観測」するのに対し、IOAM は **network path 上で telemetry state を packet へ運ぶ**。両者は観測対象と placement が異なる。
+``` text
+route → nexthop object / group
 
+hand-written Netlink description
+        → YAML specification / YNL
+        → generated policy / docs / clients
 
-**Takeaway:** routing object と synchronization scope を明示し、global RTNL dependency を縮小する方向へ進んだ。
+global RTNL
+ → unlocked operations / RCU readers
+ → per-netns RTNL
+ → subsystem locks / refcounts
+ → RTNL-less FIB rule updates
+```
+
+IPv4 route-cache removal（3.6）はper-destination shared cacheを外した早いscalability milestoneである。nexthop objectはrouteとforwarding adjacencyを分離し、YNL/netdev-genlはNetlink family/attributesをmachine-readable schemaとgenerated toolingへ接続した。
+
+RTNL側では、多数のnetwork object更新を一つのglobal mutexで直列化するmodelから、operation/namespace/subsystemごとに保護範囲を縮める方向へ進んだ。6.13のper-netns RTNL開始、6.15以降の分解、7.3-rc/mainlineのRTNL-less FIB rule updateとper-netns netdev unregistrationは、このserialization scope縮小の連続したmilestoneである。teardown/unregisterも同じ対象に含まれるため、「configuration fast pathだけのlock分割」とは異なる。
+
+SRv6/IOAMは別のcontrol-plane展開として、routing objectからpacket path intentやpath telemetryを指定/運搬する。host-local BPF observabilityとは観測placementが異なるが、routing/control objectを通じてnetwork path behaviorを明示する例である。
+
+**Takeaway:** control planeはroute/device stateをnamed objectとschema-driven APIで表し、同時にglobal RTNL serializationをnamespace/subsystem単位へ縮小する方向へ進んだ。
 
 ------------------------------------------------------------------------
 
@@ -573,11 +515,11 @@ process VA ── MR ── eager pinned RAM
 GPU / device memory ── dma-buf ── RDMA MR ── RNIC
 ```
 
-ここでの変化は単なるzero-copy最適化ではない。**memory type、registration、permission、mapping、revocation/lifetimeを別々のcontractとして扱える範囲が広がった**ことが重要である。これはsocket/netdev側の `page_pool → netmem → memory providers` と異なるdatapath上で、よく似たarchitecture pressureへ応答した例になる。
+ここでの変化は単なるzero-copy最適化とは異なる。**memory type、registration、permission、mapping、revocation/lifetimeを別々のcontractとして扱える範囲が広がった**ことが重要である。これはsocket/netdev側の `page_pool → netmem → memory providers` と異なるdatapath上で、よく似たarchitecture pressureへ応答した例になる。
 
 #### AI / HPC と observability
 
-AI trainingはRDMAを生んだworkloadではないが、大規模collective communicationとaccelerator-resident dataによって、CPU involvement、system-memory copy、fabric congestionのcostを強く可視化した。RoCEv2/RDMAはその代表的transportであり、GPU/device memoryをRNICへ直接接続するdma-buf/P2P modelの価値も大きくなった。
+AI trainingはRDMAを生んだworkloadとは別系統だが、大規模collective communicationとaccelerator-resident dataによって、CPU involvement、system-memory copy、fabric congestionのcostを強く可視化した。RoCEv2/RDMAはその代表的transportであり、GPU/device memoryをRNICへ直接接続するdma-buf/P2P modelの価値も大きくなった。
 
 同時にexecutionをHCAへ移すほど、通常のkernel packet traceだけではfailureを説明しにくくなる。LPC 2025のproduction事例が示すように、large-model trainingではQP/MR/device-resource stateとapplication errorを結び付けるobservabilityが必要になる。これはPart Vの「evidence layer」のRDMA版である。
 
@@ -587,166 +529,61 @@ AI trainingはRDMAを生んだworkloadではないが、大規模collective comm
 
 <a id="detail-congestion-signals"></a>
 <a id="detail-transport"></a>
-### TCP / UDP / transport
+<a id="detail-mptcp"></a>
+### TCP / UDP / transport — connection / feedback / path semantics
 
-この節は **transport protocol 自体の semantics / feedback / path management** に絞る。 TCP 上で使われるという理由だけで、memory、aggregation、programmability の milestone を ここへ再収容しない。
+transportはpacket-memoryやprogrammabilityとは別に、**connection establishment、congestion feedback、multipath、authentication**そのものを更新してきた。
 
-#### Transport protocol evolution
+| Theme | Representative milestones | Semantics |
+|---|---|---|
+| establishment | TFO | handshake / early data |
+| congestion / feedback | DCTCP · BBR · PLB · AccECN | signal と sender/path behavior |
+| multipath | MPTCP | logical connection と subflow/path |
+| authentication | TCP-AO | connection authentication / keying |
 
-| Theme | Representative milestones | この節で追う意味 |
-|-------------------------------|----------------------------|--------------------------------------------|
-| connection establishment | TFO client / server | handshake latency / early data |
-| congestion control / feedback | DCTCP · BBR · PLB · AccECN | congestion signal と sender behavior |
-| multipath | MPTCP | 複数 path / subflow の transport semantics |
-| authentication | TCP-AO | TCP connection authentication |
+TFOはhandshakeとearly dataの境界を変える。DCTCPはECN marking、BBRはbandwidth/RTT model、PLBはpersistent congestionを受けたpath reselection、AccECNはより詳細なECN feedbackをtransport behaviorへ接続する。これらは同じalgorithmの世代交代ではなく、異なるsignal/modelをsender behaviorへ反映する並行進化である。
 
-これらも一本の派生系列ではない。
-
-TFO は handshake と application data の境界を変え、connection establishment latency を削減した。DCTCP は ECN marking を datacenter congestion feedback として積極的に利用し、BBR は loss を主信号とする従来型とは異なり bandwidth / RTT model に基づいて sending behavior を決める。PLB は ECMP 環境で persistent congestion を検出した flow の path を transport 側から再選択する。AccECN は CE feedback の情報量を増やし、より細かな congestion signal を transport に返す。
-
-MPTCP は一つの論理 connection の下に複数 subflow / address / path-manager state を持つ transport へ TCP semantics を拡張した。TCP-AO は connection authentication を現在の TCP option / key-management model に更新する。これらは packet-memory や BPF execution contract とは異なり、**transport が保持する connection / congestion / path / authentication semantics 自体**を変更する lineage である。
+MPTCPではapplicationから見える一つのbyte streamの下に複数subflowを持ち、logical connection、subflow、endpoint、address advertisement、scheduler/path managerが別stateになる。MP_CAPABLE/MP_JOINとDSS mapping、in-kernel/userspace Path Manager、Generic Netlink APIにより、**connection identityとpath managementを分離したobject/control model**が形成された。7.2のPM limit expansionはこのmodelのoperational scaleを広げる。
 
 ``` text
-connection establishment: TFO
-congestion control / feedback: DCTCP ∥ BBR ∥ PLB ∥ AccECN
-multipath: MPTCP
-authentication: TCP-AO
-```
-
-MPTCP は initial upstream から multi-subflow、userspace path manager、Generic Netlink、BPF integration へ発展し、7.2 の PM limit expansion は operational scale を広げたが、BBR や BIG TCP の後継ではない。
-
-#### 他の architecture lineage へ置く TCP 関連機能
-
-- **BIG TCP** — `Packet aggregation` を参照。
-- **Device Memory TCP** — `Packet memory` を参照。
-- **BPF congestion control / struct_ops** — `BPF` を参照。
-- **`TCP_ZEROCOPY_RECEIVE` / io_uring ZCRX** — zero-copy / memory-delivery mechanism として `io_uring networking` および `Packet memory` を参照。
-
-#### UDP
-
-UDP でも `MSG_ZEROCOPY` と GRO/GSO は copy cost と per-packet processing を減らす重要な PERFORMANCE milestone だが、protocol semantics の変更ではない。前者は socket zero-copy、 後者は aggregation の lineage として位置付ける。
-
-UDP は GRO/GSO、tunnel/encapsulation、high packet-rate RX、receive-buffer scaling の 基盤として発展してきた。ここでは UDP 固有の protocol lineage と、PERFORMANCE / VIRTUAL-OVERLAY 側で扱う packet aggregation・tunnel acceleration を混同しない。
-
-
-<a id="detail-mptcp"></a>
-#### MPTCP — connection と path を別 object として扱う
-
-MPTCP では application から見える 1 本の socket/byte stream の下に複数の TCP subflow を持つ。MP_CAPABLE で MPTCP connection を確立し、MP_JOIN で追加 subflow を参加させ、DSS mapping で MPTCP-level data sequence space と各 subflow の TCP sequence space を対応付ける。このため「TCP connection = 1 path」という従来の暗黙の対応が崩れ、**logical connection、subflow、local/remote endpoint、address advertisement、scheduler/path manager** が別々の state になる。
-
-Path Manager は subflow の生成・削除と `ADD_ADDR`/`REMOVE_ADDR` による address advertisement を担当する。現在は全 connection へ共通 rule を適用する in-kernel PM と、connection ごとに userspace daemon が判断できる userspace PM があり、Netlink API で endpoint/path state を制御する。これは TRANSPORT の中でも、本書の「implicit state を named object/control API へ出す」流れと強く接続する。
-
-```text
-object model:
 application byte stream
         ↓
-MPTCP connection / data sequence space
-        ├─ subflow A → path A
-        ├─ subflow B → path B
-        └─ Path Manager
-              ├─ endpoint object
-              ├─ ADD_ADDR / REMOVE_ADDR
-              └─ subflow create / destroy
+MPTCP connection
+   ├─ subflow / path A
+   ├─ subflow / path B
+   └─ Path Manager → endpoint / address / subflow lifecycle
 ```
 
-Kernel documentation: <https://docs.kernel.org/networking/mptcp.html>
+TCP_REPAIRはlive TCP stateをcheckpoint/restore lifecycleへ、TSQ/pacingはsocket-side bufferingとrate-controlled transmissionへ接続する。UDP側でもzero-copyやGRO/GSOが性能を広げたが、そのarchitecture上の意味はzero-copy/aggregation節で扱う。
 
-#### TCP のその他の重要な変化 — repair / small queues / pacing / auth
-
-`TCP_REPAIR` は checkpoint/restore 用途で socket state や sequence/window 情報を userspace から保存・復元できるようにし、live connection を process/container lifecycle と切り離す。TCP Small Queues (TSQ) は 1 socket が qdisc/device queue へ過剰な bytes を押し込むのを抑え、BQL が driver/hardware queue を制御するのに対して socket 側の buffering を制限する。
-
-TCP pacing は `sch_fq` と transport rate information を接続し、後の BBR 等が burst ではなく rate-controlled transmission を利用する基盤になった。TCP-AO は MD5 signature の後継として connection authentication/key management を拡張し、routing protocol 等の long-lived TCP session を security domain へ接続する。
-
-
-**Takeaway:** transport は explicit-contract thesis だけでは説明しない。TFO、DCTCP、BBR、MPTCP、PLB、AccECN は主に connection / congestion / path / feedback semantics 自体を更新する並行系列である。
+**Takeaway:** transport evolutionはconnection、feedback、path、authentication semanticsを独自に発展させ、その一部ではMPTCPのようにimplicitな「1 connection = 1 path」をexplicit object/control stateへ分解した。
 
 ------------------------------------------------------------------------
 
 <a id="detail-security"></a>
-### SECURITY / kTLS / XFRM / WireGuard — security semantics と execution placement の分離
+### SECURITY / kTLS / XFRM / WireGuard — security state と execution placement
 
-SECURITY は第 7 の architecture axis ではなく、TRANSPORT や VIRTUAL / OVERLAY と同じ **cross-cutting lineage** として扱う。ここで追う共通テーマは「暗号方式の変遷」そのものではなく、**security state / policy を kernel が保持し、その semantics を変えずに software・accelerator・NIC のどこで実行するかを明示的な contract で選べるようになったこと**である。
-
-``` text
-security semantics / state
-        │
-        ├─ TLS record state on TCP socket
-        │      ├─ kTLS TX (4.13)
-        │      ├─ kTLS RX (4.17)
-        │      ├─ TLS device offload TX (4.18)
-        │      └─ TLS device offload RX (4.19)
-        │
-        ├─ XFRM SA / policy
-        │      ├─ IPsec crypto offload
-        │      └─ packet offload (6.2)
-        │
-        └─ WireGuard peer / key / allowed-IP state (5.6)
-               └─ integrated L3 secure netdevice
-```
-
-#### kTLS — userspace handshake と kernel record datapath を分離する
-
-kTLS の origin は4.13 の `tls: kernel TLS support`（exact SHA は Part VII） である。TLS handshake と certificate/key-exchange policy を userspace に残し、handshake 完了後の symmetric crypto state を `setsockopt()` で TCP socket へ渡して、TLS record datapath を kernel へ移す。現在の kernel documentation も kTLS を TLS record subprotocol の実装として説明し、handshake は別の subprotocol として区別している。
-
-4.17 では `tls: RX path for ktls`（exact SHA は Part VII） により `TLS_RX`、`recvmsg`、`splice_read`、poll と record framing/decryption が加わり、TX だけだった record datapath が双方向になった。
-
-その次の転換は「kernel で crypto する」から「kernel が security semantics/state を保持したまま、crypto execution を device へ配置できる」ことである。`net/tls: Add generic NIC offload infrastructure`（exact SHA は Part VII） は TX の generic NIC offload contract を導入し、`tls: Add rx inline crypto offload`（exact SHA は Part VII） が RX 側を完成させた。kernel docs が示す `TLS_SW` と `TLS_HW` は別プロトコルではなく、同じ kTLS socket/API に対する **execution placement** の違いである。
-
-
-したがって kTLS の lineage は、
+SECURITYはTRANSPORTやVIRTUAL/OVERLAYを横断し、**kernel-visible security state/policyとcrypto/packet executionの配置を分離する**storyとして整理できる。
 
 ``` text
-userspace TLS record processing
-        ↓
-kernel-visible TLS record state
-        ↓
-software kTLS TX/RX
-        ↓
-same TLS semantics + NIC execution
+TLS socket state ── kTLS SW ── TLS NIC offload
+XFRM SA/policy ─── software ── crypto offload ── packet offload
+WireGuard peer/key/allowed-IP ── secure netdevice
 ```
 
-と読むのが本書の主要 architecture trend に最もよく対応する。
+kTLSはhandshake/key-exchange policyをuserspaceに残しつつ、established TLS record stateをTCP socketへ渡してTX/RX record processingをkernelへ配置する。generic TLS device offloadは同じsocket/security semanticsを維持したままcrypto executionをNICへ移せるようにした。
 
-#### XFRM/IPsec — SA/policy を canonical state として software / hardware execution を選ぶ
+XFRMではSA/policyがcanonical kernel stateであり、4.12のcrypto offloadは暗号処理をNICへ、6.2のpacket offloadはpolicy/encapsulationを含むより広いexecutionをhardwareへ配置する。ここではstate lifetime、rekey、policy synchronizationがoffload contractの中心になる。
 
-XFRM では kernel が Security Association (SA) と policy を保持する。device offload でもこの control-plane semantics を捨てるのではなく、`xfrmdev_ops` と netdev capability を介して driver/NIC へ実行を委譲する。
+WireGuardはpeer/key/allowed-IP stateを持つL3 secure tunnelを通常の`net_device`として統合し、RTNL、Generic Netlink、UDP tunnel、GRO/GSO、NAPI等の既存networking infrastructureへ接続する。kTLS/XFRMがexecution placementを広げる例なら、WireGuardはsecurity semanticsをstandard network object/APIへ統合する例である。
 
-XFRM device offload の origin は4.12 の `xfrmdev_ops` / IPsec hardware-offloading API であり、まず SA/ESP の **crypto offload** を可能にした（exact SHA は Part VII）。
+| Mechanism | Canonical state | Placement / integration |
+|---|---|---|
+| kTLS | TLS record/crypto state on TCP socket | software / NIC TLS |
+| XFRM/IPsec | SA + policy | software / crypto offload / packet offload |
+| WireGuard | peer + key + allowed-IP + netdevice | normal Linux network object/API |
 
-ここでは **crypto offload** と **packet offload** を区別する。crypto offload では NIC が encrypt/decrypt を担当する一方、packet construction や XFRM processing の多くは kernel 側に残る。6.2 世代の packet offload では SA だけでなく policy も kernel と NIC で同期し、NIC が encrypt/decrypt に加えて encapsulation と policy execution まで担当できる。代表 anchor は Part VII に記録する。
-
-``` text
-XFRM SA / policy = kernel canonical state
-        ├─ software IPsec
-        ├─ crypto offload
-        │     └─ crypto execution → NIC
-        └─ packet offload (6.2)
-              └─ SA + policy execution → NIC
-```
-
-これは Routing/TC/offload 節で見た「kernel object/policy を canonical state として hardware へ写像する」設計と同型だが、XFRM では security state、rekey/lifetime、policy synchronization が contract の中心になる。
-
-#### WireGuard — offload framework ではなく、secure tunnel を通常の netdevice として統合する
-
-WireGuard 5.6（exact SHA は Part VII） は kTLS / XFRM とは異なる方向である。WireGuard は L3 secure tunnel を kernel の network device driver として実装し、RTNL、generic Netlink、UDP tunnel API、GRO/GSO、NAPI など既存 networking infrastructure へ統合した。
-
-したがって WireGuard を「XFRM の次世代版」や「kTLS と同じ offload lineage」とは扱わない。security semantics を持つ実装が network stack の通常の object/API へ統合された例として、**SECURITY / VIRTUAL / OVERLAY** の交差点に置く。
-
-#### この lineage の範囲
-
-TCP-AO は transport authentication semantics 自体の更新なので Part III「TCP / UDP / transport」で扱う。WireGuard の YNL-described Netlink は secure-tunnel semantics の変更ではなく machine-readable control-plane API の展開なので Part III「Routing / Netlink / RTNL」で扱う。
-
-#### SECURITY lineage の architecture takeaway
-
-3 つの仕組みは protocol も object model も異なるが、Linux networking 全体の進化という観点では共通点がある。
-
-| Mechanism | Kernel-visible canonical state | Execution placement | 本書での意味 |
-|---|---|---|---|
-| kTLS | TCP socket に紐付く TLS record / crypto state | software crypto / NIC TLS offload | protocol semantics と crypto execution の分離 |
-| XFRM/IPsec | SA + policy | software / crypto offload / packet offload | policy/state と hardware execution の分離 |
-| WireGuard | peer / key / allowed-IP + netdevice | kernel implementation | secure tunnel を通常の network object/API へ統合 |
-
-**Takeaway:** security の進化も「専用 fast path への置換」ではなく、**security semantics / state を kernel-visible な contract として保持し、その execution placement や network integration を明示する方向**として読むことができる。この lineage は CONTROL PLANE・DRIVER FRAMEWORK・TRANSPORT・VIRTUAL / OVERLAY を横断し、security semantics/state と execution placement / network integration の関係を示す。
+**Takeaway:** securityではprotocol state/policyをkernel-visible contractとして保ち、software/NIC executionまたはstandard netdevice integrationを選べるようになった。これはCONTROL PLANE、DRIVER FRAMEWORK、TRANSPORT、VIRTUAL/OVERLAYの接続点である。
 
 ------------------------------------------------------------------------
 
