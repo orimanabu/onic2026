@@ -80,7 +80,9 @@ RX queue
 
 重要なのは旧 path が消えたことではない。**queue identity、memory provider、consumer、lifetime、synchronization を明示し、複数の execution / memory-ownership model を同じ network device 上で選択・共存させられるようになったこと**が本書で追う主要な architecture trend である。
 
-### 接続点の予告
+#Part IIの4 eraをこの観点で読み直すと、Era 1はqueue/accountingとmulticore scalabilityの基礎、Era 2はprogrammable execution point、Era 3はprogrammabilityを支えるcommon infrastructure、Era 4はheterogeneous I/Oとcontrol scalabilityを前面化した。後のeraが前のeraを置き換えるのではなく、**利用可能なexecution/memory/control modelと、それらを接続するcontractが累積した**ことが重要である。
+
+## 接続点の予告
 
 後半の Synthesis では、queue、packet memory、forwarding object、security state、observability evidence などを「どの object/resource を誰が所有・参照し、どこで実行し、どう同期するか」という接続点で比較する。Part I の表はこの命題の**例示**であり、検証そのものは Part VI の chronology と Part VII の anchor/evidence で行う。
 
@@ -176,6 +178,8 @@ Part II–V はこの thesis を architecture の観点から説明し、Part VI
 
 # Part II — Four architecture eras
 
+Part II の4 eraは、主要 trendを証明するための分類ではなく、各時期に前面化した **主要な engineering pressure** を時系列で整理する地図である。Part IIIでは、この時代区分を横切って継続したarchitecture seriesを追う。
+
 ここでの era は kernel major version の境界ではなく、**外部の圧力に対して networking architecture が主に何を解こうとしたか**で区切る。境界は重なり、ある era で始まった仕組みは後続 era でも継続して発展する。
 
 | Era | おおよその期間 | 外部の圧力 | 主問題 | 代表的な milestone |
@@ -211,9 +215,13 @@ How explicitly can placement, lifetime and synchronization be controlled?
 
 ------------------------------------------------------------------------
 
+### Part II から Part III へ
+
+4 eraを横に読むと、performance、programmability、memory、control plane、driver frameworkのpressureは同時には始まらず、同じ速度でも進まなかった。Part IIIでは時代の境界を外し、**queueing、aggregation、BPF/XDP、packet memory、control plane、virtualization、transport、security、RDMA**などのseriesごとに「何が暗黙から明示へ移ったか」を追う。
+
 # Part III — Long-term lineages
 
-Part III は **architecture story** を担当し、release 順ではなく同じ設計課題が長期間にどう変化したかを追う。各 topic は **位置づけ → lineage / mechanism → Takeaway** の順で読み、driver-internal mechanism は Part IV、observability primitive は Part V、release/provenance は Part VI–VII を正本とする。
+Part III は Part II の時代区分を横切る **architecture series** を追う。release 順の列挙ではなく、同じ設計課題が複数eraを通じてどう変化したかを **位置づけ → lineage / mechanism → Takeaway** の順で読む。各seriesはSynthesisで再び接続し、explicit-contract trendがどこに現れ、どこでは別の説明軸が必要かを回収する。driver-internal mechanismはPart IV、observability primitiveはPart V、release/provenanceはPart VI–VIIを正本とする。
 
 ## PERFORMANCE — queueing, aggregation, pacing, CPU/queue placement
 
@@ -977,9 +985,9 @@ pwru は **function-level trajectory** を広く探索する debugger として�
 
 # Synthesis — thesis への回帰と未完の仕事
 
-Linux networking の全機能が一つの原理へ収束したわけではない。transport、aggregation、RDMA、driver scalability はそれぞれ独自の問題を解いてきた。その一方で、複数の execution / memory model を同じ system で共存させる必要が高まるほど、queue、memory、policy、device state、synchronization を **明示的な contract と object** として扱う変更が繰り返し現れた。これが本書で追ってきた主要 architecture trend である。
+Linux networking の15年は、一つのmechanismへ収束した歴史ではなく、queueing、transport、programmability、memory、control plane、virtualization、security、driver frameworkなどが異なるpressureに応答して並行進化した歴史である。その中で複数seriesを横断して繰り返し現れたのが、**resource / state / lifetime / assignment / synchronization を明示的contractとして表し、複数のexecution / memory modelを同じsystemで共存させる**方向である。本書ではこれをLinux networking全体を還元する法則ではなく、15年間を理解するための主要architecture trendとして位置づける。
 
-Part I の「1 本の RX queue を誰が使うのか」に戻ると、2011 年頃には driver/NAPI/kernel stack に強く結び付いていた queue が、2026 年にはAF_XDP、io_uring ZCRX、device-memory path、virtual deviceなど複数consumerとの間でidentity/assignment/lifetimeを明示して扱える対象へ変わっている。重要なのは全packetが新しいpathへ移ったことではなく、**同じNIC resourceへ異なるmodelを安全に接続するための境界が増えたこと**である。
+Part I の「1 本の RX queue を誰が使うのか」に戻ると、Part IIのscalability pressure、Part IIIのXDP/AF_XDP・packet memory・io_uring・virtual networking、Part IVのdriver contractが一つの場所で交差する。2011年頃にはdriver/NAPI/kernel stackに強く結び付いていたqueueが、2026年にはAF_XDP、io_uring ZCRX、device-memory path、virtual deviceなど複数consumerとの間でidentity/assignment/lifetimeを明示して扱えるresourceへ変わっている。重要なのは全packetが新しいpathへ移ったことではなく、**同じNIC resourceへ異なるmodelを安全に接続するための境界が増えたこと**である。
 
 ## Contract が共存を可能にした接続点
 
