@@ -7,7 +7,7 @@ title: Linux Networking Evolution
 > **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras, Parts III–V the lineages / driver-framework / observability story. Part VI is the only normative release chronology, Part VII the provenance ledger, and Appendix material is supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02
-**構成改訂:** 2026-10-07（r55）
+**構成改訂:** 2026-10-07（r56）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
@@ -154,6 +154,12 @@ RX queue
 この分布は Era の違いも示す。Era 1 では accounting / API の基礎、Era 2–3 では reusable object / programmability、Era 4 では assignment / lifetime / synchronization の明示化が目立つ。ただし 各 Era は重なりを許し、この表は厳密な periodization ではない。
 
 この表は release attribution の正本ではない。version と Verification status は Part VI に従う。
+
+### RDMA をどう位置づけるか
+
+RDMA は本書の 6 軸に追加する第 7 の axis ではない。InfiniBand / RoCE の verbs path は通常の socket / `skb` datapath と異なる execution / memory model を長く持っており、**MEMORY・CONTROL PLANE・DRIVER FRAMEWORK を横断する比較対象**として扱う。
+
+特に modern AI / HPC workload では GPU / accelerator memory と NIC の間で copy と CPU involvement を減らすことが重要になるが、RDMA 自体は AI のために生まれた技術ではない。本書では「AI が RDMA を生んだ」とはせず、**AI workload が、registered memory・queue pair・completion queue・ODP・dma-buf/P2P といった既存 Linux RDMA contract の価値を強く可視化した**と位置づける。
 
 ### この thesis が説明しないもの
 
@@ -837,6 +843,57 @@ named netns もこの性質を利用しており、`/var/run/netns/NAME` を ope
 
 ------------------------------------------------------------------------
 
+<a id="detail-rdma"></a>
+### RDMA — registered memory から accelerator / peer memory へ
+
+RDMA は Linux networking の進化を説明するうえで重要な「別の datapath」である。通常の socket path が packet を kernel networking stack と `skb` を通して処理するのに対し、RDMA verbs は **QP (Queue Pair) / CQ (Completion Queue) / MR (Memory Region)** を明示的 object とし、あらかじめ登録した memory を HCA が DMA できるようにする。Linux 3.0 の時点ですでに成熟した subsystem であり、本書の対象期間は RDMA の誕生ではなく、**memory registration と execution/resource contract がどう一般化されたか**を見る。
+
+``` text
+registered userspace memory + QP/CQ
+              │
+              ├─ ODP (3.19)
+              │    └─ registration ≠ permanent pinning
+              │
+              ├─ Soft-RoCE / RXE (4.8)
+              │    └─ RDMA semantics ≠ dedicated RDMA HCA
+              │
+              └─ dma-buf MR (5.12)
+                   └─ registered memory ≠ ordinary userspace RAM
+                        → accelerator / GPU peer-memory use case
+```
+
+#### ODP — memory registration と physical pinning を分離する
+
+traditional MR registration は userspace virtual range を pin し、HCA が利用する DMA mapping を安定させる。この方式は高速だが、大きな MR では pinned memory pressure が問題になる。3.19 の On-Demand Paging (ODP) core support は、MR を登録することと全 page を最初から permanent に pin することを分離し、device fault / invalidation と memory-management lifecycle を協調させる方向を導入した。
+
+ここで重要なのは単なる paging optimization ではなく、**MR の virtual address contract と、その時点で resident / DMA-mapped な physical backing を別 lifecycle として扱えるようになったこと**である。
+
+#### Soft-RoCE — verbs semantics と hardware implementation を分離する
+
+4.8 の RXE (Soft-RoCE) は RDMA transport/verbs semantics を通常の Ethernet/IP networking 上で software implementation として実行できるようにした。性能面では dedicated HCA の代替ではないが、RDMA object model が特定 hardware implementation だけに閉じたものではないことを示す。
+
+これは本書の中心命題とも整合する。同じ API / object semantics に対して execution placement が hardware HCA と software RXE に分かれ得るためである。
+
+#### dma-buf MR — RDMA memory contract を device memory へ広げる
+
+5.12 の RDMA dma-buf memory-region support は、ordinary userspace VA だけでなく dma-buf を RDMA MR として import/register する共通経路を導入した。dma-buf は device 間で DMA-accessible buffer を共有する Linux の共通 object であり、RDMA 側では GPU VRAM 等の peer memory を system RAM へ copy せず NIC から利用する設計へ接続する。
+
+``` text
+GPU / accelerator memory
+        │  dma-buf
+        ▼
+RDMA MR / umem
+        │
+        ▼
+NIC DMA / peer-to-peer path
+```
+
+この点は modern AI networking と直接つながる。ただし「RDMA = AI networking」と単純化しない。AI training / inference cluster は RDMA/RoCE を大規模に利用する代表的 workload だが、kernel architecture 上の本質は **memory type、registration、mapping、revocation、device access を explicit contract にしたこと**である。2026 年にも RDMA の dma-buf export、generic UMEM buffer descriptor、Soft-RoCE dma-buf support などが提案されており、RDMA memory model は accelerator / P2P memory をより一般的に扱う方向へ進化を続けている。これら未確定 series は Part VI の canonical milestone には含めない。
+
+**Takeaway:** RDMA は通常の `skb` path を置き換える系列ではなく、registered-memory / verbs path という別 execution model である。ODP と dma-buf はその model の memory ownership/lifetime を一般化し、AI/HPC で重要な accelerator-to-NIC data movement を Linux の共通 memory contract へ近づけた。
+
+------------------------------------------------------------------------
+
 <a id="detail-congestion-signals"></a>
 <a id="detail-transport"></a>
 ### TCP / UDP / transport
@@ -1407,6 +1464,7 @@ Part II–V を通過すると、この 2 段のつながりを具体的に言�
 | queue occupancy | DQL/BQL → TSQ / `sch_fq` / pacing | socket・qdisc・driver が backlog を別々の層で制御する multi-layer control |
 | execution point | `bpf()` / maps / verifier → XDP・TC・cgroup・socket hooks → `struct_ops` / TCX / BPF qdisc | built-in stack と verified program が同じ packet・socket・algorithm を扱う |
 | packet memory | page_pool → netmem → memory providers | system-RAM page、userspace-owned buffer、device memory が同じ RX architecture に接続される |
+| registered / peer memory | RDMA MR → ODP → dma-buf MR | pinned userspace RAM、on-demand resident memory、accelerator/device memory を同じ verbs object model から扱う |
 | queue identity | AF_XDP queue / UMEM binding → netdev-genl queue/NAPI objects → RX HW queue leasing | NIC queue を kernel stack、AF_XDP、io_uring ZCRX、device-memory path、virtual device が用途に応じて使い分ける |
 | forwarding / device state | switchdev・devlink → representor / TC offload → XFRM packet offload | kernel が canonical semantics/control state を保持しながら software path と hardware path を選べる |
 | control-plane state | nexthop objects → YNL → per-netns RTNL | reusable object / machine-readable API / narrower synchronization scope の下で configuration を並行化する |
@@ -1419,7 +1477,7 @@ Part II–V を通過すると、この 2 段のつながりを具体的に言�
 
 ## Contract に還元しない並行系列
 
-15 年間の変化のすべてが上の表に収まるわけではない。**transport / protocol** では TFO・DCTCP・BBR・MPTCP・PLB・AccECN が接続確立、輻輳制御、multipath、feedback semantics を更新した。**processing unit** では GRO/GSO と BIG TCP が 1 回の処理で扱う単位を拡大した。**implementation scalability** では `dev_queue_xmit()` の llist 化のように、contract を変えずに実装を速くする変更が続いた。一方 **routing / forwarding** は第 5 の並行系列ではなく、CONTROL PLANE と VIRTUAL / OVERLAY、PROGRAMMABILITY / DRIVER FRAMEWORK が交差する **connection point** として扱う。bridge VLAN filtering、MPLS、VRF、Flower、TC `ct` action は、その接点で software forwarding semantics と hardware offload の関係を広げた。
+15 年間の変化のすべてが上の表に収まるわけではない。**transport / protocol** では TFO・DCTCP・BBR・MPTCP・PLB・AccECN が接続確立、輻輳制御、multipath、feedback semantics を更新した。**processing unit** では GRO/GSO と BIG TCP が 1 回の処理で扱う単位を拡大した。 **RDMA / accelerator I/O** は通常の `skb` path と並行する registered-memory datapath として発展し、ODP / dma-buf によって memory backing の選択肢を広げた。AI/HPC はこの系列の現代的な主要 consumer だが、RDMA 自体はそれ以前から存在する。**implementation scalability** では `dev_queue_xmit()` の llist 化のように、contract を変えずに実装を速くする変更が続いた。一方 **routing / forwarding** は第 5 の並行系列ではなく、CONTROL PLANE と VIRTUAL / OVERLAY、PROGRAMMABILITY / DRIVER FRAMEWORK が交差する **connection point** として扱う。bridge VLAN filtering、MPLS、VRF、Flower、TC `ct` action は、その接点で software forwarding semantics と hardware offload の関係を広げた。
 
 これらは thesis の例外ではなく、別の説明を要する並行系列である。本書の thesis は、どの系列を説明しているかを限定した上で成り立つ。
 
@@ -1509,6 +1567,7 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 
 | Release | Milestone | Axis | Domain | Verification status | Architecture detail |
 | :-------- | :------------------------------------- | :------------------------- | :--------------------- | ---------------- | --- |
+| 3.19 | RDMA On-Demand Paging core | MEMORY / DRIVER FRAMEWORK | — | anchor: Part VII | [RDMA](#detail-rdma) |
 | 3.19 | switchdev origin | DRIVER FRAMEWORK | — | release | [switchdev](#detail-switchdev) |
 | 3.19 | ipvlan | — | VIRTUAL / OVERLAY | release | [virtual networking](#detail-virtual) |
 | 3.19 | SO_ATTACH_BPF | PROGRAMMABILITY | — | release | [BPF](#detail-bpf) |
@@ -1519,6 +1578,7 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 4.3 | VRF device | CONTROL PLANE | VIRTUAL / OVERLAY | anchor: Part VII | [routing / TC / offload](#detail-routing-tc-offload) |
 | 4.6 | devlink | DRIVER FRAMEWORK | — | anchor: Part VII | [devlink](#detail-devlink) |
 | 4.7 | TC BPF direct packet access | PROGRAMMABILITY | — | release | [BPF](#detail-bpf) |
+| 4.8 | Soft-RoCE / RXE | DRIVER FRAMEWORK | — | anchor: Part VII | [RDMA](#detail-rdma) |
 | 4.8 | XDP | PROGRAMMABILITY | — | series + release | [XDP / AF_XDP](#detail-xdp-afxdp) |
 | 4.9 | BBR | — | TRANSPORT | anchor: Part VII | [transport](#detail-transport) |
 | 4.10 | cgroup BPF | PROGRAMMABILITY | — | series + release | [BPF](#detail-bpf) |
@@ -1568,6 +1628,7 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 5.7 | vDPA bus | DRIVER FRAMEWORK | VIRTUAL / OVERLAY | anchor: Part VII | [virtual networking](#detail-virtual) |
 | 5.9 | BPF_PROG_TYPE_SK_LOOKUP | PROGRAMMABILITY | — | anchor: Part VII | [BPF](#detail-bpf) |
 | 5.11 | auxiliary bus | DRIVER FRAMEWORK | — | anchor: Part VII | [auxiliary bus](#detail-auxiliary-bus) |
+| 5.12 | RDMA dma-buf memory region | MEMORY / DRIVER FRAMEWORK | — | anchor: Part VII | [RDMA](#detail-rdma) |
 | 5.12 | threaded NAPI | DRIVER FRAMEWORK | — | release | [threaded NAPI](#detail-threaded-napi) |
 | 5.17 | structured drop-reason foundation | OBSERVABILITY | — | release | [drop reason](#detail-drop-reason) |
 | 5.18 | XDP multi-buffer / frags generation | PROGRAMMABILITY | — | series + release | [XDP / AF_XDP](#detail-xdp-afxdp) |
@@ -1676,6 +1737,9 @@ Part VI は release chronology の正本である。各 milestone の `Architect
 | TLS device offload RX | integration | `4799ac81e52a72a6404827bf2738337bb581a174` | `tls: Add rx inline crypto offload` | completes generic RX device-offload infrastructure | v4.19 |
 | WireGuard | origin | `e7096c131e5161fa3b8e52a650d7719d2857adfd` | `net: WireGuard secure network tunnel` | L3 secure tunnel as normal netdevice | v5.6 |
 | XFRM packet offload | integration | `d14f28b8c1de668bab863bf5892a49c824cb110d` | `xfrm: add new packet offload flag` | packet-level IPsec offload; policy/SA synchronization with NIC | v6.2 |
+| RDMA On-Demand Paging core | enablement | `8ada2c1c0c1d75a60723cd2ca7d49c594a146af6` | `IB/core: Add support for on demand paging regions` | separates MR registration from eager/permanent page pinning and establishes ODP memory lifecycle | v3.19 |
+| Soft-RoCE / RXE | origin | `8700e3e7c4857d28ebaa824509934556da0b3e76` | `Soft RoCE driver` | software implementation of RoCE/RDMA verbs semantics over the Linux networking stack | v4.8 |
+| RDMA dma-buf memory region | integration | `368c0159d492d7fbdb5791b40c9263ec4e97a10f` | `RDMA/umem: Support importing dma-buf as user memory region` | imports dma-buf-backed memory into RDMA umem/MR lifecycle for device/peer memory | v5.12 |
 | BTF origin | origin | `69b693f0aefa0ed521e8bd02260523b5ae446ad7` | `bpf: btf: Introduce BPF Type Format (BTF)` | typed metadata for BPF program/map | v4.18 |
 | Net DIM common-library integration | integration | `4f75da3666c0c572967729a2401ac650be5581b6` | `linux/dim: Move implementation to .c files` | driver-local/header logic becomes common `lib/dim` implementation | v5.3 |
 | vDPA bus | origin | `961e9c84077f6c8579d7a628cbe94a675cb67ae4` | `vDPA: introduce vDPA bus` | common virtio datapath / vendor-control abstraction | v5.7 |
@@ -1697,11 +1761,13 @@ Part VI は release chronology の正本である。各 milestone の `Architect
 
 ### Upstream anchor audit status
 
-Part VII の 48 anchor は upstream Git object と照合済みである。48/48 で SHA と exact commit subject を確認し、final release が確定している 47 anchor は **記載 final tag が commit を含み、直前 final tag が含まない**ことを確認したため、first final release も47/47で再検証済みである。`net-next-7.3` merge (`91ec2035...`) は mainline merge と exact subject まで確認済みだが、この版の基準時点では final release 未確定なので `7.3 final pending` を維持する。
+Part VII の 51 anchor は upstream Git object と照合済みである。51/51 で SHA と exact commit subject を確認し、final release が確定している 50 anchor は **記載 final tag が commit を含み、直前 final tag が含まない**ことを確認したため、first final release も50/50で再検証済みである。`net-next-7.3` merge (`91ec2035...`) は mainline merge と exact subject まで確認済みだが、この版の基準時点では final release 未確定なので `7.3 final pending` を維持する。
 
 このため台帳では、機械監査できる **Exact subject** と、文書上の意味づけである **Architectural role** を別列にする。前者は Git object の属性、後者は本書の architecture synthesis における解釈であり、混同しない。
 
 ### Exact-anchor interpretation notes
+
+RDMA の 3 anchor は RDMA subsystem の起源を示すものではない。RDMA は v3.0 より前から Linux に存在する。本書では対象期間内の architecture boundary として、3.19 ODP を memory-registration lifecycle の一般化、4.8 RXE を execution implementation の分離、5.12 dma-buf MR を device/peer memory integration の代表点として採用する。
 
 `netmem` と memory providers は別の boundary である。6.9 の `netmem_ref` は **memory type を `struct page` から抽象化する型/API contract**、6.15 の memory-provider hooks は **page_pool が custom allocator/provider を選択する lifecycle/integration contract** である。Device Memory TCP RX は6.12 に専用経路で先行し、6.15 で devmem TCP と io_uring ZCRX が共通 provider interface へ整理された。
 
@@ -1729,6 +1795,17 @@ Appendix は supporting evidence / research provenance の索引である。本�
 - **NSDI 2025 — eTran** — eBPF によって kernel transport を extensible にし、TCP/DCTCP と Homa を実装。
 
 これらは Part VI / Part VII の canonical release/commit evidence と混同しない。
+
+### RDMA / accelerator-memory sources
+
+- Linux RDMA subsystem background / registered-memory model: <https://lwn.net/Articles/133649/>
+- ODP exact anchor: <https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=8ada2c1c0c1d75a60723cd2ca7d49c594a146af6>
+- Soft-RoCE exact anchor: <https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=8700e3e7c4857d28ebaa824509934556da0b3e76>
+- RDMA dma-buf exact anchor: <https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=368c0159d492d7fbdb5791b40c9263ec4e97a10f>
+- RDMA dma-buf design series / GPU peer-memory motivation: <https://lwn.net/Articles/839314/>
+- dma-buf framework: <https://docs.kernel.org/driver-api/dma-buf.html>
+- 2026 generic RDMA UMEM buffer-descriptor series (non-canonical / proposed): <https://lwn.net/Articles/1074879/>
+- 2026 Soft-RoCE dma-buf series (non-canonical / proposed): <https://lwn.net/Articles/1064824/>
 
 ## Kernel documentation / primary-source index
 
