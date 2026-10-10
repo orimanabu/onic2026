@@ -83,7 +83,7 @@ RX queue
 
 ## 接続点の予告
 
-後半の Synthesis では、queue、packet memory、forwarding object、security state、observability evidence などを「どの object/resource を誰が所有・参照し、どこで実行し、どう同期するか」という接続点で比較する。 Part I の表はこの命題の**例示**であり、検証そのものは Part VI の chronology と Part VII の anchor/evidence で行う。
+後半の Synthesis では、queue、packet memory、forwarding object、security state、observability evidence などを「どの object/resource を誰が所有・参照し、どこで実行し、どう同期するか」という接続点で比較する。 後掲の代表例の表はこの trend の**例示**であり、検証そのものは Part VI の chronology と Part VII の anchor/evidence で行う。
 
 
 ## Architecture evolution map
@@ -1038,6 +1038,7 @@ explicit-contract architecture trendと並行して、別の設計軸も継続�
 
 
 ------------------------------------------------------------------------
+
 # Part VI — Canonical release chronology
 
 ここだけが **release attribution と Verification status の正本**である。 Part I–V の version 表記は story/lineage の参照であり、この表を上書きしない。
@@ -1067,7 +1068,6 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 ### 年表から architecture detail への読み方
 
 `Architecture detail` 列は、各 milestone を Part III / IV の説明へ逆リンクする。ここでは release attribution を説明し直さず、**年表 → mechanism / object model → Part VII exact anchor または source audit** の順に辿れるようにする。`—` は milestone が独立した詳細節を必要としないか、現時点で release chronology のみを保持していることを意味する。
-
 
 `Architecture detail` は年表の各 milestone と本文を1対1で再説明する列ではない。複数 milestone が同じ architecture series に属する場合は、共通の節へリンクする。たとえば bridge VLAN / MPLS / VRF は Routing / TC / offload 節、TCP zero-copy RX / socket zero-copy は io_uring / socket zero-copy 節で系列として読む。
 
