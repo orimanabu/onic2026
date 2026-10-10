@@ -7,7 +7,7 @@ title: Linux Networking Evolution
 > **Clean canonical edition.** Part I presents the thesis, Part II the architecture eras, Parts III–V the lineages / driver-framework / observability story. Part VI is the only normative release chronology, Part VII the provenance ledger, and Appendix material is supporting evidence rather than an alternate release map.
 
 **調査基準日:** 2026-10-02
-**構成改訂:** 2026-10-07（r56）
+**構成改訂:** 2026-10-07（r57）
 
 この文書は、Linux networking の変化を「調査した順」ではなく、 **kernel networking がどのように進化したかを読む順序**に再構成した版である。
 
@@ -844,53 +844,149 @@ named netns もこの性質を利用しており、`/var/run/netns/NAME` を ope
 ------------------------------------------------------------------------
 
 <a id="detail-rdma"></a>
-### RDMA — registered memory から accelerator / peer memory へ
+### RDMA — explicit queue / memory objects から accelerator peer memory へ
 
-RDMA は Linux networking の進化を説明するうえで重要な「別の datapath」である。通常の socket path が packet を kernel networking stack と `skb` を通して処理するのに対し、RDMA verbs は **QP (Queue Pair) / CQ (Completion Queue) / MR (Memory Region)** を明示的 object とし、あらかじめ登録した memory を HCA が DMA できるようにする。Linux 3.0 の時点ですでに成熟した subsystem であり、本書の対象期間は RDMA の誕生ではなく、**memory registration と execution/resource contract がどう一般化されたか**を見る。
+RDMA は Linux networking の進化を説明するうえで重要な「別の datapath」である。通常の socket path が system call、socket buffer、kernel protocol stack を中心に構成されるのに対し、RDMA verbs は **QP (Queue Pair) / CQ (Completion Queue) / MR (Memory Region) / PD (Protection Domain)** を userspace-visible object として明示し、application が work request を queue へ post し、NIC/HCA が registered memory に DMA し、completion を CQ から回収する。
+
+`rdma_cm(7)` が RDMA CM を「socket に似ているが QP semantics に適応した connection-management API」と説明しているように、control path には address/route resolution と connection establishment が残る一方、data path は verbs object と queue を中心に進む。`ibv_create_qp(3)` は SQ/RQ と CQ の association、`ibv_post_send(3)` は work request の posting、`ibv_reg_mr(3)` は PD に属する MR と local/remote access permission、`lkey` / `rkey` を明示する。この object model 自体が、通常の socket/`skb` path とは異なる resource contract である。
 
 ``` text
-registered userspace memory + QP/CQ
-              │
-              ├─ ODP (3.19)
-              │    └─ registration ≠ permanent pinning
-              │
-              ├─ Soft-RoCE / RXE (4.8)
-              │    └─ RDMA semantics ≠ dedicated RDMA HCA
-              │
-              └─ dma-buf MR (5.12)
-                   └─ registered memory ≠ ordinary userspace RAM
-                        → accelerator / GPU peer-memory use case
+control / setup
+    RDMA CM: address → route → connection
+                         │
+                         ▼
+data / execution
+    QP: SQ/RQ -- work request --> NIC/HCA
+          │                         │
+          └------ CQ < completion --┘
+                         │
+                         ▼
+memory
+    PD ── MR ── {VA / ODP / dma-buf}
+           └── lkey / rkey / access permission
 ```
+
+Linux 3.0 の時点ですでに RDMA subsystem と verbs model は成熟していたため、本書は RDMA の「起源」を対象期間内へ無理に置かない。見るべき変化は、**transport placement、memory registration、memory backing、lifetime / invalidation、observability がどのように一般化されたか**である。
+
+#### RoCEv2 — RDMA semantics と Linux Ethernet/IP control plane の接続
+
+RDMA は InfiniBand fabric だけの話ではない。NetDev 1.1 の RDMA/LAG talk は upstream RDMA stack が IB / RoCE / iWARP を扱い、RoCE application が **RDMA-CM を control path、verbs を data path**として使う構造を整理している。Linux 4.5 の RDMA pull では core、mlx4、mlx5 の RoCEv2 support が入り、RoCEv2 は UDP/IP 上へ RDMA transport を載せることで routable Ethernet fabric と verbs datapath を接続した。
+
+``` text
+Linux netdev / IP addressing / route / ARP-ND
+                     │
+                  RDMA-CM
+                     │
+             RoCEv2 over UDP/IP
+                     │
+          QP / CQ / MR verbs datapath
+```
+
+ここは本書の CONTROL PLANE と DRIVER FRAMEWORK の重要な接続点である。IP address や route、bond/team 等の通常の netdev state が control plane に関与する一方、established RDMA data path の transport processing と memory access は HCA 側へ大きく placement される。したがって RoCE は「Linux network stack を完全に使わない」と説明するより、**Linux netdev/IP control state と offloaded verbs datapath を組み合わせる architecture**と捉える方が正確である。
+
+NetDev 0x16 の RDMA programming tutorial も、RDMA の特徴を asynchronous work/completion queues、kernel bypass、transport offload、one-sided operations、memory pre-registration/pinningとして整理し、同時に IB / RoCE / iWARP 等の transport difference と accelerator-memory extension を扱っている。これは socket path と RDMA path の比較基準として有用である。
 
 #### ODP — memory registration と physical pinning を分離する
 
-traditional MR registration は userspace virtual range を pin し、HCA が利用する DMA mapping を安定させる。この方式は高速だが、大きな MR では pinned memory pressure が問題になる。3.19 の On-Demand Paging (ODP) core support は、MR を登録することと全 page を最初から permanent に pin することを分離し、device fault / invalidation と memory-management lifecycle を協調させる方向を導入した。
+traditional MR registration は userspace virtual range を登録し、NIC が DMA できる backing memory と translation を安定させる。`ibv_reg_mr(3)` が示すように、MR は access permission と `lkey` / `rkey` を持つ explicit capability object でもある。
 
-ここで重要なのは単なる paging optimization ではなく、**MR の virtual address contract と、その時点で resident / DMA-mapped な physical backing を別 lifecycle として扱えるようになったこと**である。
-
-#### Soft-RoCE — verbs semantics と hardware implementation を分離する
-
-4.8 の RXE (Soft-RoCE) は RDMA transport/verbs semantics を通常の Ethernet/IP networking 上で software implementation として実行できるようにした。性能面では dedicated HCA の代替ではないが、RDMA object model が特定 hardware implementation だけに閉じたものではないことを示す。
-
-これは本書の中心命題とも整合する。同じ API / object semantics に対して execution placement が hardware HCA と software RXE に分かれ得るためである。
-
-#### dma-buf MR — RDMA memory contract を device memory へ広げる
-
-5.12 の RDMA dma-buf memory-region support は、ordinary userspace VA だけでなく dma-buf を RDMA MR として import/register する共通経路を導入した。dma-buf は device 間で DMA-accessible buffer を共有する Linux の共通 object であり、RDMA 側では GPU VRAM 等の peer memory を system RAM へ copy せず NIC から利用する設計へ接続する。
+3.19 の On-Demand Paging (ODP) core support は、MR を登録することと全 page を最初から permanent に pin することを分離した。kernel RDMA documentation の `ib_umem_odp_get()` は ODP memory について「pinning を避け、将来の page fault handling のため `mm` を保持し MMU notifier と協調する」と説明する。必要な範囲は fault 時に pin/DMA-map され、MMU invalidation と HCA translation update を同期する。
 
 ``` text
-GPU / accelerator memory
-        │  dma-buf
-        ▼
-RDMA MR / umem
-        │
-        ▼
-NIC DMA / peer-to-peer path
+traditional MR
+    register VA
+       └─ pin backing pages
+          └─ DMA map
+             └─ HCA translation
+
+ODP MR
+    register VA / access contract
+       └─ fault when needed
+          ├─ pin + DMA map current backing
+          └─ MMU invalidation ↔ HCA translation update
 ```
 
-この点は modern AI networking と直接つながる。ただし「RDMA = AI networking」と単純化しない。AI training / inference cluster は RDMA/RoCE を大規模に利用する代表的 workload だが、kernel architecture 上の本質は **memory type、registration、mapping、revocation、device access を explicit contract にしたこと**である。2026 年にも RDMA の dma-buf export、generic UMEM buffer descriptor、Soft-RoCE dma-buf support などが提案されており、RDMA memory model は accelerator / P2P memory をより一般的に扱う方向へ進化を続けている。これら未確定 series は Part VI の canonical milestone には含めない。
+ここで重要なのは単なる paging optimization ではない。**MR の virtual-address/access contract と、その時点で resident / DMA-mapped な physical backing を別 lifecycle として扱えるようになった**ことである。`ibv_advise_mr(3)` の prefetch advice は、その分離後に application が将来の access pattern を hint できることも示している。
 
-**Takeaway:** RDMA は通常の `skb` path を置き換える系列ではなく、registered-memory / verbs path という別 execution model である。ODP と dma-buf はその model の memory ownership/lifetime を一般化し、AI/HPC で重要な accelerator-to-NIC data movement を Linux の共通 memory contract へ近づけた。
+#### Soft-RoCE / RXE — verbs semantics と hardware implementation を分離する
+
+4.8 の RXE (Soft-RoCE) は RDMA/RoCE verbs semantics を software implementation として Ethernet/IP 上で実行できるようにした。性能面では dedicated HCA の代替ではないが、QP/CQ/MR という object model と RoCE semantics が特定 hardware implementation だけに閉じたものではないことを示す。
+
+これは本書の中心命題とも整合する。同じ API / object semantics に対して execution placement が hardware HCA と software RXE に分かれ得るためである。2026 年には RXE へ dma-buf support を加え、GPU 等が export した memory と zero-copy/P2P-like workflow を可能にする series も提案されている。これは未確定 series なので canonical chronology には入れない。
+
+#### PCI P2PDMA と dma-buf — 「どの memory を NIC が DMA するか」の一般化
+
+accelerator / storage / NIC 間の peer DMA を考えると、問題は単なる zero-copy ではない。**memory の owner は誰か、backing storage はどこか、NIC がその memory を addressable か、移動・invalidate・revoke と DMA access をどう同期するか**が contract になる。
+
+Linux PCI P2PDMA documentation は、RDMA driver が client となり RNIC が NVMe device の exposed memory へ直接 DMA する構成を明示している。一方 dma-buf は exporter が backing storage と migration を管理し、importer が `dma_buf_attachment` を通じて device access を得る cross-subsystem buffer-sharing framework である。最新 kernel documentation では importer の `allow_peer2peer` や mapping invalidation、`dma_resv` / fence synchronization まで contract に含まれる。
+
+5.12 の RDMA dma-buf MR support はこの dma-buf object を RDMA MR として import する共通経路を導入した。導入 series は GPU VRAM を明示的 motivation とし、従来の `get_user_pages()` + `dma_map_sg_attrs()` が `struct page` を持たない peer device memory には適さないこと、dma-buf dynamic attach と ODP を組み合わせて migration/invalidation を扱うことを説明している。
+
+``` text
+GPU / accelerator
+   owns backing memory
+          │
+       dma-buf fd
+          │
+          ▼
+   RDMA dma-buf MR
+    / umem importer
+          │
+   dynamic attach / map
+          │
+          ▼
+        RNIC
+          │
+       PCIe P2P
+```
+
+userspace API でも `ibv_reg_dmabuf_mr()` が dma-buf FD、offset、length、IOVA、access flags から MR を作るため、**「RDMA memory = process VA backed by ordinary RAM」ではない**ことが API 上も明示されている。
+
+#### AI / ML cluster — なぜこの lineage が再び中心になったか
+
+AI training は RDMA を生んだ workload ではない。しかし大規模 collective communication は大量の accelerator-resident data を node 間で移動するため、CPU involvement、system-memory copy、tail latency、memory bandwidth pressure を顕在化させる。NetDev 0x19 の “AI Networks - RoCEv2 and the role of netdev” workshop は、NCCL 等が socket/TCP または RDMA を利用できること、LLM 規模と 800G Ethernet により full socket-stack traversal の overhead が重要になったことを問題設定としている。同 conference の congestion-control talk も、AI/ML datacenter で RDMA/RoCEv2 が high-throughput / low-latency transport として使われる一方、large-scale fabric では congestion control が主要課題になることを扱う。
+
+したがって AI networking の story は単なる「高速 NIC」ではなく、
+
+``` text
+accelerator-resident state
+        │
+ explicit shared-memory object
+        │
+ registration / permission / lifetime
+        │
+ NIC execution + transport offload
+        │
+ high-bandwidth fabric
+```
+
+という **memory contract + execution placement + fabric control** の組み合わせとして読むべきである。これは page_pool/netmem/Device Memory TCP/io_uring ZCRX が socket/netdev 側で進めている異種 memory integration と対比できる。ただし両者を同一 datapath と見なしてはいけない。RDMA は QP/CQ/MR verbs model、socket/netdev 側は socket/NAPI/page_pool/netmem 等の model を維持したまま、それぞれ memory ownership/lifetime を explicit にしている。
+
+#### Observability — offload が大きいほど「kernel から見えない」が問題になる
+
+RDMA の execution placement は性能上の利点と同時に observability gap を作る。NetDev 0x17 の io_uring ZC RX talk は、RDMA では NIC が state と flow handling を担うため、failure 時の debugging や変更が難しくなる点を socket zero-copy path との trade-off として指摘している。
+
+この問題は AI cluster で operational issue になっている。LPC 2025 の “Lessons from scaling BPF to detect RDMA Device Drivers Bugs in real time” は、大規模 model training で RDMA-related syscall error が job failure に結びつき、application/kernel 間の hardware-resource view mismatch と RDMA syscall の opacity のため既存 observability が不足した事例を報告し、BPF を用いて kernel RDMA state を低 overhead で追跡する設計を議論している。
+
+これは Part V の thesis と直接接続する。execution を HCA へ移すほど kernel packet path の tracepoint だけでは説明できず、**QP/MR/CQ/device-resource state を object identity とともに観測する observability contract** が必要になる。
+
+#### 2026 — dma-buf が「共通 memory descriptor」へ近づく
+
+2026 年の RDMA development は dma-buf integration をさらに一般化する方向を示している。generic UMEM buffer-descriptor series は、uverbs command ごとに user VA と dma-buf 用の ad-hoc attribute を増やす代わりに、両者を共通 buffer descriptor で渡す infrastructure を提案している。また RDMA device memory 自体を dma-buf FD として export する series は、RDMA PCI-backed memory を graphics/media/other process と共有し、P2P DMA と revocation/lifecycle を共通 dma-buf semantics へ寄せようとしている。
+
+これらはこの版の基準時点では proposal / development evidence として扱い、Part VI の canonical milestone には入れない。しかし方向性としては、
+
+``` text
+userspace VA ─┐
+              ├─ generic UMEM buffer descriptor → QP/CQ/MR resource
+dma-buf fd ───┘
+
+RDMA device memory ── export as dma-buf ──> other subsystem/device
+```
+
+という形で、RDMA 内部の memory representation も「memory の種類ごとの特別 API」から **typed/shared buffer object + explicit lifetime** へ向かっている。
+
+**Takeaway:** RDMA は通常の `skb` path を置き換える系列ではなく、QP/CQ/MR と registered-memory を中心にした別 execution model である。RoCEv2 はそれを Linux netdev/IP control plane と接続し、ODP は registration と physical backing lifecycle を分離し、dma-buf MR は device/accelerator memory を同じ verbs memory contract へ接続した。AI/HPC はこの architecture の価値を強く可視化し、同時に congestion control と observability という新しい pressure を前面に出している。
 
 ------------------------------------------------------------------------
 
@@ -1473,7 +1569,7 @@ Part II–V を通過すると、この 2 段のつながりを具体的に言�
 
 表中の `→` は図の記法どおり lineage continuation であり、直接依存を意味しない。また各行は「一つの contract が後続機能を直接生んだ」という因果を主張するものではなく、**共存を可能にした architecture 上の接続点**を要約している。
 
-この表の各行は Part I の 6 軸と一対一には対応しない。6 軸は「何が変わったか」の分類であり、この表は「何が明示されたから、何が共存できたか」という読み方である。OBSERVABILITY は独立した行ではなく、typed drop reason、queue/NAPI identity、page_pool introspection などを通じ、これらの接続点で実際に何が起きているかを検証する evidence layer として全行にかかる。
+この表の各行は Part I の 6 軸と一対一には対応しない。6 軸は「何が変わったか」の分類であり、この表は「何が明示されたから、何が共存できたか」という読み方である。OBSERVABILITY は独立した行ではなく、typed drop reason、queue/NAPI identity、page_pool introspection、RDMA QP/MR/device-state tracing などを通じ、これらの接続点で実際に何が起きているかを検証する evidence layer として全行にかかる。
 
 ## Contract に還元しない並行系列
 
@@ -1576,6 +1672,7 @@ Part VI は chronology であり、この列は **参照先ではなく attribut
 | 4.1 | kprobe BPF milestone | OBSERVABILITY | — | series + release | [observability](#detail-observability) |
 | 4.2 | Flower classifier | PROGRAMMABILITY | — | anchor: Part VII | [TC / Flower](#detail-tc) |
 | 4.3 | VRF device | CONTROL PLANE | VIRTUAL / OVERLAY | anchor: Part VII | [routing / TC / offload](#detail-routing-tc-offload) |
+| 4.5 | RoCEv2 core + mlx4/mlx5 support | CONTROL PLANE / DRIVER FRAMEWORK | — | anchor: Part VII | [RDMA / RoCE](#detail-rdma) |
 | 4.6 | devlink | DRIVER FRAMEWORK | — | anchor: Part VII | [devlink](#detail-devlink) |
 | 4.7 | TC BPF direct packet access | PROGRAMMABILITY | — | release | [BPF](#detail-bpf) |
 | 4.8 | Soft-RoCE / RXE | DRIVER FRAMEWORK | — | anchor: Part VII | [RDMA](#detail-rdma) |
@@ -1737,6 +1834,7 @@ Part VI は release chronology の正本である。各 milestone の `Architect
 | TLS device offload RX | integration | `4799ac81e52a72a6404827bf2738337bb581a174` | `tls: Add rx inline crypto offload` | completes generic RX device-offload infrastructure | v4.19 |
 | WireGuard | origin | `e7096c131e5161fa3b8e52a650d7719d2857adfd` | `net: WireGuard secure network tunnel` | L3 secure tunnel as normal netdevice | v5.6 |
 | XFRM packet offload | integration | `d14f28b8c1de668bab863bf5892a49c824cb110d` | `xfrm: add new packet offload flag` | packet-level IPsec offload; policy/SA synchronization with NIC | v6.2 |
+| RoCEv2 generation merge | merge | `048ccca8c1c8f583deec3367d7df521bb1f542ae` | `Merge tag 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/dledford/rdma` | RDMA 4.5 pull containing core, mlx4 and mlx5 RoCEv2 support | v4.5 |
 | RDMA On-Demand Paging core | enablement | `8ada2c1c0c1d75a60723cd2ca7d49c594a146af6` | `IB/core: Add support for on demand paging regions` | separates MR registration from eager/permanent page pinning and establishes ODP memory lifecycle | v3.19 |
 | Soft-RoCE / RXE | origin | `8700e3e7c4857d28ebaa824509934556da0b3e76` | `Soft RoCE driver` | software implementation of RoCE/RDMA verbs semantics over the Linux networking stack | v4.8 |
 | RDMA dma-buf memory region | integration | `368c0159d492d7fbdb5791b40c9263ec4e97a10f` | `RDMA/umem: Support importing dma-buf as user memory region` | imports dma-buf-backed memory into RDMA umem/MR lifecycle for device/peer memory | v5.12 |
@@ -1761,13 +1859,13 @@ Part VI は release chronology の正本である。各 milestone の `Architect
 
 ### Upstream anchor audit status
 
-Part VII の 51 anchor は upstream Git object と照合済みである。51/51 で SHA と exact commit subject を確認し、final release が確定している 50 anchor は **記載 final tag が commit を含み、直前 final tag が含まない**ことを確認したため、first final release も50/50で再検証済みである。`net-next-7.3` merge (`91ec2035...`) は mainline merge と exact subject まで確認済みだが、この版の基準時点では final release 未確定なので `7.3 final pending` を維持する。
+Part VII の 52 anchor は upstream Git object と照合済みである。52/52 で SHA と exact commit subject を確認し、final release が確定している 51 anchor は **記載 final tag が commit を含み、直前 final tag が含まない**ことを確認したため、first final release も51/51で再検証済みである。`net-next-7.3` merge (`91ec2035...`) は mainline merge と exact subject まで確認済みだが、この版の基準時点では final release 未確定なので `7.3 final pending` を維持する。
 
 このため台帳では、機械監査できる **Exact subject** と、文書上の意味づけである **Architectural role** を別列にする。前者は Git object の属性、後者は本書の architecture synthesis における解釈であり、混同しない。
 
 ### Exact-anchor interpretation notes
 
-RDMA の 3 anchor は RDMA subsystem の起源を示すものではない。RDMA は v3.0 より前から Linux に存在する。本書では対象期間内の architecture boundary として、3.19 ODP を memory-registration lifecycle の一般化、4.8 RXE を execution implementation の分離、5.12 dma-buf MR を device/peer memory integration の代表点として採用する。
+RDMA の canonical rows は RDMA subsystem の起源を示すものではない。RDMA は v3.0 より前から Linux に存在する。4.5 RoCEv2 は core + mlx4 + mlx5 の複数 commit から成るため、Part VII では `048ccca8...` の RDMA pull merge を generation-level representative anchor とする。対象期間内の architecture boundary として、3.19 ODP を memory-registration lifecycle の一般化、4.5 RoCEv2 を Ethernet/IP control plane と verbs datapath の接続、4.8 RXE を execution implementation の分離、5.12 dma-buf MR を device/peer memory integration の代表点として採用する。
 
 `netmem` と memory providers は別の boundary である。6.9 の `netmem_ref` は **memory type を `struct page` から抽象化する型/API contract**、6.15 の memory-provider hooks は **page_pool が custom allocator/provider を選択する lifecycle/integration contract** である。Device Memory TCP RX は6.12 に専用経路で先行し、6.15 で devmem TCP と io_uring ZCRX が共通 provider interface へ整理された。
 
@@ -1798,14 +1896,43 @@ Appendix は supporting evidence / research provenance の索引である。本�
 
 ### RDMA / accelerator-memory sources
 
-- Linux RDMA subsystem background / registered-memory model: <https://lwn.net/Articles/133649/>
+**API / object model**
+
+- man7 `rdma_cm(7)` — socket-like connection management adapted to QP semantics: <https://man7.org/linux/man-pages/man7/rdma_cm.7.html>
+- man7 `ibv_create_qp(3)` — QP, SQ/RQ, CQ association and queue capacity: <https://man7.org/linux/man-pages/man3/ibv_create_qp.3.html>
+- man7 `ibv_create_cq(3)` — completion-queue object: <https://man7.org/linux/man-pages/man3/ibv_create_cq.3.html>
+- man7 `ibv_post_send(3)` — work-request posting and completion lifetime: <https://man7.org/linux/man-pages/man3/ibv_post_send.3.html>
+- man7 `ibv_reg_mr(3)` — MR, access flags, ODP and `ibv_reg_dmabuf_mr()`: <https://man7.org/linux/man-pages/man3/ibv_reg_mr.3.html>
+- man7 `ibv_advise_mr(3)` — ODP prefetch/advice semantics: <https://man7.org/linux/man-pages/man3/ibv_advise_mr.3.html>
+- Linux kernel RDMA/InfiniBand driver API — `ib_umem`, ODP fault/map/invalidation machinery: <https://kernel.org/doc/html/latest/driver-api/infiniband.html>
+
+**RoCE / execution placement**
+
+- NetDev 1.1 — Ethernet HA/LAG and RDMA; useful architecture summary of RDMA-CM control path vs verbs data path and RoCEv2 4.5: <https://www.netdevconf.info/1.1/talk-hw-high-availabity-and-link-aggregation-ethernet-switch-and-nic-rdma-using-linux-bondingteam.html>
+- Linux 4.5 RDMA pull merge containing core + mlx4 + mlx5 RoCEv2 support: <https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=048ccca8c1c8f583deec3367d7df521bb1f542ae>
+- NetDev 0x16 — RDMA programming tutorial (QP/CQ/MR, kernel bypass, transport offload, accelerator memory): <https://netdevconf.info/0x16/sessions/tutorial/rdma-programming-tutorial.html>
+- LPC 2017 RDMA microconference — system boot, OFA direction, paravirtual RDMA and subsystem integration context: <https://blog.linuxplumbersconf.org/2017/ocw/events/LPC2017/schedule.html>
+
+**Memory / peer-to-peer evolution**
+
 - ODP exact anchor: <https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=8ada2c1c0c1d75a60723cd2ca7d49c594a146af6>
 - Soft-RoCE exact anchor: <https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=8700e3e7c4857d28ebaa824509934556da0b3e76>
 - RDMA dma-buf exact anchor: <https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=368c0159d492d7fbdb5791b40c9263ec4e97a10f>
-- RDMA dma-buf design series / GPU peer-memory motivation: <https://lwn.net/Articles/839314/>
-- dma-buf framework: <https://docs.kernel.org/driver-api/dma-buf.html>
-- 2026 generic RDMA UMEM buffer-descriptor series (non-canonical / proposed): <https://lwn.net/Articles/1074879/>
+- LWN / linux-rdma — RDMA dma-buf design series; GPU VRAM, dynamic attach and ODP motivation: <https://lwn.net/Articles/839314/>
+- Linux dma-buf documentation — exporter/importer, attachment, P2P and synchronization/lifetime contract: <https://docs.kernel.org/driver-api/dma-buf.html>
+- Linux PCI P2PDMA documentation — RNIC as P2P client and direct DMA to peer-device memory: <https://docs.kernel.org/driver-api/pci/p2pdma.html>
+
+**AI / operations / current direction**
+
+- NetDev 0x19 — AI Networks: RoCEv2 and the role of netdev: <https://netdevconf.info/0x19/sessions/workshop/ai-networks-rocev2-and-the-role-of-netdev.html>
+- NetDev 0x19 — Congestion-control in AI/ML networks at datacenter scale: <https://netdevconf.info/0x19/sessions/talk/congestion-control-in-aiml-networks-at-datacenter-scale.html>
+- NetDev 0x17 — io_uring ZC RX comparison with RDMA/kernel-bypass trade-offs: <https://netdevconf.info/0x17/sessions/talk/fast-zc-rx-data-plane-using-io-uring.html>
+- LPC 2025 — BPF-based production observability for RDMA driver/resource failures in large-model training: <https://lpc.events/event/19/contributions/2177/>
+- 2026 RDMA dma-buf export series (non-canonical / proposed): <https://lwn.net/Articles/1056826/>
 - 2026 Soft-RoCE dma-buf series (non-canonical / proposed): <https://lwn.net/Articles/1064824/>
+- 2026 generic RDMA UMEM buffer-descriptor series (non-canonical / proposed): <https://lwn.net/Articles/1073183/>
+
+The searched Kernel Recipes archive did not yield a comparably direct RDMA architecture talk; therefore Kernel Recipes material is not used merely to fill the bibliography. The useful conference evidence for this topic came primarily from NetDev and Linux Plumbers.
 
 ## Kernel documentation / primary-source index
 
